@@ -125,7 +125,7 @@ export function AppHeader() {
 
           <Popover open={notifOpen} onOpenChange={setNotifOpen}>
             <PopoverTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground relative">
+              <Button variant="ghost" size="icon" className="text-muted-foreground relative" aria-label="Notifications">
                 <Bell size={18} />
                 {notificationCount > 0 && (
                   <span className="absolute top-1.5 right-1.5 w-4 h-4 flex items-center justify-center text-[9px] font-bold rounded-full bg-destructive text-destructive-foreground">

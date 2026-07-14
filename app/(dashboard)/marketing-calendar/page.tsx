@@ -23,9 +23,14 @@ export default function MarketingCalendarPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await getCalendarEvents();
-    setEvents(data);
-    setLoading(false);
+    try {
+      const data = await getCalendarEvents();
+      setEvents(data);
+    } catch {
+      toast.error('Failed to load calendar events');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);

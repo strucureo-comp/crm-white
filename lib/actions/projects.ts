@@ -1,7 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
-import { updateProject, createProject, createNotification } from '@/lib/firebase/database';
+import { updateProject, createProject } from '@/lib/firebase/database';
 import { Project } from '@/lib/db/types';
 
 export async function updateProjectAction(projectId: string, updates: Partial<Project>, path?: string) {

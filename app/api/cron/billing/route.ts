@@ -27,8 +27,6 @@ export async function GET(req: Request) {
         billingDate.setHours(0, 0, 0, 0);
 
         if (today >= billingDate) {
-          console.log(`Processing billing for project: ${project.title} (${project.id})`);
-
           const invoiceNumber = `INV-${Date.now().toString().slice(-6)}-${project.title.slice(0, 3).toUpperCase()}`;
 
           const invoiceId = await createInvoice({

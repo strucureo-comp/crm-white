@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -44,8 +44,12 @@ const defaultForm = {
 };
 
 export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProps) {
-  const [form, setForm] = useState(() => lead
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (lead) {
+      setForm({
         name: lead.name,
         email: lead.email,
         company: lead.company || '',
@@ -55,10 +59,11 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
         potential_value: lead.potential_value || 0,
         probability: lead.probability || 0,
         notes: lead.notes || '',
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [lead]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -37,15 +37,20 @@ const defaultForm = {
 };
 
 export function CalendarEventDialog({ open, onOpenChange, onSaved, event }: CalendarEventDialogProps) {
-  const [form, setForm] = useState(() => event
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (event) {
+      setForm({
         title: event.title,
         type: event.type,
         date: event.date.split('T')[0],
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [event]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

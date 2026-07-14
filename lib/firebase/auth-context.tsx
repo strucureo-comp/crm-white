@@ -6,7 +6,7 @@ import {
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
   signOut as firebaseSignOut,
-  onAuthStateChanged,
+  onIdTokenChanged,
   sendPasswordResetEmail,
 } from 'firebase/auth';
 import { ref, set, get, child } from 'firebase/database';
@@ -92,13 +92,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+    const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setFirebaseUser(firebaseUser);
         await fetchUser(firebaseUser);
+        try {
+          const idToken = await firebaseUser.getIdToken();
+          await fetch('/api/auth/session', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ idToken }),
+          });
+        } catch (e) {
+          console.error('Failed to set session cookie:', e);
+        }
       } else {
         setFirebaseUser(null);
         setUser(null);
+        try {
+          await fetch('/api/auth/session', { method: 'DELETE' });
+        } catch (e) {
+          console.error('Failed to clear session cookie:', e);
+        }
       }
       setLoading(false);
     });

@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Search, Trophy, MessageSquare, Phone, Mail, MoreHorizontal, Pencil } from 'lucide-react';
+import { Plus, Search, Trophy, MessageSquare, Phone, Mail, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import {
   DropdownMenu,
@@ -13,10 +13,11 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getUsers } from '@/lib/firebase/database';
+import { getUsers, deleteUser } from '@/lib/firebase/database';
 import type { User } from '@/lib/db/types';
 import { toast } from 'sonner';
 import { TeamDialog } from '@/components/dialogs/team-dialog';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 const roleColors: Record<string, string> = {
   admin: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400',
@@ -31,6 +32,7 @@ export default function TeamPage() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<'edit' | 'invite'>('invite');
   const [editingUser, setEditingUser] = useState<User | null>(null);
+  const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
     setLoading(true);
@@ -57,6 +59,25 @@ export default function TeamPage() {
     setDialogOpen(true);
   }
 
+  async function handleDelete(id: string) {
+    setConfirmState({ open: true, id });
+  }
+
+  async function onDeleteConfirm() {
+    const id = confirmState.id;
+    if (!id) return;
+    setConfirmState((prev) => ({ ...prev, loading: true }));
+    try {
+      await deleteUser(id);
+      toast.success('Member removed');
+      load();
+    } catch {
+      toast.error('Failed to remove member');
+    } finally {
+      setConfirmState({ open: false });
+    }
+  }
+
   if (loading) {
     return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading team...</p></div>;
   }
@@ -69,7 +90,7 @@ export default function TeamPage() {
           <p className="text-sm text-muted-foreground">Manage your team and track performance</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast.info('Team chat coming soon')} className="text-xs sm:text-sm">
+          <Button variant="outline" size="sm" onClick={() => toast.message('Team chat coming soon')} className="text-xs sm:text-sm">
             <MessageSquare size={14} className="mr-1.5" />
             Team Chat
           </Button>
@@ -109,13 +130,16 @@ export default function TeamPage() {
                       </Badge>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Member actions">
                             <MoreHorizontal size={14} />
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-36">
                           <DropdownMenuItem onClick={() => openEdit(user)}>
                             <Pencil size={14} className="mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(user.id)}>
+                            <Trash2 size={14} className="mr-2" /> Remove
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
@@ -175,6 +199,15 @@ export default function TeamPage() {
         onSaved={load}
         user={editingUser}
         mode={dialogMode}
+      />
+
+      <ConfirmDialog
+        open={confirmState.open}
+        onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
+        title="Remove member"
+        description="Are you sure you want to remove this team member? This action cannot be undone."
+        onConfirm={onDeleteConfirm}
+        loading={confirmState.loading}
       />
     </div>
   );

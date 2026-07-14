@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AiConversationDialog } from '@/components/dialogs/ai-conversation-dialog';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { getAiConversations, createAiConversation, updateAiConversation, deleteAiConversation } from '@/lib/firebase/database';
 import type { AiConversation, AiMessage } from '@/lib/db/types';
 import { toast } from 'sonner';
@@ -44,6 +45,7 @@ export default function AiAssistantPage() {
   const [sending, setSending] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const { user } = useAuth();
   const historyRef = useRef<HTMLDivElement>(null);
 
   const activeConversation = conversations.find((c) => c.id === activeId) || null;
@@ -69,7 +71,7 @@ export default function AiAssistantPage() {
         title: message.slice(0, 40) + (message.length > 40 ? '...' : ''),
         assistant: 'tara',
         messages: [],
-        created_by: '',
+        created_by: user?.id || '',
       });
       if (!id) return;
       conv = { id, title: message.slice(0, 40), assistant: 'tara', messages: [], created_by: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -88,7 +90,7 @@ export default function AiAssistantPage() {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assistant: conv.assistant }),
+        body: JSON.stringify({ assistant: conv.assistant, message: userMsg.message, messages: updatedMessages }),
       });
       if (res.ok) {
         const data = await res.json();

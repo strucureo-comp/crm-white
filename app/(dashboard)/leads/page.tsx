@@ -234,7 +234,7 @@ export default function LeadsPage() {
                   render: (lead) => (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9">
+                        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Lead actions">
                           <MoreHorizontal size={14} />
                         </Button>
                       </DropdownMenuTrigger>

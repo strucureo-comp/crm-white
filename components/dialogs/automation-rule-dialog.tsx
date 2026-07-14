@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -37,15 +37,20 @@ const defaultForm = {
 };
 
 export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: AutomationRuleDialogProps) {
-  const [form, setForm] = useState(() => rule
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (rule) {
+      setForm({
         trigger: rule.trigger,
         action: rule.action,
         status: rule.status,
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [rule]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

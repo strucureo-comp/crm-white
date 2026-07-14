@@ -869,6 +869,55 @@ export async function updateQuotation(quotationId: string, updates: Partial<Quot
   }
 }
 
+export async function convertQuotationToInvoice(quotation: Quotation): Promise<string | null> {
+  try {
+    const invoiceId = await createInvoice({
+      project_id: quotation.project_id || '',
+      client_id: quotation.client_id,
+      invoice_number: `INV-${Date.now()}`,
+      amount: quotation.amount,
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      status: 'pending',
+      description: quotation.description || `Invoice for ${quotation.quotation_number}`,
+    });
+
+    if (invoiceId) {
+      await updateQuotation(quotation.id, { status: 'accepted' });
+    }
+
+    return invoiceId;
+  } catch (error) {
+    console.error('Error converting quotation to invoice:', error);
+    return null;
+  }
+}
+
+export async function markInvoiceAsPaid(
+  invoiceId: string,
+  paymentData: { amount: number; payment_method: string; transaction_id?: string }
+): Promise<boolean> {
+  try {
+    const now = new Date().toISOString();
+    await updateInvoice(invoiceId, {
+      status: 'paid',
+      paid_at: now,
+    });
+
+    await createTransaction({
+      type: 'income',
+      amount: paymentData.amount,
+      category: 'invoice_payment',
+      description: `Payment for invoice ${invoiceId}`,
+      date: now,
+      created_by: '',
+    });
+
+    return true;
+  } catch (error) {
+    console.error('Error marking invoice as paid:', error);
+    return false;
+  }
+}
 
 export async function deleteQuotation(quotationId: string): Promise<boolean> {
   try {
@@ -1556,6 +1605,288 @@ export async function updateAiConversation(id: string, updates: Partial<AiConver
 export async function deleteAiConversation(id: string): Promise<boolean> {
   try {
     await remove(ref(database, `ai_conversations/${id}`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ----------------------------------------------------
+// TEAM MEMBER FUNCTIONS
+// ----------------------------------------------------
+
+export async function getTeamMembers(): Promise<TeamMember[]> {
+  try {
+    const refPath = ref(database, 'team_members');
+    const snapshot = await get(refPath);
+
+    if (!snapshot.exists()) return [];
+
+    const items: TeamMember[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as TeamMember);
+    });
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function getTeamMember(id: string): Promise<TeamMember | null> {
+  try {
+    const refPath = ref(database, `team_members/${id}`);
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return null;
+    return { id: snapshot.key, ...snapshot.val() } as TeamMember;
+  } catch {
+    return null;
+  }
+}
+
+export async function createTeamMember(data: Omit<TeamMember, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'team_members');
+    const newRef = push(refPath);
+    const now = new Date().toISOString();
+    await set(newRef, cleanData({ ...data, created_at: now, updated_at: now }));
+
+    const admins = await getAdmins();
+    for (const admin of admins) {
+      await createNotification({
+        user_id: admin.id,
+        title: 'New Team Member Added',
+        message: `${data.name} has been added as a team member.`,
+        type: 'system',
+        link: `/admin/team`,
+        read: false
+      });
+    }
+
+    return newRef.key;
+  } catch {
+    return null;
+  }
+}
+
+export async function updateTeamMember(id: string, updates: Partial<TeamMember>): Promise<boolean> {
+  try {
+    const refPath = ref(database, `team_members/${id}`);
+    await update(refPath, cleanData({ ...updates, updated_at: new Date().toISOString() }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function deleteTeamMember(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `team_members/${id}`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ----------------------------------------------------
+// SALARY PAYMENT FUNCTIONS
+// ----------------------------------------------------
+
+export async function getSalaryPayments(teamMemberId?: string): Promise<SalaryPayment[]> {
+  try {
+    const refPath = ref(database, 'salary_payments');
+    const snapshot = await get(refPath);
+
+    if (!snapshot.exists()) return [];
+
+    const items: SalaryPayment[] = [];
+    snapshot.forEach((child) => {
+      const item = { id: child.key, ...child.val() } as SalaryPayment;
+      if (!teamMemberId || item.team_member_id === teamMemberId) {
+        items.push(item);
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function createSalaryPayment(data: Omit<SalaryPayment, 'id' | 'created_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'salary_payments');
+    const newRef = push(refPath);
+    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString() }));
+    return newRef.key;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteSalaryPayment(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `salary_payments/${id}`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ----------------------------------------------------
+// PROJECT FILE FUNCTIONS
+// ----------------------------------------------------
+
+export async function getProjectFiles(projectId: string): Promise<ProjectFile[]> {
+  try {
+    const refPath = ref(database, 'project_files');
+    const snapshot = await get(refPath);
+
+    if (!snapshot.exists()) return [];
+
+    const items: ProjectFile[] = [];
+    snapshot.forEach((child) => {
+      const item = { id: child.key, ...child.val() } as ProjectFile;
+      if (item.project_id === projectId) {
+        items.push(item);
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function createProjectFile(data: Omit<ProjectFile, 'id' | 'created_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'project_files');
+    const newRef = push(refPath);
+    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString() }));
+    return newRef.key;
+  } catch {
+    return null;
+  }
+}
+
+export async function deleteProjectFile(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `project_files/${id}`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ----------------------------------------------------
+// PROJECT UPDATE FUNCTIONS
+// ----------------------------------------------------
+
+export async function getProjectUpdates(projectId: string): Promise<ProjectUpdate[]> {
+  try {
+    const refPath = ref(database, 'project_updates');
+    const snapshot = await get(refPath);
+
+    if (!snapshot.exists()) return [];
+
+    const items: ProjectUpdate[] = [];
+    snapshot.forEach((child) => {
+      const item = { id: child.key, ...child.val() } as ProjectUpdate;
+      if (item.project_id === projectId) {
+        items.push(item);
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function createProjectUpdate(data: Omit<ProjectUpdate, 'id' | 'created_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'project_updates');
+    const newRef = push(refPath);
+    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString() }));
+    return newRef.key;
+  } catch {
+    return null;
+  }
+}
+
+// ----------------------------------------------------
+// SUPPORT MESSAGE FUNCTIONS
+// ----------------------------------------------------
+
+export async function getSupportMessages(requestId: string): Promise<SupportMessage[]> {
+  try {
+    const refPath = ref(database, 'support_messages');
+    const snapshot = await get(refPath);
+
+    if (!snapshot.exists()) return [];
+
+    const items: SupportMessage[] = [];
+    snapshot.forEach((child) => {
+      const item = { id: child.key, ...child.val() } as SupportMessage;
+      if (item.support_request_id === requestId) {
+        items.push(item);
+      }
+    });
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function createSupportMessage(data: Omit<SupportMessage, 'id' | 'created_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'support_messages');
+    const newRef = push(refPath);
+    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString() }));
+    return newRef.key;
+  } catch {
+    return null;
+  }
+}
+
+// ----------------------------------------------------
+// PAYMENT FUNCTIONS
+// ----------------------------------------------------
+
+export async function getPayments(): Promise<Payment[]> {
+  try {
+    const refPath = ref(database, 'transactions');
+    const snapshot = await get(refPath);
+
+    if (!snapshot.exists()) return [];
+
+    const items: Payment[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as Payment);
+    });
+
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch {
+    return [];
+  }
+}
+
+export async function getPayment(id: string): Promise<Payment | null> {
+  try {
+    const refPath = ref(database, `transactions/${id}`);
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return null;
+    return { id: snapshot.key, ...snapshot.val() } as Payment;
+  } catch {
+    return null;
+  }
+}
+
+export async function updatePayment(id: string, updates: Partial<Payment>): Promise<boolean> {
+  try {
+    const refPath = ref(database, `transactions/${id}`);
+    await update(refPath, cleanData({ ...updates, updated_at: new Date().toISOString() }));
     return true;
   } catch {
     return false;

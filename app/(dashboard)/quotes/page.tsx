@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Download, Eye, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Search, Download, Eye, MoreHorizontal, Pencil, Trash2, FileText } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -21,7 +21,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { ResponsiveTable } from '@/components/ui/responsive-table';
-import { getQuotations, deleteQuotation } from '@/lib/firebase/database';
+import { getQuotations, deleteQuotation, convertQuotationToInvoice } from '@/lib/firebase/database';
 import type { Quotation } from '@/lib/db/types';
 import { QuoteDialog } from '@/components/dialogs/quote-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
@@ -51,9 +51,14 @@ export default function QuotesPage() {
 
   async function load() {
     setLoading(true);
-    const data = await getQuotations();
-    setQuotations(data);
-    setLoading(false);
+    try {
+      const data = await getQuotations();
+      setQuotations(data);
+    } catch {
+      toast.error('Failed to load quotes');
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -71,16 +76,37 @@ export default function QuotesPage() {
     return true;
   });
 
+  async function handleConvertToInvoice(q: Quotation) {
+    const toastId = toast.loading('Converting quote to invoice...');
+    try {
+      const invoiceId = await convertQuotationToInvoice(q);
+      if (invoiceId) {
+        toast.success('Quote converted to invoice successfully', { id: toastId });
+        load();
+      } else {
+        toast.error('Failed to convert quote to invoice', { id: toastId });
+      }
+    } catch {
+      toast.error('Failed to convert quote to invoice', { id: toastId });
+    }
+  }
+
   async function handleDelete(q: Quotation) {
     setConfirmState({ open: true, id: q.id });
   }
 
   async function onDeleteConfirm() {
     if (!confirmState.id) return;
-    await deleteQuotation(confirmState.id);
-    toast.success('Quote deleted');
-    load();
-    setConfirmState({ open: false });
+    setConfirmState((prev) => ({ ...prev, loading: true }));
+    try {
+      await deleteQuotation(confirmState.id);
+      toast.success('Quote deleted');
+      load();
+    } catch {
+      toast.error('Failed to delete quote');
+    } finally {
+      setConfirmState({ open: false });
+    }
   }
 
   if (loading) {
@@ -169,7 +195,7 @@ export default function QuotesPage() {
                   render: (q) => (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9">
+                        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Quote actions">
                           <MoreHorizontal size={14} />
                         </Button>
                       </DropdownMenuTrigger>
@@ -195,6 +221,11 @@ export default function QuotesPage() {
                         }}>
                           <Eye size={14} className="mr-2" /> Preview
                         </DropdownMenuItem>
+                        {q.status === 'accepted' && (
+                          <DropdownMenuItem onClick={() => handleConvertToInvoice(q)}>
+                            <FileText size={14} className="mr-2" /> Convert to Invoice
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(q)}>
                           <Trash2 size={14} className="mr-2" /> Delete

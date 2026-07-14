@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,18 +40,23 @@ const defaultForm = {
 };
 
 export function ContractDialog({ open, onOpenChange, onSaved, contract }: ContractDialogProps) {
-  const [form, setForm] = useState(() => contract
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (contract) {
+      setForm({
         title: contract.title,
         type: contract.type,
         status: contract.status,
         parties: contract.parties,
         expiry: contract.expiry,
         progress: contract.progress,
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [contract]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

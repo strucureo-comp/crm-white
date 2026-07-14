@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -46,9 +46,12 @@ const defaultForm = {
 };
 
 export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultStatus }: ProjectDialogProps) {
-  const [form, setForm] = useState(() => {
+  const [form, setForm] = useState({ ...defaultForm, status: (defaultStatus as ProjectStatus) || 'pending' });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
     if (project) {
-      return {
+      setForm({
         title: project.title,
         description: project.description,
         status: project.status,
@@ -59,11 +62,11 @@ export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultSta
         manual_client_name: project.manual_client_name || '',
         manual_client_email: project.manual_client_email || '',
         manual_client_company: project.manual_client_company || '',
-      };
+      });
+    } else {
+      setForm({ ...defaultForm, status: (defaultStatus as ProjectStatus) || 'pending' });
     }
-    return { ...defaultForm, status: (defaultStatus as ProjectStatus) || 'pending' };
-  });
-  const [saving, setSaving] = useState(false);
+  }, [project, defaultStatus]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

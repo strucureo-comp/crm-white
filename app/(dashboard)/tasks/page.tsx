@@ -203,7 +203,7 @@ export default function TasksPage() {
                         )}
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal size={14} /></Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Task actions"><MoreHorizontal size={14} /></Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end" className="w-36">
                             <DropdownMenuItem onClick={() => { setEditingTask(task); setDialogOpen(true); }}>

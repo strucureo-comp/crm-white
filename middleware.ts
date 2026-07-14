@@ -1,29 +1,51 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicPaths = ['/login', '/register', '/forgot-password', '/api/enquiries'];
-const authPaths = ['/login', '/register', '/forgot-password'];
+const publicPaths = ['/login', '/register', '/forgot-password'];
+const publicApiPaths = ['/api/enquiries', '/api/auth/session'];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
   if (pathname === '/') {
+    const session = req.cookies.get('__session')?.value;
+    return NextResponse.redirect(new URL(session ? '/dashboard' : '/login', req.url));
+  }
+
+  const isStaticAsset = pathname.startsWith('/_next') || pathname.startsWith('/images') || pathname === '/favicon.ico';
+
+  if (isStaticAsset) {
+    return NextResponse.next();
+  }
+
+  const isPublicApiPath = publicApiPaths.some(p => pathname.startsWith(p));
+  const isPublicPath = publicPaths.some(p => pathname === p);
+  const session = req.cookies.get('__session')?.value;
+
+  if (pathname.startsWith('/api/')) {
+    if (isPublicApiPath) {
+      return NextResponse.next();
+    }
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    return NextResponse.next();
+  }
+
+  const isDashboardRoute = !isPublicPath && !pathname.startsWith('/api');
+
+  if (isDashboardRoute) {
+    if (!session) {
+      const loginUrl = new URL('/login', req.url);
+      loginUrl.searchParams.set('redirect', pathname);
+      return NextResponse.redirect(loginUrl);
+    }
+    return NextResponse.next();
+  }
+
+  if (isPublicPath && session) {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
-
-  if (pathname.startsWith('/api/upload') || pathname.startsWith('/api/cron')) {
-    const authHeader = req.headers.get('authorization');
-    if (pathname.startsWith('/api/cron/billing')) {
-      const cronSecret = process.env.CRON_SECRET;
-      if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-      }
-    }
-  }
-
-  const isDashboardRoute = pathname.startsWith('/dashboard') || (
-    pathname.startsWith('/') && !pathname.startsWith('/api') && !publicPaths.includes(pathname) && !authPaths.includes(pathname)
-  );
 
   const response = NextResponse.next();
 
@@ -35,5 +57,5 @@ export async function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+  matcher: ['/((?!_next/static|_next/image).*)'],
 };

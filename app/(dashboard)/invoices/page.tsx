@@ -175,7 +175,7 @@ export default function InvoicesPage() {
                   render: (inv) => (
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9">
+                        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Invoice actions">
                           <MoreHorizontal size={14} />
                         </Button>
                       </DropdownMenuTrigger>

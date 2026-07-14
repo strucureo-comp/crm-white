@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,18 +40,23 @@ const defaultForm = {
 };
 
 export function ReportDialog({ open, onOpenChange, onSaved, report }: ReportDialogProps) {
-  const [form, setForm] = useState(() => report
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (report) {
+      setForm({
         name: report.name,
         type: report.type,
         nextRun: report.nextRun,
         format: report.format,
         recipientCount: report.recipientCount,
         status: report.status,
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [report]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

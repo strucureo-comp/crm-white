@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -42,8 +42,12 @@ const defaultForm = {
 };
 
 export function TaskDialog({ open, onOpenChange, onSaved, task }: TaskDialogProps) {
-  const [form, setForm] = useState(() => task
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (task) {
+      setForm({
         title: task.title,
         description: task.description || '',
         project: task.project || '',
@@ -51,10 +55,11 @@ export function TaskDialog({ open, onOpenChange, onSaved, task }: TaskDialogProp
         status: task.status,
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         assignee: task.assignee || '',
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [task]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

@@ -32,9 +32,14 @@ export default function MediaLibraryPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await getMediaItems();
-    setItems(data);
-    setLoading(false);
+    try {
+      const data = await getMediaItems();
+      setItems(data);
+    } catch {
+      toast.error('Failed to load media items');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -136,7 +141,7 @@ export default function MediaLibraryPage() {
                     </>
                   )}
                   <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 bg-background/80" onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}>
+                    <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 bg-background/80" aria-label="File actions" onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}>
                       <MoreHorizontal size={12} />
                     </Button>
                     {menuOpen === item.id && (
@@ -188,7 +193,7 @@ export default function MediaLibraryPage() {
                     <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(item.created_at).toLocaleDateString()}</td>
                     <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="relative">
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}>
+                        <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="File actions" onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}>
                           <MoreHorizontal size={14} />
                         </Button>
                         {menuOpen === item.id && (

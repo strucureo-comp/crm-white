@@ -91,7 +91,7 @@ export default function IntegrationsPage() {
           <p className="text-sm text-muted-foreground">Connect your tools and automate workflows</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast.info('Webhook endpoints: /api/webhooks/inbound — see docs for details')} className="text-xs sm:text-sm">
+          <Button variant="outline" size="sm" onClick={() => toast.message('Webhook endpoints: /api/webhooks/inbound — see docs for details')} className="text-xs sm:text-sm">
             <Webhook size={14} className="mr-1.5" />
             Webhooks
           </Button>
@@ -99,7 +99,7 @@ export default function IntegrationsPage() {
             <Code size={14} className="mr-1.5" />
             API
           </Button>
-          <Button variant="outline" size="sm" onClick={() => toast.info('MCP (Model Context Protocol) server exposed at /api/mcp')} className="text-xs sm:text-sm">
+          <Button variant="outline" size="sm" onClick={() => toast.message('MCP (Model Context Protocol) server exposed at /api/mcp')} className="text-xs sm:text-sm">
             <Bot size={14} className="mr-1.5" />
             MCP
           </Button>
@@ -144,9 +144,9 @@ export default function IntegrationsPage() {
                     <div className="flex items-center justify-between">
                       <Button variant={integration.status === 'Available' ? 'default' : 'outline'} size="sm" onClick={() => {
                         if (integration.status === 'Available') {
-                          toast.info(`OAuth connection for ${integration.name} coming soon`);
+                          toast.message(`OAuth connection for ${integration.name} coming soon`);
                         } else {
-                          toast.info(`Opening ${integration.name} configuration`);
+                          toast.message(`Opening ${integration.name} configuration`);
                         }
                       }}>
                         {integration.status === 'Available' ? (
@@ -162,7 +162,7 @@ export default function IntegrationsPage() {
                           <Switch checked={integration.enabled} onCheckedChange={(c) => toggleIntegration(integration, c)} />
                         )}
                         <div className="relative">
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setMenuOpen(menuOpen === integration.id ? null : integration.id)}>
+                          <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Integration actions" onClick={() => setMenuOpen(menuOpen === integration.id ? null : integration.id)}>
                             <MoreHorizontal size={12} />
                           </Button>
                           {menuOpen === integration.id && (

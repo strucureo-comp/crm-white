@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Search, Command, FileText, Users, DollarSign, Briefcase, ArrowRight, CheckCircle, Target, type LucideIcon } from 'lucide-react';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { getLeads, getProjects, getTasks } from '@/lib/firebase/database';
 
@@ -126,6 +126,8 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl top-[15%] translate-y-0 p-0 gap-0">
+        <DialogTitle className="sr-only">Search</DialogTitle>
+        <DialogDescription className="sr-only">Search across pages, leads, projects, and tasks</DialogDescription>
         <div className="flex items-center gap-3 px-4 border-b">
           <Search size={18} className="text-muted-foreground shrink-0" />
           <input

@@ -66,7 +66,7 @@ export default function ReportsPage() {
           <p className="text-sm text-muted-foreground">Create and schedule business reports</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => toast.info('Scheduled report generation coming soon — reports can be run individually once configured')}>
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => toast.message('Scheduled report generation coming soon — reports can be run individually once configured')}>
             <RefreshCw size={14} className="mr-1.5" />
             Run All
           </Button>
@@ -155,7 +155,7 @@ export default function ReportsPage() {
                       } catch { toast.error('Failed to generate preview'); }
                     }}><Eye size={14} className="mr-1" />Preview</Button>
                     <div className="relative">
-                      <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setMenuOpen(menuOpen === report.id ? null : report.id)}>
+                      <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Report actions" onClick={() => setMenuOpen(menuOpen === report.id ? null : report.id)}>
                         <MoreHorizontal size={14} />
                       </Button>
                       {menuOpen === report.id && (

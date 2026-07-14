@@ -112,7 +112,6 @@ export default function ProjectsPage() {
           <p className="text-sm text-muted-foreground">Manage projects with Kanban boards</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast.info('Timeline view coming soon')} className="text-xs sm:text-sm">Timeline</Button>
           <Button onClick={() => openNewProject()} size="sm" className="text-xs sm:text-sm">
             <Plus size={14} className="mr-1.5" />
             New Project
@@ -142,7 +141,7 @@ export default function ProjectsPage() {
                       <p className="text-sm font-medium">{project.title}</p>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 -mt-1">
+                          <Button variant="ghost" size="icon" className="h-6 w-6 -mr-1 -mt-1" aria-label="Project actions">
                             <MoreHorizontal size={12} />
                           </Button>
                         </DropdownMenuTrigger>

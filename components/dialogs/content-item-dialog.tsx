@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -38,16 +38,21 @@ const defaultForm = {
 };
 
 export function ContentItemDialog({ open, onOpenChange, onSaved, item }: ContentItemDialogProps) {
-  const [form, setForm] = useState(() => item
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (item) {
+      setForm({
         title: item.title,
         type: item.type,
         author: item.author,
         status: item.status,
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [item]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

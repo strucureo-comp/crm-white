@@ -25,7 +25,7 @@ export function ThemeSwitcher() {
         <Tooltip>
           <TooltipTrigger asChild>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-muted-foreground">
+              <Button variant="ghost" size="icon" className="text-muted-foreground" aria-label="Change theme">
                 <Sun size={18} className="rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
                 <Moon size={18} className="absolute rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               </Button>

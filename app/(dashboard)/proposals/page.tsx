@@ -134,7 +134,7 @@ export default function ProposalsPage() {
                 <div className="flex items-center gap-1 mt-3 pt-3 border-t">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" aria-label="Proposal actions">
                         <MoreHorizontal size={14} />
                       </Button>
                     </DropdownMenuTrigger>
@@ -152,12 +152,10 @@ export default function ProposalsPage() {
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={async () => {
                         try {
-                          await updateQuotation(q.id, { status: 'sent' });
-                          toast.success(`Proposal ${q.quotation_number} sent`);
-                          load();
-                        } catch {
-                          toast.error('Failed to send proposal');
-                        }
+                          const pdf = await generateQuotationPdf(q, null);
+                          const url = await openPdfPreview(pdf);
+                          window.open(url, '_blank');
+                        } catch { toast.error('Failed to generate preview'); }
                       }}>
                         <Eye size={14} className="mr-2" /> Preview
                       </DropdownMenuItem>

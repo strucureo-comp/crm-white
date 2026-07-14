@@ -155,7 +155,7 @@ export default function DealsPage() {
                         </div>
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon" className="h-6 w-6">
+                            <Button variant="ghost" size="icon" className="h-6 w-6" aria-label="Deal actions">
                               <MoreHorizontal size={12} />
                             </Button>
                           </DropdownMenuTrigger>

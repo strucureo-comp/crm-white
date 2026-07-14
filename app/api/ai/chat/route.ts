@@ -21,11 +21,11 @@ const responses: Record<string, string[]> = {
 
 export async function POST(request: Request) {
   try {
-    const { assistant } = await request.json();
+    const { assistant, message: userMessage, messages } = await request.json();
     const key = assistant === 'rio' ? 'rio' : 'tara';
     const pool = responses[key];
-    const message = pool[Math.floor(Math.random() * pool.length)];
-    return NextResponse.json({ message });
+    const reply = pool[Math.floor(Math.random() * pool.length)];
+    return NextResponse.json({ message: reply });
   } catch {
     return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
   }

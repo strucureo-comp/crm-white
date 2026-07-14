@@ -25,10 +25,15 @@ export default function FieldMonitoringPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [a, al] = await Promise.all([getFieldAgents(), getFieldAlerts()]);
-    setAgents(a);
-    setAlerts(al);
-    setLoading(false);
+    try {
+      const [a, al] = await Promise.all([getFieldAgents(), getFieldAlerts()]);
+      setAgents(a);
+      setAlerts(al);
+    } catch {
+      toast.error('Failed to load field data');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -77,7 +82,6 @@ export default function FieldMonitoringPage() {
             <Radio size={14} className="mr-1.5" />
             Broadcast
           </Button>
-          <Button variant="outline" size="sm" onClick={() => toast.info('Map view coming soon — integrates with Google Maps API')} className="text-xs sm:text-sm">Map</Button>
           <Button onClick={() => { setEditing(null); setDialogOpen(true); }} size="sm" className="text-xs sm:text-sm">
             <Plus size={14} className="mr-1.5" />
             Add Agent
@@ -140,7 +144,7 @@ export default function FieldMonitoringPage() {
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => window.open(`https://maps.google.com?q=${encodeURIComponent(agent.location)}`, '_blank')}>
                           <Navigation size={12} />
                         </Button>
-                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.info(`Messaging ${agent.name} coming soon`)}>
+                        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => toast.message(`Messaging ${agent.name} coming soon`)}>
                           <MessageSquare size={12} />
                         </Button>
                         <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { const phone = (agent as any).phone; if (phone) { window.open(`tel:${phone}`); } else { toast.error('No phone number for this agent'); } }}>

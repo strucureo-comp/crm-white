@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,17 +40,22 @@ const defaultForm = {
 };
 
 export function IntegrationDialog({ open, onOpenChange, onSaved, integration }: IntegrationDialogProps) {
-  const [form, setForm] = useState(() => integration
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (integration) {
+      setForm({
         name: integration.name,
         description: integration.description,
         status: integration.status,
         category: integration.category,
         enabled: integration.enabled,
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [integration]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

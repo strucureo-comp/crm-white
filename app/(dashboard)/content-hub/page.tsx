@@ -22,9 +22,14 @@ export default function ContentHubPage() {
 
   const load = useCallback(async () => {
     setLoading(true);
-    const data = await getContentItems();
-    setItems(data);
-    setLoading(false);
+    try {
+      const data = await getContentItems();
+      setItems(data);
+    } catch {
+      toast.error('Failed to load content');
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);

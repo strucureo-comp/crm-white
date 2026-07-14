@@ -5,7 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
-import { useState, FormEvent } from 'react';
+import { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -18,8 +18,22 @@ export default function RegisterPage() {
   const [company, setCompany] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signUp } = useAuth();
+  const { signUp, user, loading } = useAuth();
   const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && user) {
+      router.replace('/dashboard');
+    }
+  }, [user, loading, router]);
+
+  if (loading || user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

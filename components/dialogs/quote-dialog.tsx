@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -48,9 +48,16 @@ const defaultForm = {
 };
 
 export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogProps) {
-  const [form, setForm] = useState(() => {
+  const [form, setForm] = useState({
+    ...defaultForm,
+    quotation_number: `Q-${Date.now().toString().slice(-6)}`,
+    valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+  });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
     if (quote) {
-      return {
+      setForm({
         client_name: quote.client_name || '',
         client_email: quote.client_email || '',
         client_company: quote.client_company || '',
@@ -63,15 +70,15 @@ export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogP
         description: quote.description || '',
         notes: quote.notes || '',
         items: quote.items || [],
-      };
+      });
+    } else {
+      setForm({
+        ...defaultForm,
+        quotation_number: `Q-${Date.now().toString().slice(-6)}`,
+        valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      });
     }
-    return {
-      ...defaultForm,
-      quotation_number: `Q-${Date.now().toString().slice(-6)}`,
-      valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    };
-  });
-  const [saving, setSaving] = useState(false);
+  }, [quote]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

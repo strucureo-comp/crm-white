@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -39,17 +39,22 @@ const defaultForm = {
 };
 
 export function FieldAgentDialog({ open, onOpenChange, onSaved, agent }: FieldAgentDialogProps) {
-  const [form, setForm] = useState(() => agent
-    ? {
+  const [form, setForm] = useState({ ...defaultForm });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (agent) {
+      setForm({
         name: agent.name,
         status: agent.status,
         location: agent.location,
         battery: agent.battery,
         route: agent.route,
-      }
-    : { ...defaultForm }
-  );
-  const [saving, setSaving] = useState(false);
+      });
+    } else {
+      setForm({ ...defaultForm });
+    }
+  }, [agent]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

@@ -81,10 +81,10 @@ export default function ContractsPage() {
           <p className="text-sm text-muted-foreground">Manage contracts, NDAs, and agreements</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => { setEditing(null); setDialogOpen(true); toast.info('Create a new NDA contract template'); }}>
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => { setEditing(null); setDialogOpen(true); toast.message('Create a new NDA contract template'); }}>
             <FileSignature size={14} className="mr-1.5" />NDA
           </Button>
-          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => { setEditing(null); setDialogOpen(true); toast.info('Create a new service agreement template'); }}>
+          <Button variant="outline" size="sm" className="text-xs sm:text-sm" onClick={() => { setEditing(null); setDialogOpen(true); toast.message('Create a new service agreement template'); }}>
             <FileSignature size={14} className="mr-1.5" />Service
           </Button>
           <Button onClick={handleNew} size="sm" className="text-xs sm:text-sm">
@@ -145,7 +145,7 @@ export default function ContractsPage() {
                 </div>
                 <div className="flex items-center gap-1 mt-3 pt-3 border-t relative">
                   <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => handleEdit(contract)}><Eye size={14} className="mr-1" />View</Button>
-                  <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" onClick={() => setMenuOpen(menuOpen === contract.id ? null : contract.id)}>
+                  <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" aria-label="Contract actions" onClick={() => setMenuOpen(menuOpen === contract.id ? null : contract.id)}>
                     <MoreHorizontal size={14} />
                   </Button>
                   {menuOpen === contract.id && (
