@@ -148,7 +148,7 @@ export default function ProposalsPage() {
                           toast.error('Failed to send proposal');
                         }
                       }}>
-                        <Eye size={14} className="mr-2" /> Send
+                        <FileSpreadsheet size={14} className="mr-2" /> Send
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={async () => {
                         try {
@@ -167,15 +167,6 @@ export default function ProposalsPage() {
                         } catch { toast.error('Failed to generate PDF'); }
                       }}>
                         <Download size={14} className="mr-2" /> Download
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={async () => {
-                        try {
-                          const pdf = await generateQuotationPdf(q, null);
-                          const url = await openPdfPreview(pdf);
-                          window.open(url, '_blank');
-                        } catch { toast.error('Failed to generate preview'); }
-                      }}>
-                        <Eye size={14} className="mr-2" /> Preview
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={async () => {
                         try {

@@ -95,7 +95,7 @@ export default function IntegrationsPage() {
             <Webhook size={14} className="mr-1.5" />
             Webhooks
           </Button>
-          <Button variant="outline" size="sm" onClick={() => window.open('/docs/api', '_blank')} className="text-xs sm:text-sm">
+          <Button variant="outline" size="sm" onClick={() => toast.message('API documentation available at /api/docs — full reference coming soon')} className="text-xs sm:text-sm">
             <Code size={14} className="mr-1.5" />
             API
           </Button>

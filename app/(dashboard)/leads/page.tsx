@@ -163,7 +163,7 @@ export default function LeadsPage() {
               <SelectItem value="lost">Lost</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="outline" size="icon">
+          <Button variant="outline" size="icon" onClick={() => toast.message('Advanced filters coming soon')}>
             <SlidersHorizontal size={16} />
           </Button>
         </div>
