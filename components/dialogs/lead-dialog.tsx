@@ -31,41 +31,91 @@ interface LeadDialogProps {
   lead?: Lead | null;
 }
 
-const defaultForm = {
+interface LeadForm {
+  name: string;
+  email: string;
+  company: string;
+  phone: string;
+  status: LeadStatus;
+  source: string;
+  potential_value: number;
+  probability: number;
+  notes: string;
+  lead_score: number;
+  intent: string;
+  tags: string;
+  last_contacted: string;
+  next_follow_up: string;
+  follow_up_notes: string;
+}
+
+const defaultForm: LeadForm = {
   name: '',
   email: '',
   company: '',
   phone: '',
-  status: 'new' as LeadStatus,
+  status: 'new',
   source: '',
   potential_value: 0,
   probability: 0,
   notes: '',
+  lead_score: 0,
+  intent: '',
+  tags: '',
+  last_contacted: '',
+  next_follow_up: '',
+  follow_up_notes: '',
 };
 
+function leadToForm(l: Lead): LeadForm {
+  return {
+    name: l.name,
+    email: l.email,
+    company: l.company || '',
+    phone: l.phone || '',
+    status: l.status,
+    source: l.source || '',
+    potential_value: l.potential_value || 0,
+    probability: l.probability || 0,
+    notes: l.notes || '',
+    lead_score: l.lead_score || 0,
+    intent: l.intent || '',
+    tags: l.tags?.join(', ') || '',
+    last_contacted: l.last_contacted || '',
+    next_follow_up: l.next_follow_up || '',
+    follow_up_notes: l.follow_up_notes || '',
+  };
+}
+
+function formToPayload(f: LeadForm) {
+  return {
+    name: f.name,
+    email: f.email,
+    company: f.company || null,
+    phone: f.phone || null,
+    status: f.status,
+    source: f.source || null,
+    potential_value: f.potential_value || null,
+    probability: f.probability || null,
+    notes: f.notes || null,
+    lead_score: f.lead_score || null,
+    intent: f.intent || null,
+    tags: f.tags ? f.tags.split(',').map(t => t.trim()).filter(Boolean) : null,
+    last_contacted: f.last_contacted || null,
+    next_follow_up: f.next_follow_up || null,
+    follow_up_notes: f.follow_up_notes || null,
+  };
+}
+
 export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProps) {
-  const [form, setForm] = useState({ ...defaultForm });
+  const [form, setForm] = useState<LeadForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (lead) {
-      setForm({
-        name: lead.name,
-        email: lead.email,
-        company: lead.company || '',
-        phone: lead.phone || '',
-        status: lead.status,
-        source: lead.source || '',
-        potential_value: lead.potential_value || 0,
-        probability: lead.probability || 0,
-        notes: lead.notes || '',
-      });
-    } else {
-      setForm({ ...defaultForm });
-    }
+    setForm(lead ? leadToForm(lead) : { ...defaultForm });
   }, [lead]);
 
-  function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
+  function set<K extends keyof LeadForm>(key: K, value: LeadForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -77,16 +127,17 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
     }
     setSaving(true);
     try {
+      const payload = formToPayload(form);
       if (lead) {
-        await updateLead(lead.id, form);
+        await updateLead(lead.id, payload as any);
         toast.success('Updated successfully');
       } else {
-        await createLead(form);
+        await createLead(payload as any);
         toast.success('Created successfully');
       }
       onSaved();
       onOpenChange(false);
-    } catch (err) {
+    } catch {
       toast.error('Something went wrong');
     } finally {
       setSaving(false);
@@ -94,17 +145,7 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
   }
 
   function handleCancel() {
-    setForm(lead ? {
-      name: lead.name,
-      email: lead.email,
-      company: lead.company || '',
-      phone: lead.phone || '',
-      status: lead.status,
-      source: lead.source || '',
-      potential_value: lead.potential_value || 0,
-      probability: lead.probability || 0,
-      notes: lead.notes || '',
-    } : { ...defaultForm });
+    setForm(lead ? leadToForm(lead) : { ...defaultForm });
     onOpenChange(false);
   }
 
@@ -178,7 +219,39 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
             </div>
             <div className="col-span-2">
               <Label htmlFor="notes">Notes</Label>
-              <Textarea id="notes" value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Any notes..." rows={3} />
+              <Textarea id="notes" value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Any notes..." rows={2} />
+            </div>
+            <div>
+              <Label htmlFor="lead_score">Lead Score</Label>
+              <Input id="lead_score" type="number" min={0} max={100} value={form.lead_score} onChange={(e) => set('lead_score', Number(e.target.value))} />
+            </div>
+            <div>
+              <Label htmlFor="intent">Intent</Label>
+              <Select value={form.intent} onValueChange={(v) => set('intent', v)}>
+                <SelectTrigger id="intent"><SelectValue placeholder="Select intent" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">High</SelectItem>
+                  <SelectItem value="medium">Medium</SelectItem>
+                  <SelectItem value="low">Low</SelectItem>
+                  <SelectItem value="exploratory">Exploratory</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="tags">Tags (comma-separated)</Label>
+              <Input id="tags" value={form.tags} onChange={(e) => set('tags', e.target.value)} placeholder="hot, vip, follow-up" />
+            </div>
+            <div>
+              <Label htmlFor="last_contacted">Last Contacted</Label>
+              <Input id="last_contacted" type="date" value={form.last_contacted} onChange={(e) => set('last_contacted', e.target.value)} />
+            </div>
+            <div>
+              <Label htmlFor="next_follow_up">Next Follow-up</Label>
+              <Input id="next_follow_up" type="date" value={form.next_follow_up} onChange={(e) => set('next_follow_up', e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="follow_up_notes">Follow-up Notes</Label>
+              <Textarea id="follow_up_notes" value={form.follow_up_notes} onChange={(e) => set('follow_up_notes', e.target.value)} placeholder="Follow-up details..." rows={2} />
             </div>
           </div>
           <DialogFooter>

@@ -40,6 +40,14 @@ import type {
   Integration,
   AutomationRule,
   AiConversation,
+  Campaign,
+  SocialPost,
+  Delivery,
+  DeliveryItem,
+  ActivityLog,
+  EmailTemplate,
+  EmailCampaign,
+  EmailLog,
 } from '@/lib/db/types';
 
 function cleanData(data: any) {
@@ -1891,4 +1899,283 @@ export async function updatePayment(id: string, updates: Partial<Payment>): Prom
   } catch {
     return false;
   }
+}
+
+export async function createPayment(data: Omit<Payment, 'id' | 'created_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'transactions');
+    const newRef = push(refPath);
+    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString() }));
+    return newRef.key;
+  } catch {
+    return null;
+  }
+}
+
+export async function deletePayment(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `transactions/${id}`));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// ----------------------------------------------------
+// CAMPAIGN FUNCTIONS
+// ----------------------------------------------------
+
+export async function getCampaigns(): Promise<Campaign[]> {
+  try {
+    const refPath = ref(database, 'campaigns');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: Campaign[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as Campaign);
+    });
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch { return []; }
+}
+
+export async function createCampaign(data: Omit<Campaign, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'campaigns');
+    const newRef = push(refPath);
+    const campaign = { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+    await set(newRef, campaign);
+    await createNotification({
+      user_id: 'system', title: 'Campaign Created', message: `Campaign "${data.name}" created`,
+      type: 'system', link: '/campaigns', read: false,
+    });
+    return newRef.key;
+  } catch { return null; }
+}
+
+export async function updateCampaign(id: string, updates: Partial<Campaign>): Promise<boolean> {
+  try {
+    const refPath = ref(database, `campaigns/${id}`);
+    await update(refPath, { ...updates, updated_at: new Date().toISOString() });
+    return true;
+  } catch { return false; }
+}
+
+export async function deleteCampaign(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `campaigns/${id}`));
+    return true;
+  } catch { return false; }
+}
+
+// ----------------------------------------------------
+// SOCIAL POST FUNCTIONS
+// ----------------------------------------------------
+
+export async function getSocialPosts(): Promise<SocialPost[]> {
+  try {
+    const refPath = ref(database, 'social_posts');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: SocialPost[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as SocialPost);
+    });
+    return items.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+  } catch { return []; }
+}
+
+export async function createSocialPost(data: Omit<SocialPost, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'social_posts');
+    const newRef = push(refPath);
+    await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    return newRef.key;
+  } catch { return null; }
+}
+
+export async function updateSocialPost(id: string, updates: Partial<SocialPost>): Promise<boolean> {
+  try {
+    await update(ref(database, `social_posts/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    return true;
+  } catch { return false; }
+}
+
+export async function deleteSocialPost(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `social_posts/${id}`));
+    return true;
+  } catch { return false; }
+}
+
+// ----------------------------------------------------
+// DELIVERY FUNCTIONS
+// ----------------------------------------------------
+
+export async function getDeliveries(): Promise<Delivery[]> {
+  try {
+    const refPath = ref(database, 'deliveries');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: Delivery[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as Delivery);
+    });
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch { return []; }
+}
+
+export async function createDelivery(data: Omit<Delivery, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'deliveries');
+    const newRef = push(refPath);
+    await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    return newRef.key;
+  } catch { return null; }
+}
+
+export async function updateDelivery(id: string, updates: Partial<Delivery>): Promise<boolean> {
+  try {
+    await update(ref(database, `deliveries/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    return true;
+  } catch { return false; }
+}
+
+export async function deleteDelivery(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `deliveries/${id}`));
+    return true;
+  } catch { return false; }
+}
+
+// ----------------------------------------------------
+// ACTIVITY LOG FUNCTIONS
+// ----------------------------------------------------
+
+export async function getActivityLogs(limitCount: number = 50): Promise<ActivityLog[]> {
+  try {
+    const refPath = ref(database, 'activity_logs');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: ActivityLog[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as ActivityLog);
+    });
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limitCount);
+  } catch { return []; }
+}
+
+export async function createActivityLog(data: Omit<ActivityLog, 'id' | 'created_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'activity_logs');
+    const newRef = push(refPath);
+    await set(newRef, { ...data, created_at: new Date().toISOString() });
+    return newRef.key;
+  } catch { return null; }
+}
+
+// ----------------------------------------------------
+// EMAIL TEMPLATE FUNCTIONS
+// ----------------------------------------------------
+
+export async function getEmailTemplates(): Promise<EmailTemplate[]> {
+  try {
+    const refPath = ref(database, 'email_templates');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: EmailTemplate[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as EmailTemplate);
+    });
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch { return []; }
+}
+
+export async function createEmailTemplate(data: Omit<EmailTemplate, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'email_templates');
+    const newRef = push(refPath);
+    await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    return newRef.key;
+  } catch { return null; }
+}
+
+export async function updateEmailTemplate(id: string, updates: Partial<EmailTemplate>): Promise<boolean> {
+  try {
+    await update(ref(database, `email_templates/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    return true;
+  } catch { return false; }
+}
+
+export async function deleteEmailTemplate(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `email_templates/${id}`));
+    return true;
+  } catch { return false; }
+}
+
+// ----------------------------------------------------
+// EMAIL CAMPAIGN FUNCTIONS
+// ----------------------------------------------------
+
+export async function getEmailCampaigns(): Promise<EmailCampaign[]> {
+  try {
+    const refPath = ref(database, 'email_campaigns');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: EmailCampaign[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as EmailCampaign);
+    });
+    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch { return []; }
+}
+
+export async function createEmailCampaign(data: Omit<EmailCampaign, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'email_campaigns');
+    const newRef = push(refPath);
+    await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    return newRef.key;
+  } catch { return null; }
+}
+
+export async function updateEmailCampaign(id: string, updates: Partial<EmailCampaign>): Promise<boolean> {
+  try {
+    await update(ref(database, `email_campaigns/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    return true;
+  } catch { return false; }
+}
+
+export async function deleteEmailCampaign(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `email_campaigns/${id}`));
+    return true;
+  } catch { return false; }
+}
+
+// ----------------------------------------------------
+// EMAIL LOG FUNCTIONS
+// ----------------------------------------------------
+
+export async function getEmailLogs(campaignId?: string): Promise<EmailLog[]> {
+  try {
+    const refPath = ref(database, 'email_logs');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: EmailLog[] = [];
+    snapshot.forEach((child) => {
+      const log = { id: child.key, ...child.val() } as EmailLog;
+      if (!campaignId || log.campaign_id === campaignId) items.push(log);
+    });
+    return items.sort((a, b) => new Date(b.sent_at).getTime() - new Date(a.sent_at).getTime());
+  } catch { return []; }
+}
+
+export async function createEmailLog(data: Omit<EmailLog, 'id'>): Promise<string | null> {
+  try {
+    const refPath = ref(database, 'email_logs');
+    const newRef = push(refPath);
+    await set(newRef, { ...data, sent_at: new Date().toISOString() });
+    return newRef.key;
+  } catch { return null; }
 }

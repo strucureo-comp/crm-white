@@ -3,6 +3,14 @@ import { Auth, getAuth } from 'firebase-admin/auth';
 
 let adminAuthInstance: Auth | null = null;
 
+export function isAdminAvailable(): boolean {
+  return !!(
+    process.env.FIREBASE_PROJECT_ID &&
+    process.env.FIREBASE_CLIENT_EMAIL &&
+    process.env.FIREBASE_PRIVATE_KEY
+  );
+}
+
 function getAdminApp() {
   if (getApps().length > 0) return getApp();
 

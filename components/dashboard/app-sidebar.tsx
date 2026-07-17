@@ -38,6 +38,13 @@ import {
   MapPin,
   Receipt,
   X,
+  Activity,
+  TrendingUp,
+  Target,
+  Camera,
+  Mail,
+  Truck,
+  Wallet,
 } from 'lucide-react';
 
 interface NavItem {
@@ -57,10 +64,13 @@ function getNavGroups(leadCount: number): NavGroup[] {
     {
       title: 'CRM',
       items: [
-        { title: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+        { title: 'Overview', href: '/overview', icon: LayoutDashboard },
+        { title: 'Dashboard', href: '/dashboard', icon: BarChart3 },
         { title: 'Leads', href: '/leads', icon: Users, badge: leadCount || undefined },
         { title: 'Contacts', href: '/contacts', icon: Contact2 },
         { title: 'Deals', href: '/deals', icon: DollarSign },
+        { title: 'Funnel', href: '/funnel', icon: TrendingUp },
+        { title: 'Activity', href: '/activity', icon: Activity },
         { title: 'Field Monitoring', href: '/field-monitoring', icon: MapPin },
       ],
     },
@@ -71,22 +81,28 @@ function getNavGroups(leadCount: number): NavGroup[] {
         { title: 'Invoices', href: '/invoices', icon: Receipt },
         { title: 'Proposals', href: '/proposals', icon: FileSpreadsheet },
         { title: 'Contracts', href: '/contracts', icon: FileSignature },
+        { title: 'Payments', href: '/payments', icon: Wallet },
       ],
     },
     {
       title: 'Marketing',
       items: [
+        { title: 'Campaigns', href: '/campaigns', icon: Target },
         { title: 'Content Hub', href: '/content-hub', icon: Megaphone },
+        { title: 'Social Media', href: '/social', icon: Camera },
+        { title: 'Email Marketing', href: '/email', icon: Mail },
         { title: 'Media Library', href: '/media-library', icon: Image },
         { title: 'Marketing Calendar', href: '/marketing-calendar', icon: Calendar },
       ],
     },
     {
-      title: 'Collaboration',
+      title: 'Workspace',
       items: [
         { title: 'Projects', href: '/projects', icon: Briefcase },
         { title: 'Tasks', href: '/tasks', icon: CheckSquare },
+        { title: 'Calendar', href: '/calendar', icon: Calendar },
         { title: 'Team', href: '/team', icon: Users2 },
+        { title: 'Deliveries', href: '/deliveries', icon: Truck },
       ],
     },
     {
@@ -94,6 +110,7 @@ function getNavGroups(leadCount: number): NavGroup[] {
       items: [
         { title: 'Analytics', href: '/analytics', icon: BarChart3 },
         { title: 'Reports', href: '/reports', icon: LineChart },
+        { title: 'Assets', href: '/assets', icon: Image },
       ],
     },
     {

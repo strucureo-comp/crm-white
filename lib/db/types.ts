@@ -291,6 +291,12 @@ export interface CalendarEvent {
   title: string;
   type: string;
   date: string;
+  time?: string;
+  description?: string;
+  attendees?: string;
+  color?: string;
+  project_id?: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -400,6 +406,133 @@ export interface PlanningNote {
   created_at: string;
 }
 
+// ===== TAGS TO ADD FROM TAGVERSE CRM =====
+
+export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed';
+export type CampaignChannel = 'email' | 'social' | 'paid' | 'sms';
+
+export interface Campaign {
+  id: string;
+  name: string;
+  description?: string;
+  channel: CampaignChannel;
+  status: CampaignStatus;
+  budget?: number;
+  spent?: number;
+  target_audience?: string;
+  start_date?: string;
+  end_date?: string;
+  kpi_metrics?: Record<string, number>;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type SocialPlatform = 'facebook' | 'instagram' | 'linkedin' | 'twitter' | 'youtube';
+
+export interface SocialPost {
+  id: string;
+  platform: SocialPlatform;
+  content: string;
+  media_url?: string;
+  scheduled_at: string;
+  published_at?: string;
+  status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'draft';
+  engagement?: { likes?: number; comments?: number; shares?: number };
+  campaign_id?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export type DeliveryStage = 'pending' | 'out_for_delivery' | 'delivered' | 'returned' | 'issue';
+
+export interface Delivery {
+  id: string;
+  client_name: string;
+  client_phone?: string;
+  client_address?: string;
+  items: DeliveryItem[];
+  stage: DeliveryStage;
+  scheduled_date?: string;
+  delivered_date?: string;
+  proof_url?: string;
+  notes?: string;
+  assigned_agent?: string;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DeliveryItem {
+  id: string;
+  name: string;
+  quantity: number;
+  description?: string;
+}
+
+export type ActivityAction =
+  | 'lead_created' | 'lead_updated' | 'lead_deleted'
+  | 'deal_stage_changed'
+  | 'invoice_created' | 'invoice_paid'
+  | 'quote_created' | 'quote_accepted'
+  | 'project_created' | 'project_updated'
+  | 'task_created' | 'task_completed'
+  | 'contract_signed'
+  | 'campaign_created'
+  | 'payment_received'
+  | 'user_login' | 'user_created';
+
+export interface ActivityLog {
+  id: string;
+  action: ActivityAction;
+  description: string;
+  entity_type: string;
+  entity_id?: string;
+  user_id: string;
+  user_name: string;
+  metadata?: Record<string, any>;
+  created_at: string;
+}
+
+export type EmailCampaignStatus = 'draft' | 'scheduling' | 'active' | 'completed' | 'paused';
+
+export interface EmailTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  html_body: string;
+  variables?: string[];
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailCampaign {
+  id: string;
+  name: string;
+  subject: string;
+  template_id: string;
+  recipient_list: string[];
+  scheduled_at?: string;
+  sequence_step: number;
+  status: EmailCampaignStatus;
+  stats?: { sent: number; opened: number; clicked: number; bounced: number };
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface EmailLog {
+  id: string;
+  campaign_id: string;
+  recipient_email: string;
+  sent_at: string;
+  opened_at?: string;
+  clicked_at?: string;
+  bounced?: boolean;
+}
+
 export type EnquiryStatus = 'new' | 'read' | 'replied' | 'converted';
 
 export interface Enquiry {
@@ -447,6 +580,9 @@ export interface Lead {
   last_contacted?: string;
   next_follow_up?: string;
   follow_up_notes?: string;
+  lead_score?: number;
+  intent?: string;
+  tags?: string[];
   created_at: string;
   updated_at: string;
 }
