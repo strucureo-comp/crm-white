@@ -35,7 +35,6 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
-  MapPin,
   Receipt,
   X,
   Activity,
@@ -43,7 +42,6 @@ import {
   Target,
   Camera,
   Mail,
-  Truck,
   Wallet,
 } from 'lucide-react';
 
@@ -71,7 +69,6 @@ function getNavGroups(leadCount: number): NavGroup[] {
         { title: 'Deals', href: '/deals', icon: DollarSign },
         { title: 'Funnel', href: '/funnel', icon: TrendingUp },
         { title: 'Activity', href: '/activity', icon: Activity },
-        { title: 'Field Monitoring', href: '/field-monitoring', icon: MapPin },
       ],
     },
     {
@@ -102,7 +99,6 @@ function getNavGroups(leadCount: number): NavGroup[] {
         { title: 'Tasks', href: '/tasks', icon: CheckSquare },
         { title: 'Calendar', href: '/calendar', icon: Calendar },
         { title: 'Team', href: '/team', icon: Users2 },
-        { title: 'Deliveries', href: '/deliveries', icon: Truck },
       ],
     },
     {
