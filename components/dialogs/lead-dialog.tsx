@@ -158,8 +158,8 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
             {lead ? 'Update the lead details below.' : 'Enter the lead details below.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <div className="grid grid-cols-2 gap-4 overflow-y-auto max-h-[55vh] pr-1 -mr-1">
             <div className="col-span-2 sm:col-span-1">
               <Label htmlFor="name">Name *</Label>
               <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="John Doe" />
