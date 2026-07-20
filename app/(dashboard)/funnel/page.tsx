@@ -1,7 +1,8 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { KpiCard } from '@/components/dashboard/kpi-card';
+import { Progress } from '@/components/ui/progress';
 import {
   Select,
   SelectContent,
@@ -10,15 +11,25 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { KpiCard } from '@/components/dashboard/kpi-card';
+import {
   DollarSign,
   TrendingUp,
-  Clock,
   PieChart,
+  TrendingDown,
   Loader2,
+  List,
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { getLeads } from '@/lib/firebase/database';
-import type { Lead } from '@/lib/db/types';
+import { getLeads, getPipelines } from '@/lib/firebase/database';
+import type { Lead, Pipeline } from '@/lib/db/types';
 import {
   FunnelChart,
   Funnel,
@@ -41,6 +52,7 @@ const STAGE_COLORS: Record<string, string> = {
   proposal: '#a855f7',
   negotiation: '#10b981',
   won: '#22c55e',
+  lost: '#ef4444',
 };
 
 const STAGE_LABELS: Record<string, string> = {
@@ -50,16 +62,25 @@ const STAGE_LABELS: Record<string, string> = {
   proposal: 'Proposal',
   negotiation: 'Negotiation',
   won: 'Won',
+  lost: 'Lost',
 };
 
 export default function FunnelPage() {
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [selectedPipeline, setSelectedPipeline] = useState('all');
   const [dateRange, setDateRange] = useState('30d');
 
   useEffect(() => {
-    getLeads()
-      .then(setLeads)
+    Promise.all([
+      getLeads(),
+      getPipelines(),
+    ])
+      .then(([leadsData, pipelinesData]) => {
+        setLeads(leadsData);
+        setPipelines(pipelinesData);
+      })
       .catch(console.error)
       .finally(() => setLoading(false));
   }, []);
@@ -93,13 +114,23 @@ export default function FunnelPage() {
     });
   }
 
+  const totalLeads = filteredLeads.length;
   const wonLeads = filteredLeads.filter((l) => l.status === 'won');
+  const lostLeads = filteredLeads.filter((l) => l.status === 'lost');
   const wonCount = wonLeads.length;
+  const lostCount = lostLeads.length;
+  const inProgressCount = totalLeads - wonCount - lostCount;
+
   const totalPipelineValue = stageData.reduce((s, d) => s + d.value, 0);
-  const winRate = filteredLeads.length > 0 ? ((wonCount / filteredLeads.length) * 100) : 0;
-  const avgDealSize = wonCount > 0
-    ? Math.round(wonLeads.reduce((s, l) => s + (l.potential_value || 0), 0) / wonCount)
+  const winRate = totalLeads > 0 ? ((wonCount / totalLeads) * 100) : 0;
+  const avgDealValue = totalLeads > 0
+    ? Math.round(filteredLeads.reduce((s, l) => s + (l.potential_value || 0), 0) / totalLeads)
     : 0;
+  const lostValue = lostLeads.reduce((s, l) => s + (l.potential_value || 0), 0);
+
+  const wonPct = totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0;
+  const lostPct = totalLeads > 0 ? (lostCount / totalLeads) * 100 : 0;
+  const inProgressPct = totalLeads > 0 ? (inProgressCount / totalLeads) * 100 : 0;
 
   if (loading) {
     return (
@@ -131,93 +162,197 @@ export default function FunnelPage() {
         </div>
       </div>
 
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <KpiCard
+          title="Total Deals"
+          value={`${totalLeads}`}
+          change="In pipeline"
+          trend={totalLeads > 0 ? 'up' : 'neutral'}
+          icon={List}
+        />
+        <KpiCard
+          title="Conversion Rate"
+          value={`${winRate.toFixed(1)}%`}
+          change={`${wonCount} won deals`}
+          trend={winRate > 0 ? 'up' : 'neutral'}
+          icon={TrendingUp}
+        />
+        <KpiCard
+          title="Avg. Deal Value"
+          value={formatCurrency(avgDealValue)}
+          change="Per deal"
+          trend={avgDealValue > 0 ? 'up' : 'neutral'}
+          icon={DollarSign}
+        />
+        <KpiCard
+          title="Lost Value"
+          value={formatCurrency(lostValue)}
+          change={`${lostCount} lost deals`}
+          trend={lostValue > 0 ? 'down' : 'neutral'}
+          icon={TrendingDown}
+        />
+      </div>
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle className="text-lg">Funnel Chart</CardTitle>
-          </CardHeader>
-          <CardContent>
-            {filteredLeads.length > 0 ? (
-              <div className="h-[400px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <FunnelChart>
-                    <Tooltip
-                      formatter={(value: number, name: string, props: any) => [
-                        `${formatCurrency(value)} (${props.payload.count} leads)`,
-                        name,
-                      ]}
-                    />
-                    <Funnel
-                      dataKey="value"
-                      data={stageData}
-                      isAnimationActive
-                      width={400}
-                    >
-                      <LabelList
-                        position="right"
-                        fill="hsl(var(--foreground))"
-                        stroke="none"
-                        dataKey="name"
-                        style={{ fontSize: 13 }}
-                      />
-                      <LabelList
-                        position="left"
-                        fill="hsl(var(--muted-foreground))"
-                        stroke="none"
-                        dataKey="count"
-                        style={{ fontSize: 13 }}
-                      />
-                      {stageData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.fill} />
-                      ))}
-                    </Funnel>
-                  </FunnelChart>
-                </ResponsiveContainer>
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div className="flex items-center gap-3">
+                <CardTitle className="text-lg">Funnel Chart</CardTitle>
+                <Badge variant="secondary" className="text-xs">
+                  {totalLeads} total deals
+                </Badge>
               </div>
-            ) : (
-              <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-lg">
-                <div className="text-center">
-                  <PieChart size={48} className="mx-auto text-muted-foreground/50 mb-3" />
-                  <p className="text-sm text-muted-foreground">No lead data for this period</p>
+              <Select value={selectedPipeline} onValueChange={setSelectedPipeline}>
+                <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="All pipelines" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All pipelines</SelectItem>
+                  {pipelines.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </CardHeader>
+            <CardContent>
+              {filteredLeads.length > 0 ? (
+                <div className="h-[400px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <FunnelChart>
+                      <Tooltip
+                        formatter={(value: number, name: string, props: any) => [
+                          `${formatCurrency(value)} (${props.payload.count} leads)`,
+                          name,
+                        ]}
+                      />
+                      <Funnel
+                        dataKey="value"
+                        data={stageData}
+                        isAnimationActive
+                        width={400}
+                      >
+                        <LabelList
+                          position="right"
+                          fill="hsl(var(--foreground))"
+                          stroke="none"
+                          dataKey="name"
+                          style={{ fontSize: 13 }}
+                        />
+                        <LabelList
+                          position="left"
+                          fill="hsl(var(--muted-foreground))"
+                          stroke="none"
+                          dataKey="count"
+                          style={{ fontSize: 13 }}
+                        />
+                        {stageData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.fill} />
+                        ))}
+                      </Funnel>
+                    </FunnelChart>
+                  </ResponsiveContainer>
                 </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
+              ) : (
+                <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-lg">
+                  <div className="text-center">
+                    <PieChart size={48} className="mx-auto text-muted-foreground/50 mb-3" />
+                    <p className="text-sm text-muted-foreground">No lead data for this period</p>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-lg">Stage Performance Metrics</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Stage Name</TableHead>
+                    <TableHead className="text-right">Deal Volume</TableHead>
+                    <TableHead className="text-right">Stage Value</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {stageData.map((stage) => (
+                    <TableRow key={stage.name}>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <div
+                            className="w-2.5 h-2.5 rounded-full shrink-0"
+                            style={{ backgroundColor: stage.fill }}
+                          />
+                          <span className="font-medium">{stage.name}</span>
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums">{stage.count}</TableCell>
+                      <TableCell className="text-right tabular-nums font-medium">
+                        {formatCurrency(stage.value)}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
 
         <div className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle className="text-lg">Stage Breakdown</CardTitle>
+              <CardTitle className="text-lg">Win/Loss Ratio</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {stageData.map((stage) => (
-                  <div key={stage.name} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ backgroundColor: stage.fill }}
-                        />
-                        <span>{stage.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-medium">{stage.count}</span>
-                        <span className="text-muted-foreground ml-2">{formatCurrency(stage.value)}</span>
-                      </div>
-                    </div>
-                    <div className="w-full bg-muted rounded-full h-1.5">
-                      <div
-                        className="rounded-full h-1.5 transition-all"
-                        style={{
-                          width: `${Math.max(1, (stage.count / Math.max(...stageData.map((s) => s.count), 1)) * 100)}%`,
-                          backgroundColor: stage.fill,
-                        }}
-                      />
-                    </div>
+            <CardContent className="space-y-5">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-emerald-500 shrink-0" />
+                    <span>Won Deals</span>
                   </div>
-                ))}
+                  <span className="font-medium tabular-nums">
+                    {wonPct.toFixed(1)}% ({wonCount})
+                  </span>
+                </div>
+                <Progress
+                  value={wonPct}
+                  className="h-2.5 [&>div]:bg-emerald-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-red-500 shrink-0" />
+                    <span>Lost Deals</span>
+                  </div>
+                  <span className="font-medium tabular-nums">
+                    {lostPct.toFixed(1)}% ({lostCount})
+                  </span>
+                </div>
+                <Progress
+                  value={lostPct}
+                  className="h-2.5 [&>div]:bg-red-500"
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-sm">
+                  <div className="flex items-center gap-2">
+                    <div className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0" />
+                    <span>In Progress</span>
+                  </div>
+                  <span className="font-medium tabular-nums">
+                    {inProgressPct.toFixed(1)}% ({inProgressCount})
+                  </span>
+                </div>
+                <Progress
+                  value={inProgressPct}
+                  className="h-2.5 [&>div]:bg-blue-500"
+                />
               </div>
             </CardContent>
           </Card>
@@ -244,37 +379,6 @@ export default function FunnelPage() {
             </CardContent>
           </Card>
         </div>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard
-          title="Total Pipeline Value"
-          value={formatCurrency(totalPipelineValue)}
-          change={`${filteredLeads.length} leads in pipeline`}
-          trend={totalPipelineValue > 0 ? 'up' : 'neutral'}
-          icon={DollarSign}
-        />
-        <KpiCard
-          title="Win Rate"
-          value={`${winRate.toFixed(1)}%`}
-          change={`${wonCount} won deals`}
-          trend={winRate > 0 ? 'up' : 'neutral'}
-          icon={TrendingUp}
-        />
-        <KpiCard
-          title="Average Deal Size"
-          value={formatCurrency(avgDealSize)}
-          change="Per won deal"
-          trend={avgDealSize > 0 ? 'up' : 'neutral'}
-          icon={PieChart}
-        />
-        <KpiCard
-          title="Time to Close"
-          value="—"
-          change="Coming soon"
-          trend="neutral"
-          icon={Clock}
-        />
       </div>
     </div>
   );

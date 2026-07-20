@@ -48,6 +48,8 @@ import type {
   EmailTemplate,
   EmailCampaign,
   EmailLog,
+  Pipeline,
+  PipelineStage,
 } from '@/lib/db/types';
 
 function cleanData(data: any) {
@@ -2178,4 +2180,52 @@ export async function createEmailLog(data: Omit<EmailLog, 'id'>): Promise<string
     await set(newRef, { ...data, sent_at: new Date().toISOString() });
     return newRef.key;
   } catch { return null; }
+}
+
+// ----------------------------------------------------
+// PIPELINE FUNCTIONS
+// ----------------------------------------------------
+
+export async function getPipelines(): Promise<Pipeline[]> {
+  try {
+    const refPath = ref(database, 'pipelines');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return [];
+    const items: Pipeline[] = [];
+    snapshot.forEach((child) => {
+      items.push({ id: child.key, ...child.val() } as Pipeline);
+    });
+    return items;
+  } catch { return []; }
+}
+
+export async function getPipeline(id: string): Promise<Pipeline | null> {
+  try {
+    const snapshot = await get(ref(database, `pipelines/${id}`));
+    if (!snapshot.exists()) return null;
+    return { id: snapshot.key, ...snapshot.val() } as Pipeline;
+  } catch { return null; }
+}
+
+export async function createPipeline(data: Omit<Pipeline, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const newRef = push(ref(database, 'pipelines'));
+    await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', user_id: 'system', user_name: 'System' });
+    return newRef.key;
+  } catch { return null; }
+}
+
+export async function updatePipeline(id: string, updates: Partial<Pipeline>): Promise<boolean> {
+  try {
+    await update(ref(database, `pipelines/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    return true;
+  } catch { return false; }
+}
+
+export async function deletePipeline(id: string): Promise<boolean> {
+  try {
+    await remove(ref(database, `pipelines/${id}`));
+    return true;
+  } catch { return false; }
 }

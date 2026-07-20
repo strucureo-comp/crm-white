@@ -471,6 +471,21 @@ export interface DeliveryItem {
   description?: string;
 }
 
+export interface PipelineStage {
+  id: string;
+  name: string;
+  color: string;
+  order: number;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  stages: PipelineStage[];
+  created_at: string;
+  updated_at: string;
+}
+
 export type ActivityAction =
   | 'lead_created' | 'lead_updated' | 'lead_deleted'
   | 'deal_stage_changed'

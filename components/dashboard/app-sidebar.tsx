@@ -68,6 +68,7 @@ function getNavGroups(leadCount: number): NavGroup[] {
         { title: 'Contacts', href: '/contacts', icon: Contact2 },
         { title: 'Deals', href: '/deals', icon: DollarSign },
         { title: 'Funnel', href: '/funnel', icon: TrendingUp },
+        { title: 'Pipeline', href: '/pipeline', icon: BarChart3 },
         { title: 'Activity', href: '/activity', icon: Activity },
       ],
     },
