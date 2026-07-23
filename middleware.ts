@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
-const publicPaths = ['/login', '/register', '/forgot-password'];
+const publicPaths = ['/login', '/register', '/forgot-password', '/setup'];
 const publicApiPaths = ['/api/enquiries', '/api/auth/session'];
 
 export async function middleware(req: NextRequest) {
@@ -32,9 +32,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  const isDashboardRoute = !isPublicPath && !pathname.startsWith('/api');
+  const isProtectedRoute = !isPublicPath && !pathname.startsWith('/api');
 
-  if (isDashboardRoute) {
+  if (isProtectedRoute) {
     if (!session) {
       const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('redirect', pathname);
@@ -43,7 +43,9 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  if (isPublicPath && session) {
+  // Allow public paths with session (login, register redirect to dashboard via client-side)
+  // But /setup needs session to work, so don't redirect away from it
+  if (isPublicPath && session && pathname !== '/setup') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 

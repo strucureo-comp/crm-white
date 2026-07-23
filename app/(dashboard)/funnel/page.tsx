@@ -30,18 +30,8 @@ import {
 import { useEffect, useState } from 'react';
 import { getLeads, getPipelines } from '@/lib/firebase/database';
 import type { Lead, Pipeline } from '@/lib/db/types';
-import {
-  FunnelChart,
-  Funnel,
-  LabelList,
-  Tooltip,
-  ResponsiveContainer,
-  Cell,
-} from 'recharts';
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
+import { formatCurrency } from '@/lib/utils';
 
 const FUNNEL_STAGES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won'] as const;
 
@@ -219,41 +209,36 @@ export default function FunnelPage() {
             </CardHeader>
             <CardContent>
               {filteredLeads.length > 0 ? (
-                <div className="h-[400px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <FunnelChart>
-                      <Tooltip
-                        formatter={(value: number, name: string, props: any) => [
-                          `${formatCurrency(value)} (${props.payload.count} leads)`,
-                          name,
-                        ]}
-                      />
-                      <Funnel
-                        dataKey="value"
-                        data={stageData}
-                        isAnimationActive
-                        width={400}
-                      >
-                        <LabelList
-                          position="right"
-                          fill="hsl(var(--foreground))"
-                          stroke="none"
-                          dataKey="name"
-                          style={{ fontSize: 13 }}
-                        />
-                        <LabelList
-                          position="left"
-                          fill="hsl(var(--muted-foreground))"
-                          stroke="none"
-                          dataKey="count"
-                          style={{ fontSize: 13 }}
-                        />
-                        {stageData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Funnel>
-                    </FunnelChart>
-                  </ResponsiveContainer>
+                <div className="py-4 space-y-1">
+                  {stageData.map((stage, index) => {
+                    const maxCount = Math.max(...stageData.map((s) => s.count), 1);
+                    const widthPercent = Math.max((stage.count / maxCount) * 100, 8);
+
+                    return (
+                      <div key={stage.name} className="flex items-center gap-4">
+                        <span className="text-sm text-muted-foreground w-6 text-right tabular-nums shrink-0">
+                          {stage.count}
+                        </span>
+                        <div className="flex-1 flex items-center justify-center">
+                          <div
+                            className="h-10 rounded-md flex items-center justify-center transition-all duration-300"
+                            style={{
+                              width: `${widthPercent}%`,
+                              backgroundColor: stage.fill,
+                              minWidth: '40px',
+                            }}
+                          >
+                            <span className="text-white text-sm font-medium drop-shadow-sm">
+                              {stage.name}
+                            </span>
+                          </div>
+                        </div>
+                        <span className="text-sm font-medium tabular-nums w-24 text-right shrink-0">
+                          {formatCurrency(stage.value)}
+                        </span>
+                      </div>
+                    );
+                  })}
                 </div>
               ) : (
                 <div className="h-[400px] flex items-center justify-center border-2 border-dashed rounded-lg">

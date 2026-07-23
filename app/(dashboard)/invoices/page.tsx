@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,9 +24,9 @@ import {
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { getInvoices, deleteInvoice } from '@/lib/firebase/database';
 import type { Invoice } from '@/lib/db/types';
-import { InvoiceDialog } from '@/components/dialogs/invoice-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 import { generateInvoicePdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
 
 const statusStyles: Record<string, string> = {
@@ -35,17 +36,12 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
 };
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-}
-
 export default function InvoicesPage() {
+  const router = useRouter();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingInvoice, setEditingInvoice] = useState<Invoice | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   const load = useCallback(async () => {
@@ -101,7 +97,7 @@ export default function InvoicesPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Invoices</h2>
           <p className="text-sm text-muted-foreground">Manage and track customer invoices</p>
         </div>
-        <Button onClick={() => { setEditingInvoice(null); setDialogOpen(true); }} className="w-full sm:w-auto">
+        <Button onClick={() => router.push('/invoices/new')} className="w-full sm:w-auto">
           <Plus size={16} className="mr-2" />
           New Invoice
         </Button>
@@ -180,7 +176,7 @@ export default function InvoicesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={() => { setEditingInvoice(inv); setDialogOpen(true); }}>
+                        <DropdownMenuItem onClick={() => router.push(`/invoices/${inv.id}`)}>
                           <Pencil size={14} className="mr-2" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={async () => {
@@ -222,12 +218,6 @@ export default function InvoicesPage() {
         </Card>
       )}
 
-      <InvoiceDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSaved={load}
-        invoice={editingInvoice}
-      />
       <ConfirmDialog
         open={confirmState.open}
         onOpenChange={(open) => setConfirmState({ open })}

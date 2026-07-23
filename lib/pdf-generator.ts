@@ -1,6 +1,10 @@
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import type { Invoice, Project, User, Quotation } from './db/types';
+import type { WorkspaceSettings } from '@/lib/settings/types';
+import { DEFAULT_WORKSPACE_SETTINGS } from '@/lib/settings/types';
+
+type S = WorkspaceSettings;
 
 const getBase64ImageFromURL = (url: string): Promise<string> => {
     return new Promise((resolve, reject) => {
@@ -20,59 +24,76 @@ const getBase64ImageFromURL = (url: string): Promise<string> => {
     });
 };
 
-const formatCurrency = (amount: number, currency: string = 'USD') => {
-    // Format number with commas and 2 decimal places
+const formatCurrency = (amount: number, symbol: string = '$') => {
     const formattedNumber = amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
-
-    // Currency symbols that work in PDF
-    const symbols: Record<string, string> = {
-        'USD': '$',
-        'EUR': 'EUR',
-        'GBP': 'GBP',
-        'INR': 'INR',
-        'AUD': 'AUD',
-        'CAD': 'CAD',
-        'SGD': 'SGD'
-    };
-
-    const symbol = symbols[currency] || currency;
-
-    // For USD, put symbol before. For others, put after with space
-    if (currency === 'USD') {
-        return `${symbol}${formattedNumber}`;
-    }
-
-    return `${symbol} ${formattedNumber}`;
+    return `${symbol}${formattedNumber}`;
 };
 
-export const createQuotationDoc = async (quotation: Quotation, client: User | null) => {
+function getFromSection(s: S) {
+    return {
+        name: s.general.company_name || 'Your Company',
+        tagline: s.general.tagline || '',
+        email: s.branding.email || '',
+        phone: s.branding.phone || '',
+        address: s.branding.address || '',
+    };
+}
+
+function getFooterText(s: S) {
+    return s.branding.footer_text || '';
+}
+
+function getLogoUrl(s: S) {
+    return s.branding.logo_url || '';
+}
+
+function getSymbol(s: S) {
+    return s.general.currency_symbol || '$';
+}
+
+function hexToRgb(hex: string): [number, number, number] {
+    const clean = hex.replace('#', '');
+    const big = parseInt(clean, 16);
+    return [(big >> 16) & 255, (big >> 8) & 255, big & 255];
+}
+
+export const createQuotationDoc = async (quotation: Quotation, client: User | null, settings?: S) => {
+    const s = settings || DEFAULT_WORKSPACE_SETTINGS;
+    const from = getFromSection(s);
+    const symbol = getSymbol(s);
+    const footer = getFooterText(s);
+    const logoUrl = getLogoUrl(s);
+
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
         format: 'a4'
     });
 
-    const pageWidth = 210; // A4 width in mm
+    const pageWidth = 210;
     const margin = 15;
     const rightColumnX = pageWidth - margin;
 
-    // Add Logo (Left side, top)
-    try {
-        const logoData = await getBase64ImageFromURL('/logo_trans_(4884x4884)px_for_white_bg.png');
-        doc.addImage(logoData, 'PNG', margin, 10, 35, 35);
-    } catch (error) {
-        console.warn('Could not load logo for PDF:', error);
+    // Add Logo
+    if (logoUrl) {
+        try {
+            const logoData = await getBase64ImageFromURL(logoUrl);
+            doc.addImage(logoData, 'PNG', margin, 10, 35, 35);
+        } catch (error) {
+            console.warn('Could not load logo for PDF:', error);
+        }
     }
 
-    // Header - QUOTATION (Right side, aligned right)
+    // Header
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
+    const [r, g, b] = hexToRgb(s.branding.primary_color);
+    doc.setTextColor(r, g, b);
     doc.text('QUOTATION', rightColumnX, 20, { align: 'right' });
 
-    // Quotation details (Right side, aligned right)
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     let yPos = 28;
 
     doc.text(`Quotation #: ${quotation.quotation_number}`, rightColumnX, yPos, { align: 'right' });
@@ -97,7 +118,7 @@ export const createQuotationDoc = async (quotation: Quotation, client: User | nu
         yPos += 5;
     }
 
-    // From Section (Left side)
+    // From Section
     let leftY = 55;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -105,20 +126,33 @@ export const createQuotationDoc = async (quotation: Quotation, client: User | nu
 
     leftY += 6;
     doc.setFontSize(12);
-    doc.text('Strucureo', margin, leftY);
+    doc.text(from.name, margin, leftY);
 
-    leftY += 5;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Your Professional Solution Partner', margin, leftY);
+    if (from.tagline) {
+        leftY += 5;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(from.tagline, margin, leftY);
+    }
 
-    leftY += 5;
-    doc.text('support@strucureo.com', margin, leftY);
+    if (from.email) {
+        leftY += 5;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(from.email, margin, leftY);
+    }
 
-    leftY += 5;
-    doc.text('+91 6385362719', margin, leftY);
+    if (from.phone) {
+        leftY += 5;
+        doc.text(from.phone, margin, leftY);
+    }
 
-    // To Section (Right side, aligned right)
+    if (from.address) {
+        leftY += 5;
+        doc.text(from.address, margin, leftY);
+    }
+
+    // To Section
     let rightY = 55;
     doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
@@ -126,30 +160,23 @@ export const createQuotationDoc = async (quotation: Quotation, client: User | nu
 
     rightY += 6;
     doc.setFontSize(12);
-    doc.setFontSize(12);
 
     if (quotation.client_is_company) {
-        // Company prominent
         const companyName = quotation.client_company || 'Company Name';
         doc.text(companyName, rightColumnX, rightY, { align: 'right' });
         rightY += 5;
-
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-
         if (quotation.client_name) {
             doc.text(`Attn: ${quotation.client_name}`, rightColumnX, rightY, { align: 'right' });
             rightY += 5;
         }
     } else {
-        // Person prominent
         const clientName = quotation.client_name || client?.full_name || 'Client Name';
         doc.text(clientName, rightColumnX, rightY, { align: 'right' });
         rightY += 5;
-
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-
         if (quotation.client_company) {
             doc.text(quotation.client_company, rightColumnX, rightY, { align: 'right' });
             rightY += 5;
@@ -167,15 +194,14 @@ export const createQuotationDoc = async (quotation: Quotation, client: User | nu
         rightY += 5;
     }
 
-    // Table starts after both columns
+    // Table
     const tableStartY = Math.max(leftY, rightY) + 10;
 
-    const currency = quotation.currency || 'USD';
     const tableData = quotation.items.map(item => [
         item.description || '',
         item.quantity.toString(),
-        formatCurrency(item.unit_price, currency),
-        formatCurrency(item.total, currency)
+        formatCurrency(item.unit_price, symbol),
+        formatCurrency(item.total, symbol)
     ]);
 
     autoTable(doc, {
@@ -193,7 +219,7 @@ export const createQuotationDoc = async (quotation: Quotation, client: User | nu
             lineWidth: 0.1
         },
         headStyles: {
-            fillColor: [51, 51, 51],
+            fillColor: hexToRgb(s.branding.primary_color),
             textColor: [255, 255, 255],
             fontSize: 9,
             fontStyle: 'bold',
@@ -208,53 +234,59 @@ export const createQuotationDoc = async (quotation: Quotation, client: User | nu
             fillColor: [245, 245, 245]
         },
         columnStyles: {
-            0: { cellWidth: 'auto', halign: 'left' },   // Description - auto width
-            1: { cellWidth: 20, halign: 'center' },      // Quantity
-            2: { cellWidth: 30, halign: 'right' },       // Unit Price
-            3: { cellWidth: 30, halign: 'right' }        // Total
+            0: { cellWidth: 'auto', halign: 'left' },
+            1: { cellWidth: 20, halign: 'center' },
+            2: { cellWidth: 30, halign: 'right' },
+            3: { cellWidth: 30, halign: 'right' }
         },
         margin: { left: margin, right: margin }
     });
 
-    // Total Amount (Right aligned)
+    // Total
     let finalY = (doc as any).lastAutoTable?.finalY || tableStartY + 50;
     finalY += 10;
 
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Amount: ${formatCurrency(quotation.amount, currency)}`, rightColumnX, finalY, { align: 'right' });
+    doc.text(`Total Amount: ${formatCurrency(quotation.amount, symbol)}`, rightColumnX, finalY, { align: 'right' });
 
     finalY += 15;
 
-    // Notes Section
+    // Notes
     if (quotation.notes) {
         doc.setFontSize(11);
         doc.setFont('helvetica', 'bold');
         doc.text('Notes:', margin, finalY);
-
         finalY += 6;
         doc.setFontSize(10);
         doc.setFont('helvetica', 'normal');
-
         const splitNotes = doc.splitTextToSize(quotation.notes, pageWidth - (2 * margin));
         doc.text(splitNotes, margin, finalY);
         finalY += splitNotes.length * 5;
     }
 
-    // Footer (centered at bottom)
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Powered by BridgeBreak Software', pageWidth / 2, 285, { align: 'center' });
+    // Footer
+    if (footer) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(footer, pageWidth / 2, 285, { align: 'center' });
+    }
 
     return doc;
 };
 
-export const generateQuotationPDF = async (quotation: Quotation, client: User | null) => {
-    const doc = await createQuotationDoc(quotation, client);
+export const generateQuotationPDF = async (quotation: Quotation, client: User | null, settings?: S) => {
+    const doc = await createQuotationDoc(quotation, client, settings);
     doc.save(`${quotation.quotation_number}.pdf`);
 };
 
-export const createInvoiceDoc = async (invoice: Invoice, client: User | null, project: Project | null) => {
+export const createInvoiceDoc = async (invoice: Invoice, client: User | null, project: Project | null, settings?: S) => {
+    const s = settings || DEFAULT_WORKSPACE_SETTINGS;
+    const from = getFromSection(s);
+    const symbol = getSymbol(s);
+    const footer = getFooterText(s);
+    const logoUrl = getLogoUrl(s);
+
     const doc = new jsPDF({
         orientation: 'portrait',
         unit: 'mm',
@@ -266,22 +298,25 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
     const rightColumnX = pageWidth - margin;
 
     // Add Logo
-    try {
-        const logoData = await getBase64ImageFromURL('/logo_trans_(4884x4884)px_for_white_bg.png');
-        doc.addImage(logoData, 'PNG', margin, 10, 35, 35);
-    } catch (error) {
-        console.warn('Could not load logo for PDF:', error);
+    if (logoUrl) {
+        try {
+            const logoData = await getBase64ImageFromURL(logoUrl);
+            doc.addImage(logoData, 'PNG', margin, 10, 35, 35);
+        } catch (error) {
+            console.warn('Could not load logo for PDF:', error);
+        }
     }
 
-    // Header - INVOICE
+    // Header
     doc.setFontSize(24);
     doc.setFont('helvetica', 'bold');
-    doc.setTextColor(0, 0, 0);
+    const [r, g, b] = hexToRgb(s.branding.primary_color);
+    doc.setTextColor(r, g, b);
     doc.text('INVOICE', rightColumnX, 20, { align: 'right' });
 
-    // Details/Meta
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
+    doc.setTextColor(0, 0, 0);
     let yPos = 28;
 
     doc.text(`Invoice #: ${invoice.invoice_number}`, rightColumnX, yPos, { align: 'right' });
@@ -299,16 +334,31 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
 
     leftY += 6;
     doc.setFontSize(12);
-    doc.text('Strucureo', margin, leftY);
+    doc.text(from.name, margin, leftY);
 
-    leftY += 5;
-    doc.setFontSize(10);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Your Professional Solution Partner', margin, leftY);
-    leftY += 5;
-    doc.text('support@strucureo.com', margin, leftY);
-    leftY += 5;
-    doc.text('+91 6385362719', margin, leftY);
+    if (from.tagline) {
+        leftY += 5;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(from.tagline, margin, leftY);
+    }
+
+    if (from.email) {
+        leftY += 5;
+        doc.setFontSize(10);
+        doc.setFont('helvetica', 'normal');
+        doc.text(from.email, margin, leftY);
+    }
+
+    if (from.phone) {
+        leftY += 5;
+        doc.text(from.phone, margin, leftY);
+    }
+
+    if (from.address) {
+        leftY += 5;
+        doc.text(from.address, margin, leftY);
+    }
 
     // To Section
     let rightY = 55;
@@ -333,16 +383,14 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
         rightY += 5;
     }
 
-    // Construct table data (Invoice is simpler, effectively 1 item usually or we'd need invoice items if they existed, but type says 'items' isn't explicitly there but 'description' is)
-    // Actually Invoice type just has amount and description.
+    // Table
     const tableStartY = Math.max(leftY, rightY) + 10;
 
-    // We treat the main description as the item
     const tableData = [[
         invoice.description || 'Professional Services',
         '1',
-        formatCurrency(invoice.amount),
-        formatCurrency(invoice.amount)
+        formatCurrency(invoice.amount, symbol),
+        formatCurrency(invoice.amount, symbol)
     ]];
 
     autoTable(doc, {
@@ -356,7 +404,7 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
             cellPadding: 2
         },
         headStyles: {
-            fillColor: [51, 51, 51],
+            fillColor: hexToRgb(s.branding.primary_color),
             textColor: [255, 255, 255],
             fontStyle: 'bold'
         },
@@ -374,7 +422,7 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
 
     doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
-    doc.text(`Total Due: ${formatCurrency(invoice.amount)}`, rightColumnX, finalY, { align: 'right' });
+    doc.text(`Total Due: ${formatCurrency(invoice.amount, symbol)}`, rightColumnX, finalY, { align: 'right' });
 
     finalY += 15;
 
@@ -388,11 +436,6 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
         const splitNotes = doc.splitTextToSize(invoice.notes, pageWidth - (2 * margin));
         doc.text(splitNotes, margin, finalY);
         finalY += splitNotes.length * 5;
-    }
-
-    if (invoice.payment_qr_url) {
-        finalY += 10;
-        // Logic for QR code if needed, for now just text or placeholder
     }
 
     if (invoice.bank_details) {
@@ -410,14 +453,16 @@ export const createInvoiceDoc = async (invoice: Invoice, client: User | null, pr
         });
     }
 
-    doc.setFontSize(9);
-    doc.setFont('helvetica', 'normal');
-    doc.text('Powered by BridgeBreak Software', pageWidth / 2, 285, { align: 'center' });
+    if (footer) {
+        doc.setFontSize(9);
+        doc.setFont('helvetica', 'normal');
+        doc.text(footer, pageWidth / 2, 285, { align: 'center' });
+    }
 
     return doc;
 };
 
-export const generateInvoicePDF = async (invoice: Invoice, client: User | null, project: Project | null) => {
-    const doc = await createInvoiceDoc(invoice, client, project);
+export const generateInvoicePDF = async (invoice: Invoice, client: User | null, project: Project | null, settings?: S) => {
+    const doc = await createInvoiceDoc(invoice, client, project, settings);
     doc.save(`Invoice-${invoice.invoice_number}.pdf`);
 };

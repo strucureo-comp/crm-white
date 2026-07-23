@@ -1,6 +1,6 @@
 import { supabase } from '../supabase/client';
 
-export async function uploadProjectProjectPreview(projectId: string, file: File): Promise<string | null> {
+export async function uploadProjectPreview(projectId: string, file: File): Promise<string | null> {
     try {
         const fileName = `preview_${Date.now()}_${file.name.replace(/\s+/g, '_')}`;
         const filePath = `${projectId}/${fileName}`;
@@ -28,8 +28,7 @@ export async function uploadProjectProjectPreview(projectId: string, file: File)
     }
 }
 
-// Keeping the old name for backward compatibility if needed
-export const uploadProjectImage = uploadProjectProjectPreview;
+export const uploadProjectImage = uploadProjectPreview;
 
 export async function uploadTicketAttachment(projectId: string, file: File): Promise<string | null> {
     try {

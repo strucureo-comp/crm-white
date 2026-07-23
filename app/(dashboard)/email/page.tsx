@@ -1,372 +1,161 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
+import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Plus, FileText, Loader2, Pencil, Trash2, MoreHorizontal, Search, Eye, ArrowLeft, Mail, Send, BarChart3, Clock, CheckCircle2, Play, PauseCircle, MousePointerClick, X } from 'lucide-react';
-import { getEmailTemplates, getEmailCampaigns, getEmailLogs, deleteEmailTemplate, deleteEmailCampaign } from '@/lib/firebase/database';
-import type { EmailTemplate, EmailCampaign, EmailLog, EmailCampaignStatus } from '@/lib/db/types';
-import { toast } from 'sonner';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { EmailTemplateDialog } from '@/components/dialogs/email-template-dialog';
-import { EmailCampaignDialog } from '@/components/dialogs/email-campaign-dialog';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Search, Mail, Send, Eye, MousePointer, Trash2, UserMinus } from 'lucide-react';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { getEmailCampaigns, createEmailCampaign, deleteEmailCampaign, getEmailSegments, createEmailSegment } from '@/lib/db/automation/api';
+import { EmailCampaign, EmailSegment } from '@/lib/db/automation/types';
 
-const statusBadge: Record<EmailCampaignStatus, { label: string; className: string }> = {
-  draft: { label: 'Draft', className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
-  scheduling: { label: 'Scheduling', className: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300' },
-  active: { label: 'Active', className: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' },
-  completed: { label: 'Completed', className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300' },
-  paused: { label: 'Paused', className: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' },
+const statusColors: Record<string, string> = {
+  draft: 'bg-gray-100 text-gray-800',
+  scheduled: 'bg-blue-100 text-blue-800',
+  sending: 'bg-yellow-100 text-yellow-800',
+  sent: 'bg-green-100 text-green-800',
+  failed: 'bg-red-100 text-red-800',
 };
 
 export default function EmailMarketingPage() {
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('templates');
-  const [templates, setTemplates] = useState<EmailTemplate[]>([]);
+  const { workspace } = useAuth();
+  const workspaceId = workspace?.id || '';
+
   const [campaigns, setCampaigns] = useState<EmailCampaign[]>([]);
+  const [segments, setSegments] = useState<EmailSegment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
-  const [campaignDialogOpen, setCampaignDialogOpen] = useState(false);
-  const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
-  const [editingCampaign, setEditingCampaign] = useState<EmailCampaign | null>(null);
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; type?: 'template' | 'campaign'; loading?: boolean }>({ open: false });
-  const [selectedCampaign, setSelectedCampaign] = useState<EmailCampaign | null>(null);
-  const [campaignLogs, setCampaignLogs] = useState<EmailLog[]>([]);
-  const [logsLoading, setLogsLoading] = useState(false);
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showSegmentDialog, setShowSegmentDialog] = useState(false);
+  const [newCampaign, setNewCampaign] = useState({ name: '', subject: '', preview_text: '' });
+  const [newSegment, setNewSegment] = useState({ name: '', description: '' });
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [t, c] = await Promise.all([getEmailTemplates(), getEmailCampaigns()]);
-      setTemplates(t);
-      setCampaigns(c);
-    } catch {
-      toast.error('Failed to load email data');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  useEffect(() => {
+    if (!workspaceId) return;
+    Promise.all([getEmailCampaigns(workspaceId), getEmailSegments(workspaceId)])
+      .then(([c, s]) => { setCampaigns(c); setSegments(s); })
+      .finally(() => setLoading(false));
+  }, [workspaceId]);
 
-  useEffect(() => { load(); }, [load]);
+  const handleCreateCampaign = async () => {
+    if (!newCampaign.name.trim()) return;
+    const campaign = await createEmailCampaign(workspaceId, {
+      workspace_id: workspaceId,
+      name: newCampaign.name,
+      subject: newCampaign.subject,
+      preview_text: newCampaign.preview_text,
+      content: '',
+      recipients: [],
+      status: 'draft',
+      metrics: { sent: 0, delivered: 0, opened: 0, clicked: 0, bounced: 0, unsubscribed: 0, open_rate: 0, click_rate: 0, bounce_rate: 0, unsubscribe_rate: 0 },
+    });
+    setCampaigns([campaign, ...campaigns]);
+    setShowCreateDialog(false);
+    setNewCampaign({ name: '', subject: '', preview_text: '' });
+  };
 
-  async function handleDelete(type: 'template' | 'campaign', id: string) {
-    setConfirmState({ open: true, id, type });
-  }
+  const handleDeleteCampaign = async (id: string) => {
+    await deleteEmailCampaign(workspaceId, id);
+    setCampaigns(campaigns.filter(c => c.campaign_id !== id));
+  };
 
-  async function onDeleteConfirm() {
-    const { id, type } = confirmState;
-    if (!id || !type) return;
-    setConfirmState((prev) => ({ ...prev, loading: true }));
-    try {
-      if (type === 'template') {
-        await deleteEmailTemplate(id);
-        toast.success('Template deleted');
-      } else {
-        await deleteEmailCampaign(id);
-        toast.success('Campaign deleted');
-      }
-      load();
-    } catch {
-      toast.error('Failed to delete');
-    } finally {
-      setConfirmState({ open: false });
-    }
-  }
+  const handleCreateSegment = async () => {
+    if (!newSegment.name.trim()) return;
+    const segment = await createEmailSegment(workspaceId, {
+      workspace_id: workspaceId,
+      name: newSegment.name,
+      description: newSegment.description,
+      conditions: [],
+      contact_count: 0,
+    });
+    setSegments([segment, ...segments]);
+    setShowSegmentDialog(false);
+    setNewSegment({ name: '', description: '' });
+  };
 
-  async function viewCampaign(campaign: EmailCampaign) {
-    setSelectedCampaign(campaign);
-    setLogsLoading(true);
-    try {
-      const logs = await getEmailLogs(campaign.id);
-      setCampaignLogs(logs);
-    } catch {
-      toast.error('Failed to load campaign logs');
-    } finally {
-      setLogsLoading(false);
-    }
-  }
-
-  const filteredTemplates = templates.filter((t) =>
-    t.name.toLowerCase().includes(search.toLowerCase()) ||
-    t.subject.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const filteredCampaigns = campaigns.filter((c) =>
-    c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.subject.toLowerCase().includes(search.toLowerCase())
-  );
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={32} className="animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (selectedCampaign) {
-    const badge = statusBadge[selectedCampaign.status];
-    return (
-      <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => setSelectedCampaign(null)}>
-            <ArrowLeft size={16} />
-          </Button>
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">{selectedCampaign.name}</h2>
-            <p className="text-sm text-muted-foreground">{selectedCampaign.subject}</p>
-          </div>
-          <Badge className={`${badge.className} ml-auto`}>{badge.label}</Badge>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-primary/10"><Send size={20} className="text-primary" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Sent</p>
-                <p className="text-lg font-bold">{selectedCampaign.stats?.sent || 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-blue-500/10"><Eye size={20} className="text-blue-500" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Opened</p>
-                <p className="text-lg font-bold">{selectedCampaign.stats?.opened || 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-green-500/10"><MousePointerClick size={20} className="text-green-500" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Clicked</p>
-                <p className="text-lg font-bold">{selectedCampaign.stats?.clicked || 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-red-500/10"><X size={20} className="text-red-500" /></div>
-              <div>
-                <p className="text-xs text-muted-foreground">Bounced</p>
-                <p className="text-lg font-bold">{selectedCampaign.stats?.bounced || 0}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div>
-          <h3 className="text-sm font-semibold mb-3">Email Logs</h3>
-          {logsLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 size={24} className="animate-spin text-muted-foreground" />
-            </div>
-          ) : campaignLogs.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <Mail size={32} className="mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-sm text-muted-foreground">No logs yet</p>
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-0">
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead>
-                      <tr className="border-b bg-muted/50">
-                        <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Recipient</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Sent</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Opened</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Clicked</th>
-                        <th className="text-left text-xs font-medium text-muted-foreground uppercase tracking-wider px-4 py-3">Bounced</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {campaignLogs.map((log) => (
-                        <tr key={log.id} className="border-b last:border-0 hover:bg-muted/30">
-                          <td className="px-4 py-3 text-sm">{log.recipient_email}</td>
-                          <td className="px-4 py-3 text-sm text-muted-foreground">{new Date(log.sent_at).toLocaleDateString()}</td>
-                          <td className="px-4 py-3">{log.opened_at ? <Badge variant="outline" className="text-[10px] bg-green-50 text-green-700 border-green-200">Opened</Badge> : <span className="text-sm text-muted-foreground">-</span>}</td>
-                          <td className="px-4 py-3">{log.clicked_at ? <Badge variant="outline" className="text-[10px] bg-blue-50 text-blue-700 border-blue-200">Clicked</Badge> : <span className="text-sm text-muted-foreground">-</span>}</td>
-                          <td className="px-4 py-3">{log.bounced ? <Badge variant="outline" className="text-[10px] bg-red-50 text-red-700 border-red-200">Bounced</Badge> : <span className="text-sm text-muted-foreground">-</span>}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </div>
-    );
-  }
+  const filtered = campaigns.filter(c => c.name.toLowerCase().includes(search.toLowerCase()) || c.subject.toLowerCase().includes(search.toLowerCase()));
+  const stats = {
+    total: campaigns.length,
+    sent: campaigns.filter(c => c.status === 'sent').length,
+    totalSent: campaigns.reduce((s, c) => s + (c.metrics?.sent || 0), 0),
+    avgOpenRate: campaigns.length > 0 ? campaigns.filter(c => c.status === 'sent').reduce((s, c) => s + (c.metrics?.open_rate || 0), 0) / Math.max(campaigns.filter(c => c.status === 'sent').length, 1) : 0,
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Email Marketing</h2>
-          <p className="text-sm text-muted-foreground">Manage templates and campaigns</p>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div><h1 className="text-2xl font-bold tracking-tight">Email Marketing</h1><p className="text-muted-foreground">Create campaigns, manage subscribers, and track engagement</p></div>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => setShowSegmentDialog(true)}><UserMinus size={16} className="mr-2" />New Segment</Button>
+          <Button onClick={() => setShowCreateDialog(true)}><Plus size={16} className="mr-2" />New Campaign</Button>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4 mb-4">
-          <TabsList>
-            <TabsTrigger value="templates">Templates</TabsTrigger>
-            <TabsTrigger value="campaigns">Campaigns</TabsTrigger>
-          </TabsList>
-          <div className="flex items-center gap-2">
-            <div className="relative max-w-xs">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder={activeTab === 'templates' ? 'Search templates...' : 'Search campaigns...'}
-                className="pl-9 h-9 w-[200px]"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-              />
-            </div>
-            <Button
-              size="sm"
-              onClick={() => {
-                if (activeTab === 'templates') {
-                  setEditingTemplate(null);
-                  setTemplateDialogOpen(true);
-                } else {
-                  setEditingCampaign(null);
-                  setCampaignDialogOpen(true);
-                }
-              }}
-            >
-              <Plus size={14} className="mr-1" />
-              {activeTab === 'templates' ? 'Template' : 'Campaign'}
-            </Button>
-          </div>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Campaigns</p><p className="text-2xl font-bold">{stats.total}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Sent</p><p className="text-2xl font-bold">{stats.sent}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Emails Sent</p><p className="text-2xl font-bold">{stats.totalSent.toLocaleString()}</p></CardContent></Card>
+        <Card><CardContent className="p-4"><p className="text-sm text-muted-foreground">Avg Open Rate</p><p className="text-2xl font-bold">{stats.avgOpenRate.toFixed(1)}%</p></CardContent></Card>
+      </div>
 
-        <TabsContent value="templates" className="mt-0">
-          {filteredTemplates.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <FileText size={48} className="mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-sm text-muted-foreground">No templates yet</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filteredTemplates.map((tpl) => (
-                <Card key={tpl.id} className="group relative">
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileText size={16} className="text-primary shrink-0" />
-                        <p className="text-sm font-medium truncate">{tpl.name}</p>
-                      </div>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 -mt-1 -mr-1 shrink-0" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === tpl.id ? null : tpl.id); }}>
-                        <MoreHorizontal size={12} />
-                      </Button>
-                    </div>
-                    {menuOpen === tpl.id && (
-                      <div className="absolute right-2 top-10 z-10 w-28 rounded-md border bg-background shadow-lg">
-                        <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted" onClick={() => { setEditingTemplate(tpl); setMenuOpen(null); setTemplateDialogOpen(true); }}>
-                          <Pencil size={12} /> Edit
-                        </button>
-                        <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-red-600" onClick={() => { handleDelete('template', tpl.id); setMenuOpen(null); }}>
-                          <Trash2 size={12} /> Delete
-                        </button>
-                      </div>
-                    )}
-                    <p className="text-xs text-muted-foreground truncate mt-1">{tpl.subject}</p>
-                    <div className="flex items-center gap-2 mt-3 text-xs text-muted-foreground">
-                      <span>{tpl.variables?.length || 0} variables</span>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          )}
+      <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search campaigns..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" /></div>
+
+      <Tabs defaultValue="campaigns">
+        <TabsList><TabsTrigger value="campaigns">Campaigns ({campaigns.length})</TabsTrigger><TabsTrigger value="segments">Segments ({segments.length})</TabsTrigger></TabsList>
+        <TabsContent value="campaigns" className="space-y-4">
+          {filtered.length === 0 ? (
+            <Card><CardContent className="py-12 text-center"><Mail className="h-12 w-12 text-muted-foreground mx-auto mb-4" /><h3 className="text-lg font-medium mb-2">No campaigns yet</h3><Button onClick={() => setShowCreateDialog(true)}><Plus size={16} className="mr-2" />Create Campaign</Button></CardContent></Card>
+          ) : filtered.map(c => (
+            <Card key={c.campaign_id}>
+              <CardContent className="p-6 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-3 mb-2"><h3 className="text-lg font-semibold">{c.name}</h3><Badge className={statusColors[c.status]}>{c.status}</Badge></div>
+                  <p className="text-sm text-muted-foreground">{c.subject}</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Sent</p><p className="text-sm font-semibold">{(c.metrics?.sent || 0).toLocaleString()}</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Open Rate</p><p className="text-sm font-semibold">{(c.metrics?.open_rate || 0).toFixed(1)}%</p></div>
+                  <div className="text-center"><p className="text-xs text-muted-foreground">Click Rate</p><p className="text-sm font-semibold">{(c.metrics?.click_rate || 0).toFixed(1)}%</p></div>
+                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteCampaign(c.campaign_id)}><Trash2 size={14} /></Button>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
         </TabsContent>
-
-        <TabsContent value="campaigns" className="mt-0">
-          {filteredCampaigns.length === 0 ? (
-            <div className="text-center py-12 border-2 border-dashed rounded-lg">
-              <Send size={48} className="mx-auto text-muted-foreground/50 mb-3" />
-              <p className="text-sm text-muted-foreground">No campaigns yet</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredCampaigns.map((c) => {
-                const badge = statusBadge[c.status];
-                return (
-                  <Card key={c.id} className="cursor-pointer hover:shadow-sm transition-shadow" onClick={() => viewCampaign(c)}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <Mail size={16} className="text-primary shrink-0" />
-                          <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{c.name}</p>
-                            <p className="text-xs text-muted-foreground truncate">{c.subject}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          <div className="hidden sm:flex items-center gap-3 text-xs text-muted-foreground">
-                            <span title="Sent">{c.stats?.sent || 0} sent</span>
-                            <span title="Opened">{c.stats?.opened || 0} opened</span>
-                            <span title="Clicked">{c.stats?.clicked || 0} clicked</span>
-                          </div>
-                          <Badge className={`${badge.className} text-[10px]`}>{badge.label}</Badge>
-                          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); setMenuOpen(menuOpen === c.id ? null : c.id); }}>
-                            <MoreHorizontal size={12} />
-                          </Button>
-                        </div>
-                      </div>
-                      {menuOpen === c.id && (
-                        <div className="absolute right-12 top-12 z-10 w-28 rounded-md border bg-background shadow-lg" onClick={(e) => e.stopPropagation()}>
-                          <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted" onClick={() => { setEditingCampaign(c); setMenuOpen(null); setCampaignDialogOpen(true); }}>
-                            <Pencil size={12} /> Edit
-                          </button>
-                          <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-red-600" onClick={() => { handleDelete('campaign', c.id); setMenuOpen(null); }}>
-                            <Trash2 size={12} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
+        <TabsContent value="segments" className="space-y-4">
+          {segments.length === 0 ? (
+            <Card><CardContent className="py-12 text-center"><h3 className="text-lg font-medium mb-2">No segments yet</h3><Button onClick={() => setShowSegmentDialog(true)}><Plus size={16} className="mr-2" />Create Segment</Button></CardContent></Card>
+          ) : segments.map(s => (
+            <Card key={s.segment_id}><CardContent className="p-6"><div className="flex items-center justify-between"><div><h3 className="font-semibold">{s.name}</h3>{s.description && <p className="text-sm text-muted-foreground">{s.description}</p>}</div><Badge variant="outline">{s.contact_count} contacts</Badge></div></CardContent></Card>
+          ))}
         </TabsContent>
       </Tabs>
 
-      <EmailTemplateDialog
-        open={templateDialogOpen}
-        onOpenChange={setTemplateDialogOpen}
-        onSaved={load}
-        item={editingTemplate}
-      />
+      {showCreateDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg"><div className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Create Email Campaign</h2>
+            <div><label className="text-sm font-medium mb-2 block">Name *</label><Input placeholder="Campaign name" value={newCampaign.name} onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })} /></div>
+            <div><label className="text-sm font-medium mb-2 block">Subject *</label><Input placeholder="Email subject" value={newCampaign.subject} onChange={(e) => setNewCampaign({ ...newCampaign, subject: e.target.value })} /></div>
+            <div><label className="text-sm font-medium mb-2 block">Preview Text</label><Input placeholder="Preview text..." value={newCampaign.preview_text} onChange={(e) => setNewCampaign({ ...newCampaign, preview_text: e.target.value })} /></div>
+            <div className="flex justify-end gap-2 pt-4"><Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button><Button onClick={handleCreateCampaign}>Create</Button></div>
+          </div></Card>
+        </div>
+      )}
 
-      <EmailCampaignDialog
-        open={campaignDialogOpen}
-        onOpenChange={setCampaignDialogOpen}
-        onSaved={load}
-        item={editingCampaign}
-        templates={templates}
-      />
-
-      <ConfirmDialog
-        open={confirmState.open}
-        onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
-        title={confirmState.type === 'template' ? 'Delete template' : 'Delete campaign'}
-        description={`Are you sure you want to delete this ${confirmState.type}? This action cannot be undone.`}
-        onConfirm={onDeleteConfirm}
-        loading={confirmState.loading}
-      />
+      {showSegmentDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg"><div className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Create Segment</h2>
+            <div><label className="text-sm font-medium mb-2 block">Name *</label><Input placeholder="Segment name" value={newSegment.name} onChange={(e) => setNewSegment({ ...newSegment, name: e.target.value })} /></div>
+            <div><label className="text-sm font-medium mb-2 block">Description</label><Textarea placeholder="Description..." value={newSegment.description} onChange={(e) => setNewSegment({ ...newSegment, description: e.target.value })} /></div>
+            <div className="flex justify-end gap-2 pt-4"><Button variant="outline" onClick={() => setShowSegmentDialog(false)}>Cancel</Button><Button onClick={handleCreateSegment}>Create</Button></div>
+          </div></Card>
+        </div>
+      )}
     </div>
   );
 }

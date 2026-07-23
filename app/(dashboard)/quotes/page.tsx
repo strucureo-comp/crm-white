@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,9 +24,9 @@ import {
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { getQuotations, deleteQuotation, convertQuotationToInvoice } from '@/lib/firebase/database';
 import type { Quotation } from '@/lib/db/types';
-import { QuoteDialog } from '@/components/dialogs/quote-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 import { generateQuotationPdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
 
 const statusStyles: Record<string, string> = {
@@ -36,17 +37,12 @@ const statusStyles: Record<string, string> = {
   expired: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
 };
 
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
-
 export default function QuotesPage() {
+  const router = useRouter();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingQuote, setEditingQuote] = useState<Quotation | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
@@ -120,7 +116,7 @@ export default function QuotesPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Quotes</h2>
           <p className="text-sm text-muted-foreground">Create and manage customer quotes</p>
         </div>
-        <Button onClick={() => { setEditingQuote(null); setDialogOpen(true); }} className="w-full sm:w-auto">
+        <Button onClick={() => router.push('/quotes/new')} className="w-full sm:w-auto">
           <Plus size={16} className="mr-2" />
           New Quote
         </Button>
@@ -200,7 +196,7 @@ export default function QuotesPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-40">
-                        <DropdownMenuItem onClick={() => { setEditingQuote(q); setDialogOpen(true); }}>
+                        <DropdownMenuItem onClick={() => router.push(`/quotes/${q.id}`)}>
                           <Pencil size={14} className="mr-2" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={async () => {
@@ -242,12 +238,6 @@ export default function QuotesPage() {
         <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">No quotes yet</p></CardContent></Card>
       )}
 
-      <QuoteDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSaved={load}
-        quote={editingQuote}
-      />
       <ConfirmDialog
         open={confirmState.open}
         onOpenChange={(open) => setConfirmState({ open })}

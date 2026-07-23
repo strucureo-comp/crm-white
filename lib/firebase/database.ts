@@ -30,13 +30,11 @@ import type {
   Enquiry,
   Lead,
   TaskItem,
-  Contract,
   FieldAgent,
   FieldAlert,
   ContentItem,
   MediaItem,
   CalendarEvent,
-  Report,
   Integration,
   AutomationRule,
   AiConversation,
@@ -161,7 +159,7 @@ export async function updateProject(projectId: string, updates: Partial<Project>
           title: 'Project Updated',
           message: `Project "${oldProject.title}" has been updated.`,
           type: 'project',
-          link: `/admin/projects/${projectId}`,
+          link: `/projects/${projectId}`,
           read: false
         });
       }
@@ -1167,55 +1165,6 @@ export async function deleteLead(id: string): Promise<boolean> {
 }
 
 // ----------------------------------------------------
-// CONTRACT FUNCTIONS
-// ----------------------------------------------------
-
-export async function getContracts(): Promise<Contract[]> {
-  try {
-    const refPath = ref(database, 'contracts');
-    const snapshot = await get(refPath);
-    if (!snapshot.exists()) return [];
-    const items: Contract[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as Contract);
-    });
-    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  } catch {
-    return [];
-  }
-}
-
-export async function createContract(data: Omit<Contract, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
-  try {
-    const refPath = ref(database, 'contracts');
-    const newRef = push(refPath);
-    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }));
-    return newRef.key;
-  } catch {
-    return null;
-  }
-}
-
-export async function updateContract(id: string, updates: Partial<Contract>): Promise<boolean> {
-  try {
-    const refPath = ref(database, `contracts/${id}`);
-    await update(refPath, cleanData({ ...updates, updated_at: new Date().toISOString() }));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function deleteContract(id: string): Promise<boolean> {
-  try {
-    await remove(ref(database, `contracts/${id}`));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-// ----------------------------------------------------
 // FIELD AGENT FUNCTIONS
 // ----------------------------------------------------
 
@@ -1428,54 +1377,7 @@ export async function deleteCalendarEvent(id: string): Promise<boolean> {
   }
 }
 
-// ----------------------------------------------------
-// REPORT FUNCTIONS
-// ----------------------------------------------------
 
-export async function getReports(): Promise<Report[]> {
-  try {
-    const refPath = ref(database, 'reports');
-    const snapshot = await get(refPath);
-    if (!snapshot.exists()) return [];
-    const items: Report[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as Report);
-    });
-    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  } catch {
-    return [];
-  }
-}
-
-export async function createReport(data: Omit<Report, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
-  try {
-    const refPath = ref(database, 'reports');
-    const newRef = push(refPath);
-    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }));
-    return newRef.key;
-  } catch {
-    return null;
-  }
-}
-
-export async function updateReport(id: string, updates: Partial<Report>): Promise<boolean> {
-  try {
-    const refPath = ref(database, `reports/${id}`);
-    await update(refPath, cleanData({ ...updates, updated_at: new Date().toISOString() }));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function deleteReport(id: string): Promise<boolean> {
-  try {
-    await remove(ref(database, `reports/${id}`));
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // ----------------------------------------------------
 // INTEGRATION FUNCTIONS

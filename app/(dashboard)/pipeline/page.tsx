@@ -41,6 +41,7 @@ import { getLeads, updateLead, deleteLead, getPipelines, createPipeline, updateP
 import type { Lead, LeadStatus, Pipeline, PipelineStage } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
   { id: 'qualified', name: 'Qualified', color: '#8b5cf6', order: 0 },
@@ -70,10 +71,6 @@ const stageColors: Record<string, string> = {
   lost: 'bg-red-500',
   new: 'bg-blue-500',
 };
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
 
 function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();

@@ -20,6 +20,7 @@ import { QuoteDialog } from '@/components/dialogs/quote-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { generateQuotationPdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
+import { formatCurrency } from '@/lib/utils';
 
 const statusStyles: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
@@ -28,10 +29,6 @@ const statusStyles: Record<string, string> = {
   rejected: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
   expired: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
 };
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
 
 export default function ProposalsPage() {
   const [quotations, setQuotations] = useState<Quotation[]>([]);

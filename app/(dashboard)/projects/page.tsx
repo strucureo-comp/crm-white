@@ -3,9 +3,8 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
+import { Plus, MoreHorizontal, Pencil, Trash2, AlertCircle, RotateCcw } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import {
   DropdownMenu,
@@ -30,9 +29,11 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 const statusColumns = [
   { key: 'pending', label: 'Pending' },
   { key: 'under_review', label: 'Under Review' },
+  { key: 'accepted', label: 'Accepted' },
   { key: 'in_progress', label: 'In Progress' },
   { key: 'testing', label: 'Testing' },
   { key: 'completed', label: 'Completed' },
+  { key: 'cancelled', label: 'Cancelled' },
 ];
 
 const userColors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-500', 'bg-rose-500'];
@@ -40,16 +41,24 @@ const userColors = ['bg-blue-500', 'bg-emerald-500', 'bg-amber-500', 'bg-violet-
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [columnDefaultStatus, setColumnDefaultStatus] = useState<string | undefined>(undefined);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [mutatingIds, setMutatingIds] = useState<Set<string>>(new Set());
 
   async function load() {
     setLoading(true);
-    const data = await getProjects();
-    setProjects(data);
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await getProjects();
+      setProjects(data);
+    } catch {
+      setError('Failed to load projects');
+    } finally {
+      setLoading(false);
+    }
   }
 
   useEffect(() => { load(); }, []);
@@ -60,16 +69,23 @@ export default function ProjectsPage() {
   }
 
   async function handleStatusChange(project: Project, newStatus: ProjectStatus) {
+    setMutatingIds((prev) => new Set(prev).add(project.id));
     try {
       await updateProject(project.id, { status: newStatus });
       toast.success('Project moved');
       load();
     } catch {
       toast.error('Failed to update project status');
+    } finally {
+      setMutatingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(project.id);
+        return next;
+      });
     }
   }
 
-  async function handleDelete(project: Project) {
+  function handleDelete(project: Project) {
     setConfirmState({ open: true, id: project.id });
   }
 
@@ -102,6 +118,18 @@ export default function ProjectsPage() {
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading projects...</p></div>;
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 gap-3">
+        <AlertCircle size={24} className="text-destructive" />
+        <p className="text-sm text-muted-foreground">{error}</p>
+        <Button variant="outline" size="sm" onClick={load}>
+          <RotateCcw size={14} className="mr-1.5" /> Retry
+        </Button>
+      </div>
+    );
   }
 
   return (
@@ -157,7 +185,11 @@ export default function ProjectsPage() {
                       </DropdownMenu>
                     </div>
                     <div className="text-xs text-muted-foreground mb-2">
-                      <Select value={project.status} onValueChange={(v: ProjectStatus) => handleStatusChange(project, v)}>
+                      <Select
+                        value={project.status}
+                        onValueChange={(v: ProjectStatus) => handleStatusChange(project, v)}
+                        disabled={mutatingIds.has(project.id)}
+                      >
                         <SelectTrigger className="h-6 text-xs border-0 bg-transparent p-0 shadow-none focus:ring-0">
                           <SelectValue />
                         </SelectTrigger>

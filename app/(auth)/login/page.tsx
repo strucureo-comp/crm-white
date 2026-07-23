@@ -15,16 +15,22 @@ export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signIn, user, loading } = useAuth();
+  const { signIn, user, loading, workspace, workspaceLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace('/dashboard');
+    if (loading || workspaceLoading) return;
+    if (user) {
+      // If workspace exists and setup is complete, go to dashboard
+      if (workspace?.setup_completed) {
+        router.replace('/dashboard');
+      } else if (workspace) {
+        router.replace('/setup');
+      }
     }
-  }, [user, loading, router]);
+  }, [user, loading, workspace, workspaceLoading, router]);
 
-  if (loading || user) {
+  if (loading || workspaceLoading || user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -45,7 +51,7 @@ export default function LoginPage() {
       toast.error(error.message);
     } else {
       toast.success('Signed in successfully');
-      router.push('/dashboard');
+      // Navigation will happen via useEffect once workspace is loaded
     }
   };
 

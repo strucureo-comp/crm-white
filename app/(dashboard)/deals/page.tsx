@@ -46,6 +46,7 @@ import { LeadDialog } from '@/components/dialogs/lead-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
 
@@ -68,10 +69,6 @@ const stageColors: Record<string, string> = {
   won: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
   lost: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
 };
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
 
 function daysBetween(dateStr: string): number {
   const diff = Date.now() - new Date(dateStr).getTime();

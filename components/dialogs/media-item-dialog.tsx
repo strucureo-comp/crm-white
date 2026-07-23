@@ -50,17 +50,36 @@ export function MediaItemDialog({ open, onOpenChange, onSaved }: MediaItemDialog
     }
     setUploading(true);
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('bucket', 'media');
-      formData.append('path', `uploads/${Date.now()}-${file.name}`);
+      let url: string;
+      const isImage = file.type.startsWith('image/');
 
-      const res = await fetch('/api/upload', { method: 'POST', body: formData });
-      const data = await res.json();
-
-      if (!res.ok) {
-        toast.error(data.error || 'Upload failed');
-        return;
+      if (isImage) {
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+        const sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+        if (sizeKb > 600) {
+          toast.error(`Image is ${sizeKb}KB (base64). Max 600KB allowed.`);
+          setUploading(false);
+          return;
+        }
+        url = dataUrl;
+      } else {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('bucket', 'media');
+        formData.append('path', `uploads/${Date.now()}-${file.name}`);
+        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const data = await res.json();
+        if (!res.ok) {
+          toast.error(data.error || 'Upload failed');
+          setUploading(false);
+          return;
+        }
+        url = data.url;
       }
 
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
@@ -76,7 +95,7 @@ export function MediaItemDialog({ open, onOpenChange, onSaved }: MediaItemDialog
         type,
         size: sizeInMB,
         dimensions: type === 'image' ? '-' : '-',
-        url: data.url,
+        url,
       });
 
       toast.success('File uploaded');

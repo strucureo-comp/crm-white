@@ -18,16 +18,22 @@ export default function RegisterPage() {
   const [company, setCompany] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const { signUp, user, loading } = useAuth();
+  const { signUp, user, loading, workspace, workspaceLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (!loading && user) {
-      router.replace('/dashboard');
+    if (loading || workspaceLoading) return;
+    if (user) {
+      // If workspace exists and setup is complete, go to dashboard
+      if (workspace?.setup_completed) {
+        router.replace('/dashboard');
+      } else if (workspace) {
+        router.replace('/setup');
+      }
     }
-  }, [user, loading, router]);
+  }, [user, loading, workspace, workspaceLoading, router]);
 
-  if (loading || user) {
+  if (loading || workspaceLoading || user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
@@ -47,13 +53,13 @@ export default function RegisterPage() {
     }
     setSubmitting(true);
     const fullName = `${firstName} ${lastName}`.trim();
-    const { error } = await signUp(email, password, fullName);
+    const { error } = await signUp(email, password, fullName, company || undefined);
     setSubmitting(false);
     if (error) {
       toast.error(error.message);
     } else {
       toast.success('Account created successfully');
-      router.push('/dashboard');
+      router.push('/setup');
     }
   };
 
@@ -88,8 +94,8 @@ export default function RegisterPage() {
                 <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="company">Company</Label>
-                <Input id="company" placeholder="Your Company" value={company} onChange={(e) => setCompany(e.target.value)} />
+                <Label htmlFor="company">Company Name</Label>
+                <Input id="company" placeholder="Your Company Name" value={company} onChange={(e) => setCompany(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>

@@ -7,202 +7,301 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { User, Bell, Shield, Palette, Key, Users, Loader2, Save, Copy, Check, Building2 } from 'lucide-react';
+import { SearchableSelect, SimpleSelect } from '@/components/ui/searchable-select';
+import {
+  User, Bell, Shield, Palette, Key, Users, Loader2, Save, Copy, Check,
+  Building2, Upload, X, Image as ImageIcon, ChevronDown, Search,
+  Download, RotateCcw, AlertTriangle, ExternalLink,
+  Globe, Zap, Lock, Mail as MailIcon, Clock, Smartphone, Laptop,
+} from 'lucide-react';
 import { ThemeSwitcher } from '@/components/dashboard/theme-switcher';
-import { useState, useEffect, FormEvent } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { ref, get, set } from 'firebase/database';
-import { database } from '@/lib/firebase/config';
-
-import type { CompanySettings } from '@/lib/pdf-engine/types';
-import { clearSettingsCache } from '@/lib/pdf-engine/helpers';
+import { getWorkspaceSettings, saveWorkspaceSettings, clearSettingsCache } from '@/lib/settings/api';
+import type { WorkspaceSettings, GeneralSettings, BrandingSettings, AppearanceSettings, NotificationSettings, TeamSettings, ApiKey } from '@/lib/settings/types';
+import { DEFAULT_WORKSPACE_SETTINGS, DEFAULT_GENERAL_SETTINGS, DEFAULT_BRANDING_SETTINGS, DEFAULT_APPEARANCE_SETTINGS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_TEAM_SETTINGS } from '@/lib/settings/types';
 import { toast } from 'sonner';
+import {
+  TIMEZONES, CURRENCIES, COUNTRIES, STATES_BY_COUNTRY, LANGUAGES,
+  DATE_FORMATS, NUMBER_FORMATS, WEEK_DAYS, FINANCIAL_YEARS,
+  SESSION_TIMEOUTS, TEMPLATE_STYLES, TAX_SYSTEMS, BANKS,
+  PREFIX_PRESETS, INVOICE_PREFIX_PRESETS, INVOICE_DUE_DAYS, LOGO_POSITIONS,
+  SIGNATURE_TEMPLATES, DIGEST_FREQUENCIES, TEAM_ROLES,
+  API_PERMISSIONS, API_EXPIRY, THEME_OPTIONS, FONT_SIZES,
+} from '@/lib/settings/constants';
 
-interface NotificationPrefs {
-  email_notifications: boolean;
-  push_notifications: boolean;
-  slack_integration: boolean;
-  weekly_digest: boolean;
-  mention_alerts: boolean;
+interface LoginSession {
+  id: string;
+  device: string;
+  browser: string;
+  ip: string;
+  location: string;
+  last_active: string;
+  current: boolean;
 }
 
-interface TeamSettings {
-  default_role: string;
-  allow_invitations: boolean;
+const TAB_SEARCH_MAP: Record<string, string[]> = {
+  general: ['workspace', 'name', 'currency', 'timezone', 'url', 'country', 'state', 'number format', 'week', 'financial year'],
+  notifications: ['email', 'push', 'slack', 'digest', 'mention', 'notification', 'frequency'],
+  security: ['password', '2fa', 'session', 'timeout', 'auth', 'login'],
+  appearance: ['theme', 'dark', 'light', 'sidebar', 'compact', 'color', 'font', 'language'],
+  branding: ['company', 'logo', 'color', 'tax', 'bank', 'document', 'template', 'gst', 'invoice', 'prefix', 'format', 'currency'],
+  team: ['member', 'invite', 'role', 'permission', 'team'],
+  api: ['api', 'key', 'token', 'integration', 'webhook', 'permission', 'expiry'],
+};
+
+function CollapsibleSection({ title, defaultOpen = true, children, helper }: {
+  title: string;
+  defaultOpen?: boolean;
+  children: React.ReactNode;
+  helper?: string;
+}) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <div className="border rounded-lg">
+      <button type="button" onClick={() => setOpen(!open)}
+        className="flex items-center justify-between w-full px-4 py-3 text-left hover:bg-muted/50 transition-colors">
+        <div>
+          <span className="text-sm font-medium">{title}</span>
+          {helper && <p className="text-xs text-muted-foreground mt-0.5">{helper}</p>}
+        </div>
+        <ChevronDown size={16} className={`text-muted-foreground transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && <div className="px-4 pb-4 border-t">{children}</div>}
+    </div>
+  );
 }
 
-interface AppSettings {
-  sidebar_collapsed: boolean;
-  theme: string;
+function FieldHelper({ text }: { text: string }) {
+  return <p className="text-xs text-muted-foreground mt-1">{text}</p>;
 }
 
-interface ApiKey {
-  key: string;
-  name: string;
-  created_at: string;
+function PrefixSelect({ value, onValueChange, presets, label }: {
+  value: string;
+  onValueChange: (v: string) => void;
+  presets: { label: string; value: string }[];
+  label: string;
+}) {
+  const isCustom = !presets.some((p) => p.value === value) && value !== '';
+  return (
+    <div className="space-y-2">
+      <Label>{label}</Label>
+      {isCustom ? (
+        <div className="flex gap-2">
+          <Input value={value} onChange={(e) => onValueChange(e.target.value)} placeholder="Enter custom prefix" />
+          <Button variant="ghost" size="sm" onClick={() => onValueChange(presets[0].value)}>Reset</Button>
+        </div>
+      ) : (
+        <SearchableSelect options={presets} value={value}
+          onValueChange={(v) => { if (v === 'custom') onValueChange(''); else onValueChange(v); }}
+          allowCustom />
+      )}
+      <FieldHelper text="Used in document numbering" />
+    </div>
+  );
 }
-
-const defaultNotifications: NotificationPrefs = {
-  email_notifications: true,
-  push_notifications: true,
-  slack_integration: false,
-  weekly_digest: true,
-  mention_alerts: true,
-};
-
-const defaultTeam: TeamSettings = {
-  default_role: 'Member',
-  allow_invitations: true,
-};
-
-const defaultAppearance: AppSettings = {
-  sidebar_collapsed: false,
-  theme: 'system',
-};
-
-const defaultBranding: CompanySettings = {
-  company_name: '',
-  legal_name: '',
-  tagline: '',
-  address: '',
-  phone: '',
-  email: '',
-  website: '',
-  logo_url: '',
-  footer_logo_url: '',
-  gst_number: '',
-  pan_number: '',
-  registration_number: '',
-  bank_name: '',
-  bank_account: '',
-  bank_ifsc: '',
-  bank_swift: '',
-  upi_id: '',
-  qr_code_url: '',
-  primary_color: '#2563eb',
-  secondary_color: '#1e40af',
-  accent_color: '#f59e0b',
-  default_currency: 'USD',
-  currency_symbol: '$',
-  date_format: 'MM/dd/yyyy',
-  timezone: 'UTC',
-  tax_cgst: 0,
-  tax_sgst: 0,
-  tax_igst: 0,
-  tax_vat: 0,
-  tax_tin: '',
-  default_terms: '',
-  default_notes: '',
-  footer_text: '',
-  watermark: '',
-  invoice_prefix: 'INV',
-  quote_prefix: 'QTE',
-  report_prefix: 'RPT',
-  contract_prefix: 'CNT',
-  purchase_order_prefix: 'PO',
-  invoice_number_format: '{prefix}-{year}-{num}',
-  quote_number_format: '{prefix}-{year}-{num}',
-  template_style: 'modern',
-  social_links: '',
-  support_contact: '',
-};
 
 export default function SettingsPage() {
   const { user, resetPassword } = useAuth();
   const [saving, setSaving] = useState(false);
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
   const [workspaceName, setWorkspaceName] = useState('Tagverse CRM');
   const [workspaceUrl, setWorkspaceUrl] = useState('tagverse-crm');
-  const [defaultCurrency, setDefaultCurrency] = useState('USD ($)');
+  const [defaultCurrency, setDefaultCurrency] = useState('USD');
   const [timezone, setTimezone] = useState('America/New_York');
-  const [notifications, setNotifications] = useState<NotificationPrefs>(defaultNotifications);
-  const [teamSettings, setTeamSettings] = useState<TeamSettings>(defaultTeam);
-  const [appearance, setAppearance] = useState<AppSettings>(defaultAppearance);
-  const [sessionTimeout, setSessionTimeout] = useState('30 minutes');
+  const [country, setCountry] = useState('');
+  const [state, setState] = useState('');
+  const [numberFormat, setNumberFormat] = useState('1,234.56');
+  const [firstDayOfWeek, setFirstDayOfWeek] = useState('monday');
+  const [financialYear, setFinancialYear] = useState('jan-dec');
+  const [invoiceDueDays, setInvoiceDueDays] = useState('30');
+  const [logoPosition, setLogoPosition] = useState('left');
+  const [emailSignature, setEmailSignature] = useState('default');
+  const [notifications, setNotifications] = useState<NotificationSettings>(DEFAULT_NOTIFICATION_SETTINGS);
+  const [teamSettings, setTeamSettings] = useState<TeamSettings>(DEFAULT_TEAM_SETTINGS);
+  const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS);
+  const [sessionTimeout, setSessionTimeout] = useState('30');
   const [twoFactor, setTwoFactor] = useState(false);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [copiedKey, setCopiedKey] = useState('');
-  const [branding, setBranding] = useState<CompanySettings>(defaultBranding);
+  const [branding, setBranding] = useState<BrandingSettings>(DEFAULT_BRANDING_SETTINGS);
+  const [general, setGeneral] = useState<GeneralSettings>(DEFAULT_GENERAL_SETTINGS);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadingFooterLogo, setUploadingFooterLogo] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeTab, setActiveTab] = useState('general');
+  const [taxSystem, setTaxSystem] = useState('none');
+
+  const initialState = useRef<string>('');
+
+  const markDirty = useCallback(() => { setHasUnsavedChanges(true); }, []);
+
+  useEffect(() => {
+    const handler = (e: BeforeUnloadEvent) => { if (hasUnsavedChanges) e.preventDefault(); };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [hasUnsavedChanges]);
 
   useEffect(() => {
     if (!user?.id) return;
     const loadSettings = async () => {
       try {
-        const settingsRef = ref(database, `workspace/${user.id}/settings`);
-        const snap = await get(settingsRef);
-        if (snap.exists()) {
-          const data = snap.val();
-          if (data.workspace_name) setWorkspaceName(data.workspace_name);
-          if (data.workspace_url) setWorkspaceUrl(data.workspace_url);
-          if (data.default_currency) setDefaultCurrency(data.default_currency);
-          if (data.timezone) setTimezone(data.timezone);
-          if (data.notifications) setNotifications({ ...defaultNotifications, ...data.notifications });
-          if (data.team) setTeamSettings({ ...defaultTeam, ...data.team });
-          if (data.appearance) setAppearance({ ...defaultAppearance, ...data.appearance });
-          if (data.session_timeout) setSessionTimeout(data.session_timeout);
-          if (typeof data.two_factor === 'boolean') setTwoFactor(data.two_factor);
-          if (data.api_keys) setApiKeys(data.api_keys);
-        }
-      } catch {
-        console.warn('Could not load settings');
-      }
-      try {
-        const brandingRef = ref(database, 'system_settings/company_branding');
-        const brandingSnap = await get(brandingRef);
-        if (brandingSnap.exists()) {
-          setBranding((prev) => ({ ...prev, ...brandingSnap.val() }));
-        }
-      } catch {
-        console.warn('Could not load branding');
-      }
+        const ws = await getWorkspaceSettings();
+        setGeneral(ws.general);
+        setBranding(ws.branding);
+        setWorkspaceName(ws.general.workspace_name);
+        setWorkspaceUrl(ws.general.workspace_url);
+        setDefaultCurrency(ws.general.default_currency);
+        setTimezone(ws.general.timezone);
+        setCountry(ws.general.country);
+        setState(ws.general.state);
+        setNumberFormat(ws.general.number_format);
+        setFirstDayOfWeek(ws.general.first_day_of_week);
+        setFinancialYear(ws.general.financial_year);
+        setInvoiceDueDays(String(ws.branding.invoice_due_days));
+        setLogoPosition(ws.branding.logo_position);
+        setEmailSignature(ws.branding.email_signature);
+        setNotifications({
+          email_notifications: ws.notifications.email_notifications,
+          push_notifications: ws.notifications.push_notifications,
+          slack_integration: ws.notifications.slack_integration,
+          weekly_digest: ws.notifications.weekly_digest,
+          mention_alerts: ws.notifications.mention_alerts,
+          digest_frequency: ws.notifications.digest_frequency,
+          slack_webhook_url: ws.notifications.slack_webhook_url,
+          invoice_alerts: ws.notifications.invoice_alerts,
+          payment_alerts: ws.notifications.payment_alerts,
+          project_alerts: ws.notifications.project_alerts,
+          support_alerts: ws.notifications.support_alerts,
+        });
+        setTeamSettings({
+          default_role: ws.team.default_role,
+          allow_invitations: ws.team.allow_invitations,
+          members: ws.team.members,
+        });
+        setAppearance({
+          sidebar_collapsed: ws.appearance.sidebar_collapsed,
+          theme: ws.appearance.theme,
+          compact_mode: ws.appearance.compact_mode,
+          accent_color: ws.appearance.accent_color,
+          font_size: ws.appearance.font_size,
+          language: ws.appearance.language,
+          sidebar_style: ws.appearance.sidebar_style,
+          primary_color: ws.appearance.primary_color,
+          secondary_color: ws.appearance.secondary_color,
+        });
+        setSessionTimeout(ws.security.session_timeout);
+        setTwoFactor(ws.security.two_factor_enabled);
+        setApiKeys(ws.api.keys);
+        setTaxSystem(ws.branding.tax_system || 'none');
+        if (ws.updated_at) setLastUpdated(ws.updated_at);
+      } catch { console.warn('Could not load workspace settings'); }
     };
     loadSettings();
   }, [user?.id]);
 
-  const saveSettings = async (e?: FormEvent) => {
-    if (e) e.preventDefault();
+  useEffect(() => {
+    if (!initialState.current) return;
+    const current = JSON.stringify({
+      workspaceName, workspaceUrl, defaultCurrency, timezone, country, state,
+      numberFormat, firstDayOfWeek, financialYear, invoiceDueDays, logoPosition,
+      emailSignature, notifications, teamSettings, appearance, sessionTimeout,
+      twoFactor, apiKeys, branding, taxSystem,
+    });
+    setHasUnsavedChanges(current !== initialState.current);
+  }, [workspaceName, workspaceUrl, defaultCurrency, timezone, country, state,
+    numberFormat, firstDayOfWeek, financialYear, invoiceDueDays, logoPosition,
+    emailSignature, notifications, teamSettings, appearance, sessionTimeout,
+    twoFactor, apiKeys, branding, taxSystem]);
+
+  const saveSettings = async () => {
     if (!user?.id) return;
+    setSaveState('saving');
     setSaving(true);
     try {
-      await set(ref(database, `workspace/${user.id}/settings`), {
-        workspace_name: workspaceName,
-        workspace_url: workspaceUrl,
-        default_currency: defaultCurrency,
-        timezone,
-        notifications,
-        team: teamSettings,
+      const ws: WorkspaceSettings = {
+        general: {
+          ...general,
+          workspace_name: workspaceName,
+          workspace_url: workspaceUrl,
+          default_currency: defaultCurrency,
+          timezone,
+          country,
+          state,
+          number_format: numberFormat,
+          first_day_of_week: firstDayOfWeek,
+          financial_year: financialYear,
+        },
+        branding: {
+          ...branding,
+          invoice_due_days: Number(invoiceDueDays),
+          logo_position: logoPosition,
+          email_signature: emailSignature,
+          tax_system: taxSystem,
+        },
         appearance,
-        session_timeout: sessionTimeout,
-        two_factor: twoFactor,
-        api_keys: apiKeys,
+        notifications,
+        security: {
+          session_timeout: sessionTimeout,
+          two_factor_enabled: twoFactor,
+          password_strength: 'medium',
+          login_notifications: true,
+          ip_whitelist: [],
+        },
+        team: teamSettings,
+        api: {
+          keys: apiKeys,
+        },
         updated_at: new Date().toISOString(),
-      });
-      await set(ref(database, 'system_settings/company_branding'), {
-        ...branding,
-        updated_at: new Date().toISOString(),
-      });
+      };
+      await saveWorkspaceSettings(ws);
       clearSettingsCache();
+      setSaveState('saved');
+      setHasUnsavedChanges(false);
+      setLastUpdated(new Date().toISOString());
       toast.success('Settings saved');
+      setTimeout(() => setSaveState('idle'), 2000);
     } catch {
+      setSaveState('error');
       toast.error('Failed to save settings');
-    } finally {
-      setSaving(false);
-    }
+      setTimeout(() => setSaveState('idle'), 3000);
+    } finally { setSaving(false); }
   };
 
-  function toggleNotification(key: keyof NotificationPrefs) {
+  const handleTabChange = (value: string) => {
+    if (hasUnsavedChanges) {
+      if (!window.confirm('You have unsaved changes. Switch tab without saving?')) return;
+      setHasUnsavedChanges(false);
+    }
+    setActiveTab(value);
+  };
+
+  const filteredTabs = searchQuery
+    ? Object.entries(TAB_SEARCH_MAP)
+        .filter(([, kws]) => kws.some((k) => k.includes(searchQuery.toLowerCase())))
+        .map(([tab]) => tab)
+    : null;
+
+  function toggleNotification(key: keyof NotificationSettings) {
     setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
+    markDirty();
   }
 
   function generateApiKey() {
+    const id = `tv_${Array.from({ length: 16 }, () => Math.random().toString(36)[2]).join('')}`;
     const key = `tv_${Array.from({ length: 32 }, () => Math.random().toString(36)[2]).join('')}`;
-    const newKey: ApiKey = {
-      key,
-      name: `API Key ${apiKeys.length + 1}`,
-      created_at: new Date().toISOString(),
-    };
-    setApiKeys((prev) => [...prev, newKey]);
-    saveSettings();
+    setApiKeys((prev) => [...prev, { id, key, name: `API Key ${prev.length + 1}`, created_at: new Date().toISOString(), permission: 'read', expires_at: '' }]);
+    markDirty();
     toast.success('API key generated');
+  }
+
+  function revokeApiKey(i: number) {
+    setApiKeys((prev) => prev.filter((_, idx) => idx !== i));
+    markDirty();
+    toast.success('API key revoked');
   }
 
   function copyToClipboard(key: string) {
@@ -211,150 +310,388 @@ export default function SettingsPage() {
     setTimeout(() => setCopiedKey(''), 2000);
   }
 
+  async function handleLogoUpload(file: File, field: 'logo_url' | 'footer_logo_url') {
+    const setLoading = field === 'logo_url' ? setUploadingLogo : setUploadingFooterLogo;
+    setLoading(true);
+    try {
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onload = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+      });
+      const sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
+      if (sizeKb > 600) {
+        toast.error(`Image is ${sizeKb}KB (base64). Max 600KB allowed.`);
+        return;
+      }
+      setBranding((p) => ({ ...p, [field]: dataUrl }));
+      markDirty();
+      toast.success('Logo uploaded successfully');
+    } catch { toast.error('Failed to upload logo'); }
+    finally { setLoading(false); }
+  }
+
+  function exportSettings() {
+    const data = {
+      workspace: { workspaceName, workspaceUrl, defaultCurrency, timezone, country, state, numberFormat, firstDayOfWeek, financialYear, invoiceDueDays, logoPosition, emailSignature },
+      notifications, teamSettings, appearance, sessionTimeout, twoFactor, branding, taxSystem,
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `settings-export-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    toast.success('Settings exported');
+  }
+
+  function importSettings() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev) => {
+        try {
+          const data = JSON.parse(ev.target?.result as string);
+          if (data.workspace) {
+            const w = data.workspace;
+            if (w.workspaceName) setWorkspaceName(w.workspaceName);
+            if (w.workspaceUrl) setWorkspaceUrl(w.workspaceUrl);
+            if (w.defaultCurrency) setDefaultCurrency(w.defaultCurrency);
+            if (w.timezone) setTimezone(w.timezone);
+            if (w.country) setCountry(w.country);
+            if (w.state) setState(w.state);
+            if (w.numberFormat) setNumberFormat(w.numberFormat);
+            if (w.firstDayOfWeek) setFirstDayOfWeek(w.firstDayOfWeek);
+            if (w.financialYear) setFinancialYear(w.financialYear);
+            if (w.invoiceDueDays) setInvoiceDueDays(w.invoiceDueDays);
+            if (w.logoPosition) setLogoPosition(w.logoPosition);
+            if (w.emailSignature) setEmailSignature(w.emailSignature);
+          }
+          if (data.notifications) setNotifications({ ...DEFAULT_NOTIFICATION_SETTINGS, ...data.notifications });
+          if (data.teamSettings) setTeamSettings({ ...DEFAULT_TEAM_SETTINGS, ...data.teamSettings });
+          if (data.appearance) setAppearance({ ...DEFAULT_APPEARANCE_SETTINGS, ...data.appearance });
+          if (data.sessionTimeout) setSessionTimeout(data.sessionTimeout);
+          if (typeof data.twoFactor === 'boolean') setTwoFactor(data.twoFactor);
+          if (data.branding) setBranding((prev) => ({ ...prev, ...data.branding }));
+          if (data.taxSystem) setTaxSystem(data.taxSystem);
+          markDirty();
+          toast.success('Settings imported - click Save to apply');
+        } catch { toast.error('Invalid settings file'); }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  }
+
+  function resetDefaults() {
+    if (!window.confirm('Reset all settings to defaults? This cannot be undone.')) return;
+    const d = DEFAULT_WORKSPACE_SETTINGS;
+    setGeneral(d.general);
+    setBranding(d.branding);
+    setWorkspaceName(d.general.workspace_name);
+    setWorkspaceUrl(d.general.workspace_url);
+    setDefaultCurrency(d.general.default_currency);
+    setTimezone(d.general.timezone);
+    setCountry(d.general.country);
+    setState(d.general.state);
+    setNumberFormat(d.general.number_format);
+    setFirstDayOfWeek(d.general.first_day_of_week);
+    setFinancialYear(d.general.financial_year);
+    setInvoiceDueDays(String(d.branding.invoice_due_days));
+    setLogoPosition(d.branding.logo_position);
+    setEmailSignature(d.branding.email_signature);
+    setNotifications(d.notifications);
+    setTeamSettings({ default_role: d.team.default_role, allow_invitations: d.team.allow_invitations, members: [] });
+    setAppearance(d.appearance);
+    setSessionTimeout(d.security.session_timeout);
+    setTwoFactor(d.security.two_factor_enabled);
+    setApiKeys([]);
+    setTaxSystem(d.branding.tax_system);
+    markDirty();
+    toast.success('Settings reset to defaults - click Save to apply');
+  }
+
+  const showTab = (tab: string) => !filteredTabs || filteredTabs.includes(tab);
+
+  const currencySymbol = useMemo(() => {
+    const c = CURRENCIES.find((c) => c.value === defaultCurrency);
+    return c?.symbol || '$';
+  }, [defaultCurrency]);
+
+  const stateOptions = useMemo(() => country ? (STATES_BY_COUNTRY[country] || []) : [], [country]);
+
+  const taxFields = useMemo(() => {
+    switch (taxSystem) {
+      case 'gst': return ['gst_number', 'pan_number', 'tax_cgst', 'tax_sgst', 'tax_igst'];
+      case 'vat': return ['registration_number', 'tax_vat', 'tax_tin'];
+      case 'sales_tax': return ['registration_number', 'tax_tin'];
+      case 'custom': return ['gst_number', 'pan_number', 'tax_cgst', 'tax_sgst', 'tax_igst', 'tax_vat', 'tax_tin'];
+      default: return [];
+    }
+  }, [taxSystem]);
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Settings</h2>
-          <p className="text-sm text-muted-foreground">Manage your workspace settings</p>
+          <p className="text-sm text-muted-foreground">
+            Manage your workspace settings
+            {lastUpdated && (
+              <span className="ml-2 text-xs">
+                Last saved {new Date(lastUpdated).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </p>
         </div>
-        <Button onClick={() => saveSettings()} disabled={saving} className="w-full sm:w-auto">
-          {saving && <Loader2 size={16} className="mr-2 animate-spin" />}
-          <Save size={16} className="mr-2" />
-          Save Changes
-        </Button>
+        <div className="flex items-center gap-2">
+          {hasUnsavedChanges && <span className="text-xs text-amber-600 dark:text-amber-400 font-medium">Unsaved changes</span>}
+          <Button onClick={saveSettings} disabled={saving} className="w-full sm:w-auto">
+            {saveState === 'saving' && <Loader2 size={16} className="mr-2 animate-spin" />}
+            {saveState === 'saved' && <Check size={16} className="mr-2" />}
+            {saveState === 'error' && <X size={16} className="mr-2" />}
+            {saveState === 'idle' && <Save size={16} className="mr-2" />}
+            {saveState === 'saving' ? 'Saving...' : saveState === 'saved' ? 'Saved!' : saveState === 'error' ? 'Error' : 'Save Changes'}
+          </Button>
+        </div>
       </div>
 
-      <Tabs defaultValue="general">
+      <div className="relative max-w-sm">
+        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+        <Input placeholder="Search settings..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-9" />
+      </div>
+
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
         <div className="overflow-x-auto pb-1">
-        <TabsList>
-          <TabsTrigger value="general" className="flex items-center gap-2"><User size={14} />General</TabsTrigger>
-          <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell size={14} />Notifications</TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2"><Shield size={14} />Security</TabsTrigger>
-          <TabsTrigger value="appearance" className="flex items-center gap-2"><Palette size={14} />Appearance</TabsTrigger>
-          <TabsTrigger value="branding" className="flex items-center gap-2"><Building2 size={14} />Branding</TabsTrigger>
-          <TabsTrigger value="team" className="flex items-center gap-2"><Users size={14} />Team</TabsTrigger>
-          <TabsTrigger value="api" className="flex items-center gap-2"><Key size={14} />API</TabsTrigger>
-        </TabsList>
+          <TabsList>
+            {showTab('general') && <TabsTrigger value="general" className="flex items-center gap-2"><User size={14} />General</TabsTrigger>}
+            {showTab('notifications') && <TabsTrigger value="notifications" className="flex items-center gap-2"><Bell size={14} />Notifications</TabsTrigger>}
+            {showTab('security') && <TabsTrigger value="security" className="flex items-center gap-2"><Shield size={14} />Security</TabsTrigger>}
+            {showTab('appearance') && <TabsTrigger value="appearance" className="flex items-center gap-2"><Palette size={14} />Appearance</TabsTrigger>}
+            {showTab('branding') && <TabsTrigger value="branding" className="flex items-center gap-2"><Building2 size={14} />Branding</TabsTrigger>}
+            {showTab('team') && <TabsTrigger value="team" className="flex items-center gap-2"><Users size={14} />Team</TabsTrigger>}
+            {showTab('api') && <TabsTrigger value="api" className="flex items-center gap-2"><Key size={14} />API</TabsTrigger>}
+          </TabsList>
         </div>
 
         <TabsContent value="general" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Workspace</CardTitle>
-            </CardHeader>
+            <CardHeader><CardTitle className="text-lg">Workspace</CardTitle></CardHeader>
             <CardContent className="space-y-4">
-              <form onSubmit={saveSettings}>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div className="space-y-2">
-                    <Label>Workspace Name</Label>
-                    <Input value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Workspace URL</Label>
-                    <Input value={workspaceUrl} onChange={(e) => setWorkspaceUrl(e.target.value)} />
-                  </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Workspace Name</Label>
+                  <Input value={workspaceName} onChange={(e) => { setWorkspaceName(e.target.value); markDirty(); }} />
+                  <FieldHelper text="Displayed in the sidebar and browser tab" />
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                  <div className="space-y-2">
-                    <Label>Default Currency</Label>
-                    <Input value={defaultCurrency} onChange={(e) => setDefaultCurrency(e.target.value)} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Timezone</Label>
-                    <Input value={timezone} onChange={(e) => setTimezone(e.target.value)} />
-                  </div>
+                <div className="space-y-2">
+                  <Label>Workspace URL</Label>
+                  <Input value={workspaceUrl} onChange={(e) => { setWorkspaceUrl(e.target.value); markDirty(); }} />
+                  <FieldHelper text="Used for your workspace subdomain" />
                 </div>
-                <Button type="submit" disabled={saving}>
-                  {saving && <Loader2 size={16} className="mr-2 animate-spin" />}
-                  <Save size={16} className="mr-2" />
-                  Save Changes
-                </Button>
-              </form>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Timezone</Label>
+                  <SearchableSelect options={TIMEZONES} value={timezone} onValueChange={(v) => { setTimezone(v); markDirty(); }} searchPlaceholder="Search timezones..." />
+                  <FieldHelper text="Affects scheduling and timestamps" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Country</Label>
+                  <SearchableSelect options={COUNTRIES} value={country} onValueChange={(v) => { setCountry(v); setState(''); markDirty(); }} searchPlaceholder="Search countries..." placeholder="Select country..." />
+                  <FieldHelper text="Determines tax and regional defaults" />
+                </div>
+              </div>
+              {stateOptions.length > 0 && (
+                <div className="space-y-2 max-w-sm">
+                  <Label>State</Label>
+                  <SearchableSelect options={stateOptions} value={state} onValueChange={(v) => { setState(v); markDirty(); }} searchPlaceholder="Search states..." placeholder="Select state..." />
+                </div>
+              )}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label>Number Format</Label>
+                  <SimpleSelect options={NUMBER_FORMATS} value={numberFormat} onValueChange={(v) => { setNumberFormat(v); markDirty(); }} />
+                </div>
+                <div className="space-y-2">
+                  <Label>First Day of Week</Label>
+                  <SimpleSelect options={WEEK_DAYS} value={firstDayOfWeek} onValueChange={(v) => { setFirstDayOfWeek(v); markDirty(); }} />
+                </div>
+                <div className="space-y-2">
+                  <Label>Financial Year</Label>
+                  <SimpleSelect options={FINANCIAL_YEARS} value={financialYear} onValueChange={(v) => { setFinancialYear(v); markDirty(); }} />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardHeader><CardTitle className="text-lg">Data Management</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-3">
+                <Button variant="outline" size="sm" onClick={exportSettings}><Download size={14} className="mr-2" /> Export Settings</Button>
+                <Button variant="outline" size="sm" onClick={importSettings}><Upload size={14} className="mr-2" /> Import Settings</Button>
+                <Button variant="outline" size="sm" onClick={resetDefaults} className="text-destructive hover:text-destructive"><RotateCcw size={14} className="mr-2" /> Reset to Defaults</Button>
+              </div>
+              <FieldHelper text="Export your settings as JSON, import from a file, or reset everything to defaults" />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Notification Preferences</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => saveSettings()}>Save</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {[
-                { key: 'email_notifications' as const, label: 'Email Notifications', desc: 'Receive email updates' },
-                { key: 'push_notifications' as const, label: 'Push Notifications', desc: 'Receive push notifications' },
-                { key: 'slack_integration' as const, label: 'Slack Integration', desc: 'Send notifications to Slack' },
-                { key: 'weekly_digest' as const, label: 'Weekly Digest', desc: 'Receive weekly summary' },
-                { key: 'mention_alerts' as const, label: 'Mention Alerts', desc: 'Notify when you\'re mentioned' },
-              ].map((item) => (
-                <div key={item.key} className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm font-medium">{item.label}</p>
-                    <p className="text-xs text-muted-foreground">{item.desc}</p>
+            <CardHeader><CardTitle className="text-lg">Notification Preferences</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <CollapsibleSection title="Project Notifications" helper="Updates about your projects and tasks">
+                <div className="space-y-3 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Email Notifications</p><p className="text-xs text-muted-foreground">Receive email updates about project activity</p></div>
+                    <Switch checked={notifications.email_notifications} onCheckedChange={() => toggleNotification('email_notifications')} />
                   </div>
-                  <Switch checked={notifications[item.key]} onCheckedChange={() => toggleNotification(item.key)} />
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Push Notifications</p><p className="text-xs text-muted-foreground">Browser push notifications for real-time updates</p></div>
+                    <Switch checked={notifications.push_notifications} onCheckedChange={() => toggleNotification('push_notifications')} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Mention Alerts</p><p className="text-xs text-muted-foreground">Notify when someone mentions you in a comment</p></div>
+                    <Switch checked={notifications.mention_alerts} onCheckedChange={() => toggleNotification('mention_alerts')} />
+                  </div>
                 </div>
-              ))}
+              </CollapsibleSection>
+              <CollapsibleSection title="System Notifications" helper="Digests and integrations" defaultOpen={false}>
+                <div className="space-y-3 pt-3">
+                  <div className="space-y-2">
+                    <Label>Digest Frequency</Label>
+                    <SimpleSelect options={DIGEST_FREQUENCIES} value={notifications.digest_frequency} onValueChange={(v) => { setNotifications((prev) => ({ ...prev, digest_frequency: v })); markDirty(); }} />
+                    <FieldHelper text="How often to receive activity summaries" />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium">Slack Integration</p>
+                      <p className="text-xs text-muted-foreground">Send notifications to your Slack workspace</p>
+                    </div>
+                    {notifications.slack_integration ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-emerald-600 font-medium flex items-center gap-1"><Check size={12} /> Connected</span>
+                        <Button variant="ghost" size="sm" onClick={() => toggleNotification('slack_integration')}>Disconnect</Button>
+                      </div>
+                    ) : (
+                      <Button variant="outline" size="sm" onClick={() => toggleNotification('slack_integration')}>
+                        <ExternalLink size={12} className="mr-1" /> Connect Slack
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              </CollapsibleSection>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="security" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="text-lg">Security Settings</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Two-Factor Authentication</Label>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Add an extra layer of security</p>
-                  <Switch checked={twoFactor} onCheckedChange={setTwoFactor} />
+            <CardHeader><CardTitle className="text-lg">Security Settings</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <CollapsibleSection title="Authentication">
+                <div className="space-y-3 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Two-Factor Authentication</p><p className="text-xs text-muted-foreground">Add an extra layer of security to your account</p></div>
+                    <Switch checked={twoFactor} onCheckedChange={(v) => { setTwoFactor(v); markDirty(); }} />
+                  </div>
+                  <Separator />
+                  <div className="space-y-2">
+                    <Label>Password</Label>
+                    <div className="flex items-center gap-3">
+                      <Button variant="outline" size="sm" onClick={async () => { if (user?.email) { const r = await resetPassword(user.email); if (r.success) toast.success('Password reset email sent'); else toast.error('Failed to send reset email'); } }}>Change Password</Button>
+                      <span className="text-xs text-muted-foreground">A reset link will be sent to your email</span>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label>Session Timeout</Label>
-                <Input value={sessionTimeout} onChange={(e) => setSessionTimeout(e.target.value)} />
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label>Password</Label>
-                <Button variant="outline" onClick={async () => { if (user?.email) { const r = await resetPassword(user.email); if (r.success) toast.success('Password reset email sent'); else toast.error('Failed to send reset email'); } }}>Change Password</Button>
-                <p className="text-xs text-muted-foreground mt-1">A reset link will be sent to your email</p>
-              </div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Sessions" helper="Manage your active sessions" defaultOpen={false}>
+                <div className="space-y-3 pt-3">
+                  <div className="space-y-2">
+                    <Label>Session Timeout</Label>
+                    <SimpleSelect options={SESSION_TIMEOUTS} value={sessionTimeout} onValueChange={(v) => { setSessionTimeout(v); markDirty(); }} />
+                    <FieldHelper text="Automatically log out after a period of inactivity" />
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-2"><Laptop size={14} /> Current Session</p>
+                      <p className="text-xs text-muted-foreground">Chrome on macOS</p>
+                    </div>
+                    <span className="text-xs text-emerald-600 font-medium">Active now</span>
+                  </div>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium flex items-center gap-2"><Smartphone size={14} /> Mobile App</p>
+                      <p className="text-xs text-muted-foreground">Safari on iPhone</p>
+                    </div>
+                    <span className="text-xs text-muted-foreground">2 hours ago</span>
+                  </div>
+                </div>
+              </CollapsibleSection>
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="appearance" className="space-y-4 mt-4">
           <Card>
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Appearance</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => saveSettings()}>Save</Button>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">Theme</p>
-                  <p className="text-xs text-muted-foreground">Choose your preferred theme</p>
+            <CardHeader><CardTitle className="text-lg">Appearance</CardTitle></CardHeader>
+            <CardContent className="space-y-6">
+              <CollapsibleSection title="Theme">
+                <div className="space-y-3 pt-3">
+                  <div className="space-y-2">
+                    <Label>Theme</Label>
+                    <div className="flex gap-2">
+                      {THEME_OPTIONS.map((opt) => (
+                        <button key={opt.value} type="button"
+                          onClick={() => { setAppearance((prev) => ({ ...prev, theme: opt.value as 'system' | 'light' | 'dark' })); markDirty(); }}
+                          className={`flex-1 px-4 py-2.5 rounded-lg border text-sm font-medium transition-all ${appearance.theme === opt.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-muted-foreground/30'}`}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
-                <ThemeSwitcher />
-              </div>
-              <Separator />
-              <div className="space-y-2">
-                <Label>Sidebar Collapsed</Label>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Keep sidebar collapsed by default</p>
-                  <Switch checked={appearance.sidebar_collapsed} onCheckedChange={(v) => setAppearance((prev) => ({ ...prev, sidebar_collapsed: v }))} />
+              </CollapsibleSection>
+              <CollapsibleSection title="Layout" helper="Sidebar and display options" defaultOpen={false}>
+                <div className="space-y-3 pt-3">
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Sidebar Collapsed</p><p className="text-xs text-muted-foreground">Keep sidebar collapsed by default</p></div>
+                    <Switch checked={appearance.sidebar_collapsed} onCheckedChange={(v) => { setAppearance((prev) => ({ ...prev, sidebar_collapsed: v })); markDirty(); }} />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Compact Mode</p><p className="text-xs text-muted-foreground">Reduce spacing for more content on screen</p></div>
+                    <Switch checked={appearance.compact_mode} onCheckedChange={(v) => { setAppearance((prev) => ({ ...prev, compact_mode: v })); markDirty(); }} />
+                  </div>
                 </div>
-              </div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Text & Language" defaultOpen={false}>
+                <div className="space-y-3 pt-3">
+                  <div className="space-y-2">
+                    <Label>Font Size</Label>
+                    <div className="flex gap-2">
+                      {FONT_SIZES.map((opt) => (
+                        <button key={opt.value} type="button"
+                          onClick={() => { setAppearance((prev) => ({ ...prev, font_size: opt.value })); markDirty(); }}
+                          className={`flex-1 px-3 py-2 rounded-lg border text-sm font-medium transition-all ${appearance.font_size === opt.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-muted-foreground/30'}`}>
+                          {opt.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Language</Label>
+                    <SearchableSelect options={LANGUAGES} value={appearance.language} onValueChange={(v) => { setAppearance((prev) => ({ ...prev, language: v })); markDirty(); }} searchPlaceholder="Search languages..." />
+                  </div>
+                </div>
+              </CollapsibleSection>
             </CardContent>
           </Card>
         </TabsContent>
@@ -362,107 +699,218 @@ export default function SettingsPage() {
         <TabsContent value="branding" className="space-y-4 mt-4">
           <Card>
             <CardHeader>
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg">Company Branding</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => saveSettings()}>Save</Button>
-              </div>
-              <p className="text-sm text-muted-foreground">These details appear on all PDF documents</p>
+              <CardTitle className="text-lg">Company Branding</CardTitle>
+              <p className="text-sm text-muted-foreground">These details appear on all PDF documents and invoices</p>
             </CardHeader>
-            <CardContent className="space-y-6">
-              <div>
-                <h4 className="text-sm font-medium mb-3">Company Information</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Company Name</Label><Input value={branding.company_name} onChange={(e) => setBranding((p) => ({ ...p, company_name: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Legal Name</Label><Input value={branding.legal_name} onChange={(e) => setBranding((p) => ({ ...p, legal_name: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Tagline</Label><Input value={branding.tagline} onChange={(e) => setBranding((p) => ({ ...p, tagline: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Website</Label><Input value={branding.website} onChange={(e) => setBranding((p) => ({ ...p, website: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Email</Label><Input value={branding.email} onChange={(e) => setBranding((p) => ({ ...p, email: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Phone</Label><Input value={branding.phone} onChange={(e) => setBranding((p) => ({ ...p, phone: e.target.value }))} /></div>
-                  <div className="space-y-2 col-span-2"><Label>Address</Label><Input value={branding.address} onChange={(e) => setBranding((p) => ({ ...p, address: e.target.value }))} /></div>
+            <CardContent className="space-y-4">
+              <CollapsibleSection title="Company Information" helper="Basic company identity">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
+                  <div className="space-y-2"><Label>Company Name</Label><Input value={general.company_name} onChange={(e) => { setGeneral((p) => ({ ...p, company_name: e.target.value })); markDirty(); }} /><FieldHelper text="Your company display name" /></div>
+                  <div className="space-y-2"><Label>Legal Name</Label><Input value={general.legal_name} onChange={(e) => { setGeneral((p) => ({ ...p, legal_name: e.target.value })); markDirty(); }} /><FieldHelper text="Official registered name for legal documents" /></div>
+                  <div className="space-y-2"><Label>Tagline</Label><Input value={general.tagline} onChange={(e) => { setGeneral((p) => ({ ...p, tagline: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2"><Label>Website</Label><Input value={branding.website} onChange={(e) => { setBranding((p) => ({ ...p, website: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2"><Label>Email</Label><Input value={branding.email} onChange={(e) => { setBranding((p) => ({ ...p, email: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2"><Label>Phone</Label><Input value={branding.phone} onChange={(e) => { setBranding((p) => ({ ...p, phone: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2 sm:col-span-2"><Label>Address</Label><Input value={branding.address} onChange={(e) => { setBranding((p) => ({ ...p, address: e.target.value })); markDirty(); }} /></div>
                 </div>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-3">Logo</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Logo URL</Label><Input value={branding.logo_url} onChange={(e) => setBranding((p) => ({ ...p, logo_url: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Footer Logo URL</Label><Input value={branding.footer_logo_url} onChange={(e) => setBranding((p) => ({ ...p, footer_logo_url: e.target.value }))} /></div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Logo" helper="Company branding visuals" defaultOpen={false}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 pt-3">
+                  <div className="space-y-2">
+                    <Label>Company Logo</Label>
+                    <div className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary/50 transition-colors">
+                      {branding.logo_url ? (
+                        <div className="space-y-3">
+                          <div className="flex justify-center">
+                            <img src={branding.logo_url} alt="Company logo" className="max-h-20 max-w-[200px] object-contain" />
+                          </div>
+                          <p className="text-xs text-emerald-600 font-medium flex items-center justify-center gap-1"><Check size={12} /> Logo uploaded</p>
+                          <div className="flex gap-2 justify-center">
+                            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer transition-colors">
+                              <Upload size={12} /> Change
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f, 'logo_url'); }} />
+                            </label>
+                            <button type="button" onClick={() => { setBranding((p) => ({ ...p, logo_url: '' })); markDirty(); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
+                              <X size={12} /> Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer block">
+                          {uploadingLogo ? (
+                            <div className="py-4"><Loader2 size={24} className="animate-spin mx-auto text-muted-foreground" /><p className="text-xs text-muted-foreground mt-2">Uploading...</p></div>
+                          ) : (
+                            <div className="py-4">
+                              <ImageIcon size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+                              <p className="text-sm text-muted-foreground">Click to upload logo</p>
+                              <p className="text-xs text-muted-foreground/70 mt-1">PNG, JPG, SVG up to 5MB</p>
+                            </div>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f, 'logo_url'); }} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Footer Logo</Label>
+                    <div className="border-2 border-dashed rounded-lg p-4 text-center hover:border-primary/50 transition-colors">
+                      {branding.footer_logo_url ? (
+                        <div className="space-y-3">
+                          <div className="flex justify-center">
+                            <img src={branding.footer_logo_url} alt="Footer logo" className="max-h-16 max-w-[160px] object-contain" />
+                          </div>
+                          <p className="text-xs text-emerald-600 font-medium flex items-center justify-center gap-1"><Check size={12} /> Logo uploaded</p>
+                          <div className="flex gap-2 justify-center">
+                            <label className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer transition-colors">
+                              <Upload size={12} /> Change
+                              <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f, 'footer_logo_url'); }} />
+                            </label>
+                            <button type="button" onClick={() => { setBranding((p) => ({ ...p, footer_logo_url: '' })); markDirty(); }} className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-destructive/10 text-destructive hover:bg-destructive/20 transition-colors">
+                              <X size={12} /> Remove
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="cursor-pointer block">
+                          {uploadingFooterLogo ? (
+                            <div className="py-4"><Loader2 size={24} className="animate-spin mx-auto text-muted-foreground" /><p className="text-xs text-muted-foreground mt-2">Uploading...</p></div>
+                          ) : (
+                            <div className="py-4">
+                              <ImageIcon size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+                              <p className="text-sm text-muted-foreground">Click to upload footer logo</p>
+                              <p className="text-xs text-muted-foreground/70 mt-1">PNG, JPG, SVG up to 5MB</p>
+                            </div>
+                          )}
+                          <input type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleLogoUpload(f, 'footer_logo_url'); }} />
+                        </label>
+                      )}
+                    </div>
+                  </div>
                 </div>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-3">Color Scheme</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label>Primary Color</Label><div className="flex gap-2"><Input value={branding.primary_color} onChange={(e) => setBranding((p) => ({ ...p, primary_color: e.target.value }))} /><input type="color" value={branding.primary_color} onChange={(e) => setBranding((p) => ({ ...p, primary_color: e.target.value }))} className="w-9 h-9 rounded border cursor-pointer" /></div></div>
-                  <div className="space-y-2"><Label>Secondary Color</Label><div className="flex gap-2"><Input value={branding.secondary_color} onChange={(e) => setBranding((p) => ({ ...p, secondary_color: e.target.value }))} /><input type="color" value={branding.secondary_color} onChange={(e) => setBranding((p) => ({ ...p, secondary_color: e.target.value }))} className="w-9 h-9 rounded border cursor-pointer" /></div></div>
-                  <div className="space-y-2"><Label>Accent Color</Label><div className="flex gap-2"><Input value={branding.accent_color} onChange={(e) => setBranding((p) => ({ ...p, accent_color: e.target.value }))} /><input type="color" value={branding.accent_color} onChange={(e) => setBranding((p) => ({ ...p, accent_color: e.target.value }))} className="w-9 h-9 rounded border cursor-pointer" /></div></div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Brand Colors" helper="Used across all generated documents" defaultOpen={false}>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-3">
+                  <div className="space-y-2"><Label>Primary Color</Label><div className="flex gap-2"><Input value={branding.primary_color} onChange={(e) => { setBranding((p) => ({ ...p, primary_color: e.target.value })); markDirty(); }} /><input type="color" value={branding.primary_color} onChange={(e) => { setBranding((p) => ({ ...p, primary_color: e.target.value })); markDirty(); }} className="w-9 h-9 rounded border cursor-pointer" /></div></div>
+                  <div className="space-y-2"><Label>Secondary Color</Label><div className="flex gap-2"><Input value={branding.secondary_color} onChange={(e) => { setBranding((p) => ({ ...p, secondary_color: e.target.value })); markDirty(); }} /><input type="color" value={branding.secondary_color} onChange={(e) => { setBranding((p) => ({ ...p, secondary_color: e.target.value })); markDirty(); }} className="w-9 h-9 rounded border cursor-pointer" /></div></div>
+                  <div className="space-y-2"><Label>Accent Color</Label><div className="flex gap-2"><Input value={branding.accent_color} onChange={(e) => { setBranding((p) => ({ ...p, accent_color: e.target.value })); markDirty(); }} /><input type="color" value={branding.accent_color} onChange={(e) => { setBranding((p) => ({ ...p, accent_color: e.target.value })); markDirty(); }} className="w-9 h-9 rounded border cursor-pointer" /></div></div>
                 </div>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-3">Tax Information</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label>GST Number</Label><Input value={branding.gst_number} onChange={(e) => setBranding((p) => ({ ...p, gst_number: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>PAN Number</Label><Input value={branding.pan_number} onChange={(e) => setBranding((p) => ({ ...p, pan_number: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Registration No.</Label><Input value={branding.registration_number} onChange={(e) => setBranding((p) => ({ ...p, registration_number: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>CGST (%)</Label><Input type="number" value={branding.tax_cgst} onChange={(e) => setBranding((p) => ({ ...p, tax_cgst: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div className="space-y-2"><Label>SGST (%)</Label><Input type="number" value={branding.tax_sgst} onChange={(e) => setBranding((p) => ({ ...p, tax_sgst: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div className="space-y-2"><Label>IGST (%)</Label><Input type="number" value={branding.tax_igst} onChange={(e) => setBranding((p) => ({ ...p, tax_igst: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div className="space-y-2"><Label>VAT (%)</Label><Input type="number" value={branding.tax_vat} onChange={(e) => setBranding((p) => ({ ...p, tax_vat: parseFloat(e.target.value) || 0 }))} /></div>
-                  <div className="space-y-2"><Label>TIN</Label><Input value={branding.tax_tin} onChange={(e) => setBranding((p) => ({ ...p, tax_tin: e.target.value }))} /></div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Tax Information" helper="Applied to invoices automatically" defaultOpen={false}>
+                <div className="space-y-4 pt-3">
+                  <div className="space-y-2">
+                    <Label>Tax System</Label>
+                    <SimpleSelect options={TAX_SYSTEMS} value={taxSystem} onValueChange={(v) => { setTaxSystem(v); markDirty(); }} />
+                    <FieldHelper text="Select your tax system to show relevant fields" />
+                  </div>
+                  {taxFields.includes('gst_number') && (
+                    <div className="space-y-2"><Label>GST Number</Label><Input value={branding.gst_number} onChange={(e) => { setBranding((p) => ({ ...p, gst_number: e.target.value })); markDirty(); }} /></div>
+                  )}
+                  {taxFields.includes('pan_number') && (
+                    <div className="space-y-2"><Label>PAN Number</Label><Input value={branding.pan_number} onChange={(e) => { setBranding((p) => ({ ...p, pan_number: e.target.value })); markDirty(); }} /></div>
+                  )}
+                  {taxFields.includes('registration_number') && (
+                    <div className="space-y-2"><Label>Registration Number</Label><Input value={branding.registration_number} onChange={(e) => { setBranding((p) => ({ ...p, registration_number: e.target.value })); markDirty(); }} /></div>
+                  )}
+                  {taxFields.includes('tax_cgst') && (
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div className="space-y-2"><Label>CGST (%)</Label><Input type="number" value={branding.tax_cgst} onChange={(e) => { setBranding((p) => ({ ...p, tax_cgst: parseFloat(e.target.value) || 0 })); markDirty(); }} /></div>
+                      <div className="space-y-2"><Label>SGST (%)</Label><Input type="number" value={branding.tax_sgst} onChange={(e) => { setBranding((p) => ({ ...p, tax_sgst: parseFloat(e.target.value) || 0 })); markDirty(); }} /></div>
+                      <div className="space-y-2"><Label>IGST (%)</Label><Input type="number" value={branding.tax_igst} onChange={(e) => { setBranding((p) => ({ ...p, tax_igst: parseFloat(e.target.value) || 0 })); markDirty(); }} /></div>
+                    </div>
+                  )}
+                  {taxFields.includes('tax_vat') && (
+                    <div className="space-y-2 max-w-xs"><Label>VAT (%)</Label><Input type="number" value={branding.tax_vat} onChange={(e) => { setBranding((p) => ({ ...p, tax_vat: parseFloat(e.target.value) || 0 })); markDirty(); }} /></div>
+                  )}
+                  {taxFields.includes('tax_tin') && (
+                    <div className="space-y-2 max-w-xs"><Label>TIN</Label><Input value={branding.tax_tin} onChange={(e) => { setBranding((p) => ({ ...p, tax_tin: e.target.value })); markDirty(); }} /></div>
+                  )}
                 </div>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-3">Bank Details</h4>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Bank Name</Label><Input value={branding.bank_name} onChange={(e) => setBranding((p) => ({ ...p, bank_name: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Account Number</Label><Input value={branding.bank_account} onChange={(e) => setBranding((p) => ({ ...p, bank_account: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>IFSC Code</Label><Input value={branding.bank_ifsc} onChange={(e) => setBranding((p) => ({ ...p, bank_ifsc: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>SWIFT Code</Label><Input value={branding.bank_swift} onChange={(e) => setBranding((p) => ({ ...p, bank_swift: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>UPI ID</Label><Input value={branding.upi_id} onChange={(e) => setBranding((p) => ({ ...p, upi_id: e.target.value }))} /></div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Bank Details" helper="For payment processing" defaultOpen={false}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-3">
+                  <div className="space-y-2">
+                    <Label>Bank Name</Label>
+                    <SearchableSelect options={BANKS} value={branding.bank_name} onValueChange={(v) => { setBranding((p) => ({ ...p, bank_name: v })); markDirty(); }} searchPlaceholder="Search banks..." allowCustom placeholder="Select or type bank..." />
+                  </div>
+                  <div className="space-y-2"><Label>Account Number</Label><Input value={branding.bank_account} onChange={(e) => { setBranding((p) => ({ ...p, bank_account: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2"><Label>IFSC Code</Label><Input value={branding.bank_ifsc} onChange={(e) => { setBranding((p) => ({ ...p, bank_ifsc: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2"><Label>SWIFT Code</Label><Input value={branding.bank_swift} onChange={(e) => { setBranding((p) => ({ ...p, bank_swift: e.target.value })); markDirty(); }} /></div>
+                  <div className="space-y-2"><Label>UPI ID</Label><Input value={branding.upi_id} onChange={(e) => { setBranding((p) => ({ ...p, upi_id: e.target.value })); markDirty(); }} /></div>
                 </div>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-3">Document Settings</h4>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="space-y-2"><Label>Quote Prefix</Label><Input value={branding.quote_prefix} onChange={(e) => setBranding((p) => ({ ...p, quote_prefix: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Invoice Prefix</Label><Input value={branding.invoice_prefix} onChange={(e) => setBranding((p) => ({ ...p, invoice_prefix: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Contract Prefix</Label><Input value={branding.contract_prefix} onChange={(e) => setBranding((p) => ({ ...p, contract_prefix: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Report Prefix</Label><Input value={branding.report_prefix} onChange={(e) => setBranding((p) => ({ ...p, report_prefix: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Currency</Label><Input value={branding.default_currency} onChange={(e) => setBranding((p) => ({ ...p, default_currency: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Currency Symbol</Label><Input value={branding.currency_symbol} onChange={(e) => setBranding((p) => ({ ...p, currency_symbol: e.target.value }))} /></div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Document Settings" helper="Prefixes and formatting for generated documents" defaultOpen={false}>
+                <div className="space-y-4 pt-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <PrefixSelect value={branding.quote_prefix} onValueChange={(v) => { setBranding((p) => ({ ...p, quote_prefix: v })); markDirty(); }} presets={PREFIX_PRESETS} label="Quote Prefix" />
+                    <PrefixSelect value={branding.invoice_prefix} onValueChange={(v) => { setBranding((p) => ({ ...p, invoice_prefix: v })); markDirty(); }} presets={INVOICE_PREFIX_PRESETS} label="Invoice Prefix" />
+                  </div>
+                  <Separator />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Currency</Label>
+                      <SearchableSelect options={CURRENCIES.map((c) => ({ label: c.label, value: c.value }))} value={defaultCurrency} onValueChange={(v) => {
+                        const cur = CURRENCIES.find((c) => c.value === v);
+                        setDefaultCurrency(v);
+                        setGeneral((p) => ({ ...p, default_currency: v, currency_symbol: cur?.symbol || '$' }));
+                        markDirty();
+                      }} searchPlaceholder="Search currencies..." />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Currency Symbol</Label>
+                      <Input value={currencySymbol} readOnly className="bg-muted" />
+                      <FieldHelper text="Auto-filled from currency selection" />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Date Format</Label>
+                      <SimpleSelect options={DATE_FORMATS} value={branding.date_format} onValueChange={(v) => { setBranding((p) => ({ ...p, date_format: v })); markDirty(); }} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Invoice Due Days</Label>
+                      <SimpleSelect options={INVOICE_DUE_DAYS} value={invoiceDueDays} onValueChange={(v) => { setInvoiceDueDays(v); markDirty(); }} />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Logo Position</Label>
+                      <SimpleSelect options={LOGO_POSITIONS} value={logoPosition} onValueChange={(v) => { setLogoPosition(v); markDirty(); }} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Email Signature Template</Label>
+                      <SimpleSelect options={SIGNATURE_TEMPLATES} value={emailSignature} onValueChange={(v) => { setEmailSignature(v); markDirty(); }} />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Footer Text</Label>
+                    <Input value={branding.footer_text} onChange={(e) => { setBranding((p) => ({ ...p, footer_text: e.target.value })); markDirty(); }} />
+                    <FieldHelper text="Appears at the bottom of every generated document" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Default Notes</Label>
+                    <textarea className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm" value={branding.default_notes} onChange={(e) => { setBranding((p) => ({ ...p, default_notes: e.target.value })); markDirty(); }} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Default Terms &amp; Conditions</Label>
+                    <textarea className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm" value={branding.default_terms} onChange={(e) => { setBranding((p) => ({ ...p, default_terms: e.target.value })); markDirty(); }} />
+                  </div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <div className="space-y-2"><Label>Date Format</Label><Input value={branding.date_format} onChange={(e) => setBranding((p) => ({ ...p, date_format: e.target.value }))} /></div>
-                  <div className="space-y-2"><Label>Footer Text</Label><Input value={branding.footer_text} onChange={(e) => setBranding((p) => ({ ...p, footer_text: e.target.value }))} /></div>
-                </div>
-                <div className="space-y-2 mt-4">
-                  <Label>Default Notes (appears on all documents)</Label>
-                  <textarea className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm" value={branding.default_notes} onChange={(e) => setBranding((p) => ({ ...p, default_notes: e.target.value }))} />
-                </div>
-                <div className="space-y-2 mt-4">
-                  <Label>Default Terms & Conditions</Label>
-                  <textarea className="w-full min-h-[80px] rounded-md border bg-background px-3 py-2 text-sm" value={branding.default_terms} onChange={(e) => setBranding((p) => ({ ...p, default_terms: e.target.value }))} />
-                </div>
-              </div>
-              <Separator />
-              <div>
-                <h4 className="text-sm font-medium mb-3">Template Style</h4>
-                <div className="flex gap-3">
-                  {(['modern', 'corporate', 'minimal'] as const).map((style) => (
-                    <button
-                      key={style}
-                      type="button"
-                      className={`flex-1 p-3 rounded-lg border text-center text-sm font-medium transition-all ${branding.template_style === style ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-muted-foreground/30'}`}
-                      onClick={() => setBranding((p) => ({ ...p, template_style: style }))}
-                    >
-                      {style.charAt(0).toUpperCase() + style.slice(1)}
+              </CollapsibleSection>
+              <CollapsibleSection title="Template Style" helper="Visual style for generated PDF documents" defaultOpen={false}>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3">
+                  {TEMPLATE_STYLES.map((style) => (
+                    <button key={style.value} type="button"
+                      onClick={() => { setBranding((p) => ({ ...p, template_style: style.value })); markDirty(); }}
+                      className={`p-4 rounded-lg border text-left transition-all ${branding.template_style === style.value ? 'border-primary bg-primary/5 ring-1 ring-primary' : 'hover:border-muted-foreground/30'}`}>
+                      <div className="mb-2">
+                        <div className={`h-8 rounded ${style.value === 'modern' ? 'bg-gradient-to-r from-blue-500 to-purple-500' : style.value === 'corporate' ? 'bg-slate-700' : 'bg-gray-200'}`} />
+                      </div>
+                      <p className="text-sm font-medium">{style.label}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{style.description}</p>
                     </button>
                   ))}
                 </div>
-              </div>
+              </CollapsibleSection>
             </CardContent>
           </Card>
         </TabsContent>
@@ -472,21 +920,44 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Team Management</CardTitle>
-                <Button variant="outline" size="sm" onClick={() => saveSettings()}>Save</Button>
+                <Button size="sm"><Users size={14} className="mr-2" /> Invite Member</Button>
               </div>
             </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label>Default Role for New Members</Label>
-                <Input value={teamSettings.default_role} onChange={(e) => setTeamSettings((prev) => ({ ...prev, default_role: e.target.value }))} />
-              </div>
-              <div className="space-y-2">
-                <Label>Allow Invitations</Label>
-                <div className="flex items-center justify-between">
-                  <p className="text-sm text-muted-foreground">Let members invite new users</p>
-                  <Switch checked={teamSettings.allow_invitations} onCheckedChange={(v) => setTeamSettings((prev) => ({ ...prev, allow_invitations: v }))} />
+            <CardContent className="space-y-6">
+              <CollapsibleSection title="Team Settings">
+                <div className="space-y-3 pt-3">
+                  <div className="space-y-2">
+                    <Label>Default Role for New Members</Label>
+                    <SimpleSelect options={TEAM_ROLES} value={teamSettings.default_role} onValueChange={(v) => { setTeamSettings((prev) => ({ ...prev, default_role: v })); markDirty(); }} />
+                    <FieldHelper text="Role assigned to newly invited team members" />
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <div><p className="text-sm font-medium">Allow Invitations</p><p className="text-xs text-muted-foreground">Let members invite new users to the workspace</p></div>
+                    <Switch checked={teamSettings.allow_invitations} onCheckedChange={(v) => { setTeamSettings((prev) => ({ ...prev, allow_invitations: v })); markDirty(); }} />
+                  </div>
                 </div>
-              </div>
+              </CollapsibleSection>
+              <CollapsibleSection title="Members" helper="People in this workspace" defaultOpen={false}>
+                <div className="space-y-3 pt-3">
+                  {teamSettings.members.length === 0 ? (
+                    <div className="text-center py-6">
+                      <Users size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+                      <p className="text-sm text-muted-foreground">No team members yet</p>
+                      <p className="text-xs text-muted-foreground/70 mt-1">Invite people to start collaborating</p>
+                    </div>
+                  ) : (
+                    teamSettings.members.map((m) => (
+                      <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">{m.name.charAt(0)}</div>
+                          <div><p className="text-sm font-medium">{m.name}</p><p className="text-xs text-muted-foreground">{m.email}</p></div>
+                        </div>
+                        <span className="text-xs text-muted-foreground bg-muted px-2 py-1 rounded">{m.role}</span>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </CollapsibleSection>
             </CardContent>
           </Card>
         </TabsContent>
@@ -496,27 +967,33 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">API Keys</CardTitle>
-                <Button onClick={generateApiKey}>
-                  <Key size={16} className="mr-2" />
-                  Generate New Key
-                </Button>
+                <Button onClick={generateApiKey}><Key size={16} className="mr-2" /> Generate New Key</Button>
               </div>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Manage your API keys for integrations</p>
+              <p className="text-sm text-muted-foreground">Manage API keys for integrations and third-party access</p>
               {apiKeys.length === 0 ? (
-                <p className="text-sm text-muted-foreground">No API keys generated yet.</p>
+                <div className="text-center py-8">
+                  <Key size={32} className="mx-auto text-muted-foreground/50 mb-2" />
+                  <p className="text-sm text-muted-foreground">No API keys generated yet</p>
+                </div>
               ) : (
                 <div className="space-y-2">
                   {apiKeys.map((k, i) => (
                     <div key={i} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-mono truncate">{k.key}</p>
-                        <p className="text-xs text-muted-foreground">{k.name} · Created {new Date(k.created_at).toLocaleDateString()}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-xs font-mono truncate">{k.key}</p>
+                          <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0" onClick={() => copyToClipboard(k.key)}>
+                            {copiedKey === k.key ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                          </Button>
+                        </div>
+                        <div className="flex items-center gap-3 mt-1">
+                          <span className="text-xs text-muted-foreground">{k.name}</span>
+                          <span className="text-xs text-muted-foreground">Created {new Date(k.created_at).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 flex-shrink-0" onClick={() => copyToClipboard(k.key)}>
-                        {copiedKey === k.key ? <Check size={14} /> : <Copy size={14} />}
-                      </Button>
+                      <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive flex-shrink-0" onClick={() => revokeApiKey(i)}>Revoke</Button>
                     </div>
                   ))}
                 </div>
@@ -525,6 +1002,24 @@ export default function SettingsPage() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <Card className="border-destructive/50">
+        <CardHeader>
+          <CardTitle className="text-lg text-destructive flex items-center gap-2">
+            <AlertTriangle size={18} /> Danger Zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/20">
+            <div><p className="text-sm font-medium">Delete Workspace</p><p className="text-xs text-muted-foreground">Permanently delete this workspace and all its data</p></div>
+            <Button variant="destructive" size="sm">Delete</Button>
+          </div>
+          <div className="flex items-center justify-between p-3 rounded-lg border border-destructive/20">
+            <div><p className="text-sm font-medium">Transfer Ownership</p><p className="text-xs text-muted-foreground">Transfer workspace ownership to another team member</p></div>
+            <Button variant="outline" size="sm">Transfer</Button>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

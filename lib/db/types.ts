@@ -1,5 +1,38 @@
 export type UserRole = 'client' | 'admin' | 'dev';
 
+// ===== WORKSPACE & ROLE SYSTEM =====
+
+export type WorkspaceRole = 'owner' | 'admin' | 'manager' | 'employee' | 'viewer';
+
+export interface Workspace {
+  id: string;
+  name: string;
+  slug: string;
+  owner_id: string;
+  setup_completed: boolean;
+  setup_step: number; // 0-5, tracks wizard progress
+  created_at: string;
+  updated_at: string;
+}
+
+export interface WorkspaceMember {
+  id: string;
+  workspace_id: string;
+  user_id: string;
+  role: WorkspaceRole;
+  invited_by?: string;
+  joined_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformAdmin {
+  id: string;
+  user_id: string;
+  assigned_by?: string;
+  created_at: string;
+}
+
 export type ProjectStatus =
   | 'pending'
   | 'under_review'
@@ -227,20 +260,6 @@ export interface Notification {
   created_at: string;
 }
 
-export type ContractStatus = 'Active' | 'Draft' | 'Under Review' | 'Expired';
-
-export interface Contract {
-  id: string;
-  title: string;
-  type: string;
-  status: ContractStatus;
-  parties: string;
-  expiry: string;
-  progress: number;
-  created_at: string;
-  updated_at: string;
-}
-
 export type AgentStatus = 'Active' | 'On Break' | 'Offline';
 
 export interface FieldAgent {
@@ -297,20 +316,6 @@ export interface CalendarEvent {
   color?: string;
   project_id?: string;
   created_by?: string;
-  created_at: string;
-  updated_at: string;
-}
-
-export type ReportStatus = 'Active' | 'Paused';
-
-export interface Report {
-  id: string;
-  name: string;
-  type: string;
-  nextRun: string;
-  format: string;
-  recipientCount: number;
-  status: ReportStatus;
   created_at: string;
   updated_at: string;
 }
@@ -601,3 +606,548 @@ export interface Lead {
   created_at: string;
   updated_at: string;
 }
+
+// ============================================================================
+// NORMALIZED DATA MODEL - Relationship-driven CRM
+// ============================================================================
+
+// ===== COMPANY (New Entity) =====
+export interface Company {
+  company_id: string;
+  workspace_id: string;
+  
+  // Basic Info
+  name: string;
+  legal_name: string;
+  website: string;
+  phone: string;
+  email: string;
+  
+  // Address
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+  
+  // Tax IDs
+  gst_number: string;
+  pan_number: string;
+  vat_number: string;
+  registration_number: string;
+  
+  // Financial
+  currency: string;
+  timezone: string;
+  
+  // Bank Details
+  bank_name: string;
+  account_number: string;
+  ifsc: string;
+  swift: string;
+  upi: string;
+  
+  // Branding (overrides workspace defaults)
+  logo_url: string;
+  footer_text: string;
+  
+  // Stats (computed on read)
+  contact_count?: number;
+  deal_count?: number;
+  quote_count?: number;
+  invoice_count?: number;
+  total_revenue?: number;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+// ===== CONTACT (New Entity) =====
+export interface Contact {
+  contact_id: string;
+  workspace_id: string;
+  company_id: string; // FK → Company
+  
+  // Basic Info
+  name: string;
+  email: string;
+  phone: string;
+  
+  // Role
+  role: string;
+  department: string;
+  designation: string;
+  
+  // Flags
+  is_primary: boolean;
+  is_decision_maker: boolean;
+  
+  // Social
+  linkedin: string;
+  whatsapp: string;
+  
+  // Notes
+  notes: string;
+  
+  // Stats (computed on read)
+  deal_count?: number;
+  quote_count?: number;
+  invoice_count?: number;
+  last_activity?: string;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+// ===== LEAD (Enhanced) =====
+export interface NormalizedLead {
+  lead_id: string;
+  workspace_id: string;
+  company_id: string; // FK → Company (optional)
+  contact_id: string; // FK → Contact (created when qualified)
+  
+  // Basic Info
+  name: string;
+  email: string;
+  phone: string;
+  
+  // Lead Info
+  source: string;
+  status: NormalizedLeadStatus;
+  intent: 'hot' | 'warm' | 'cold';
+  
+  // Scoring
+  lead_score: number;
+  probability: number;
+  
+  // Value
+  potential_value: number;
+  
+  // Tags
+  tags: string[];
+  
+  // Follow-up
+  last_contacted: string;
+  next_follow_up: string;
+  follow_up_notes: string;
+  
+  // Conversion
+  converted_to_contact: string;
+  converted_to_deal: string;
+  converted_at: string;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export type NormalizedLeadStatus = 
+  | 'new'
+  | 'contacted'
+  | 'qualified'
+  | 'unqualified'
+  | 'converted_contact'
+  | 'converted_deal'
+  | 'lost';
+
+// ===== DEAL (Enhanced) =====
+export interface NormalizedDeal {
+  deal_id: string;
+  workspace_id: string;
+  company_id: string; // FK → Company
+  contact_id: string; // FK → Contact
+  lead_id: string; // FK → Lead
+  pipeline_id: string; // FK → Pipeline
+  stage_id: string; // FK → PipelineStage
+  owner_id: string; // FK → User
+  
+  // Basic Info
+  title: string;
+  description: string;
+  
+  // Value
+  value: number;
+  currency: string;
+  
+  // Timeline
+  expected_close_date: string;
+  actual_close_date: string;
+  
+  // Status
+  status: DealStatus;
+  
+  // Probability
+  probability: number;
+  
+  // Source
+  source: string;
+  
+  // Stats (computed on read)
+  quote_count?: number;
+  invoice_count?: number;
+  total_quoted?: number;
+  total_invoiced?: number;
+  total_paid?: number;
+  days_in_pipeline?: number;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export type DealStatus = 'open' | 'won' | 'lost' | 'abandoned';
+
+// ===== QUOTE (Enhanced) =====
+export interface NormalizedQuote {
+  quote_id: string;
+  workspace_id: string;
+  company_id: string; // FK → Company
+  contact_id: string; // FK → Contact
+  deal_id: string; // FK → Deal
+  
+  // Number
+  quote_number: string;
+  
+  // Items
+  items: QuoteItem[];
+  
+  // Financials
+  subtotal: number;
+  discount: number;
+  discount_type: 'percentage' | 'fixed';
+  tax: number;
+  tax_rate: number;
+  total: number;
+  currency: string;
+  
+  // Status
+  status: NormalizedQuoteStatus;
+  
+  // Validity
+  valid_until: string;
+  
+  // Notes
+  notes: string;
+  terms_and_conditions: string;
+  
+  // Conversion
+  converted_to_invoice: string;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface QuoteItem {
+  item_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  tax_rate: number;
+}
+
+export type NormalizedQuoteStatus = 
+  | 'draft'
+  | 'sent'
+  | 'viewed'
+  | 'accepted'
+  | 'rejected'
+  | 'expired'
+  | 'converted';
+
+// ===== INVOICE (Enhanced) =====
+export interface NormalizedInvoice {
+  invoice_id: string;
+  workspace_id: string;
+  company_id: string; // FK → Company
+  contact_id: string; // FK → Contact
+  deal_id: string; // FK → Deal
+  quote_id: string; // FK → Quote
+  
+  // Number
+  invoice_number: string;
+  
+  // Items
+  items: InvoiceItem[];
+  
+  // Financials
+  subtotal: number;
+  discount: number;
+  discount_type: 'percentage' | 'fixed';
+  tax: number;
+  tax_rate: number;
+  total: number;
+  currency: string;
+  
+  // Status
+  status: NormalizedInvoiceStatus;
+  
+  // Timeline
+  issue_date: string;
+  due_date: string;
+  paid_date: string;
+  
+  // Payment
+  amount_paid: number;
+  amount_due: number;
+  
+  // Notes
+  notes: string;
+  terms_and_conditions: string;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export interface InvoiceItem {
+  item_id: string;
+  description: string;
+  quantity: number;
+  unit_price: number;
+  total: number;
+  tax_rate: number;
+}
+
+export type NormalizedInvoiceStatus = 
+  | 'draft'
+  | 'pending'
+  | 'sent'
+  | 'viewed'
+  | 'overdue'
+  | 'paid'
+  | 'partially_paid'
+  | 'cancelled';
+
+// ===== PAYMENT (Enhanced) =====
+export interface NormalizedPayment {
+  payment_id: string;
+  workspace_id: string;
+  company_id: string; // FK → Company
+  contact_id: string; // FK → Contact
+  invoice_id: string; // FK → Invoice
+  quote_id: string; // FK → Quote
+  deal_id: string; // FK → Deal
+  
+  // Amount
+  amount: number;
+  currency: string;
+  
+  // Method
+  method: PaymentMethod;
+  reference: string;
+  
+  // Status
+  status: PaymentStatus;
+  
+  // Date
+  date: string;
+  
+  // Notes
+  notes: string;
+  
+  // Metadata
+  created_at: string;
+  updated_at: string;
+  created_by: string;
+}
+
+export type PaymentMethod = 
+  | 'cash'
+  | 'bank_transfer'
+  | 'upi'
+  | 'credit_card'
+  | 'debit_card'
+  | 'cheque'
+  | 'other';
+
+export type PaymentStatus = 'pending' | 'completed' | 'failed' | 'refunded';
+
+// ===== ACTIVITY (New Entity) =====
+export interface NormalizedActivity {
+  activity_id: string;
+  workspace_id: string;
+  
+  // Relationships
+  company_id: string;
+  contact_id: string;
+  deal_id: string;
+  quote_id: string;
+  invoice_id: string;
+  lead_id: string;
+  
+  // Type
+  type: ActivityType;
+  
+  // Content
+  title: string;
+  description: string;
+  
+  // Metadata
+  metadata: Record<string, any>;
+  
+  // User
+  user_id: string;
+  
+  // Timestamps
+  created_at: string;
+}
+
+export type ActivityType = 
+  | 'lead_created'
+  | 'lead_qualified'
+  | 'lead_converted_contact'
+  | 'lead_converted_deal'
+  | 'contact_created'
+  | 'contact_updated'
+  | 'deal_created'
+  | 'deal_stage_changed'
+  | 'deal_won'
+  | 'deal_lost'
+  | 'quote_created'
+  | 'quote_sent'
+  | 'quote_viewed'
+  | 'quote_accepted'
+  | 'quote_rejected'
+  | 'quote_expired'
+  | 'invoice_created'
+  | 'invoice_sent'
+  | 'invoice_viewed'
+  | 'invoice_paid'
+  | 'invoice_overdue'
+  | 'payment_received'
+  | 'payment_failed'
+  | 'meeting_scheduled'
+  | 'meeting_completed'
+  | 'meeting_cancelled'
+  | 'email_sent'
+  | 'email_received'
+  | 'note_added'
+  | 'task_created'
+  | 'task_completed'
+  | 'call_logged'
+  | 'whatsapp_sent'
+  | 'whatsapp_received'
+  | 'document_uploaded'
+  | 'document_downloaded'
+  | 'status_changed'
+  | 'comment_added'
+  | 'mention_added';
+
+// ===== PIPELINE (Enhanced) =====
+export interface NormalizedPipeline {
+  pipeline_id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  stages: NormalizedPipelineStage[];
+  is_default: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface NormalizedPipelineStage {
+  stage_id: string;
+  pipeline_id: string;
+  name: string;
+  description: string;
+  order: number;
+  color: string;
+  probability: number;
+  deal_count?: number;
+  total_value?: number;
+}
+
+// ===== Relationship Check Types =====
+export interface RelationshipCheck {
+  entity_type: string;
+  entity_id: string;
+  related_count: number;
+  related_type: string;
+}
+
+export interface DeleteCheckResult {
+  canDelete: boolean;
+  reason?: string;
+  relationships: RelationshipCheck[];
+}
+
+// ===== Related Entities (for Context Panel) =====
+export interface RelatedEntities {
+  contacts: Contact[];
+  deals: NormalizedDeal[];
+  quotes: NormalizedQuote[];
+  invoices: NormalizedInvoice[];
+  payments: NormalizedPayment[];
+  activities: NormalizedActivity[];
+  tasks: TaskItem[];
+  meetings: MeetingRequest[];
+}
+
+// ===== Auto-Fill Defaults =====
+export interface AutoFillDefaults {
+  currency: string;
+  timezone: string;
+  gst_number: string;
+  pan_number: string;
+  vat_number: string;
+  bank_name: string;
+  account_number: string;
+  ifsc: string;
+  swift: string;
+  upi: string;
+  logo_url: string;
+  footer_text: string;
+  address: string;
+  city: string;
+  state: string;
+  country: string;
+  pincode: string;
+}
+
+// ===== Event Types =====
+export type EventType = 
+  | 'company:created'
+  | 'company:updated'
+  | 'company:deleted'
+  | 'contact:created'
+  | 'contact:updated'
+  | 'contact:deleted'
+  | 'lead:created'
+  | 'lead:updated'
+  | 'lead:qualified'
+  | 'lead:converted'
+  | 'deal:created'
+  | 'deal:updated'
+  | 'deal:deleted'
+  | 'deal:stage_changed'
+  | 'deal:won'
+  | 'deal:lost'
+  | 'quote:created'
+  | 'quote:updated'
+  | 'quote:deleted'
+  | 'quote:sent'
+  | 'quote:accepted'
+  | 'quote:rejected'
+  | 'invoice:created'
+  | 'invoice:updated'
+  | 'invoice:deleted'
+  | 'invoice:sent'
+  | 'invoice:paid'
+  | 'invoice:overdue'
+  | 'payment:created'
+  | 'payment:updated'
+  | 'payment:deleted'
+  | 'payment:received'
+  | 'payment:failed'
+  | 'activity:created'
+  | 'dashboard:refresh';

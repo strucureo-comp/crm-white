@@ -43,8 +43,6 @@ export interface CompanySettings {
 
   invoice_prefix: string;
   quote_prefix: string;
-  report_prefix: string;
-  contract_prefix: string;
   purchase_order_prefix: string;
   invoice_number_format: string;
   quote_number_format: string;

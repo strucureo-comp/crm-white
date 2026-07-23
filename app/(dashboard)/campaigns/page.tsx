@@ -1,284 +1,167 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Plus,
-  Search,
-  SlidersHorizontal,
-  MoreHorizontal,
-  Pencil,
-  Trash2,
-  Megaphone,
-} from 'lucide-react';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { ResponsiveTable } from '@/components/ui/responsive-table';
-import { getCampaigns, deleteCampaign } from '@/lib/firebase/database';
-import type { Campaign, CampaignChannel, CampaignStatus } from '@/lib/db/types';
-import { CampaignDialog } from '@/components/dialogs/campaign-dialog';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { toast } from 'sonner';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Plus, Search, BarChart3, TrendingUp, Eye, Pencil, Trash2, MoreHorizontal } from 'lucide-react';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { getCampaigns, createCampaign, deleteCampaign } from '@/lib/db/automation/api';
+import { Campaign } from '@/lib/db/automation/types';
+import { formatDistanceToNow } from 'date-fns';
 
 const statusColors: Record<string, string> = {
-  draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
-  active: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400',
-  paused: 'bg-yellow-50 text-yellow-600 dark:bg-yellow-950 dark:text-yellow-400',
-  completed: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
+  draft: 'bg-gray-100 text-gray-800',
+  scheduled: 'bg-blue-100 text-blue-800',
+  running: 'bg-green-100 text-green-800',
+  paused: 'bg-yellow-100 text-yellow-800',
+  completed: 'bg-blue-100 text-blue-800',
+  cancelled: 'bg-red-100 text-red-800',
 };
 
-const channelColors: Record<string, string> = {
-  email: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950 dark:text-indigo-400',
-  social: 'bg-sky-50 text-sky-600 dark:bg-sky-950 dark:text-sky-400',
-  paid: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
-  sms: 'bg-rose-50 text-rose-600 dark:bg-rose-950 dark:text-rose-400',
+const channelIcons: Record<string, string> = {
+  google_ads: 'Google Ads',
+  meta_ads: 'Meta Ads',
+  linkedin_ads: 'LinkedIn Ads',
+  email: 'Email',
+  sms: 'SMS',
+  whatsapp: 'WhatsApp',
+  social: 'Social',
+  content: 'Content',
 };
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
 
 export default function CampaignsPage() {
+  const { workspace } = useAuth();
+  const workspaceId = workspace?.id || '';
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [channelFilter, setChannelFilter] = useState('all');
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
-
-  async function load() {
-    setLoading(true);
-    try {
-      const data = await getCampaigns();
-      setCampaigns(data);
-    } catch {
-      toast.error('Failed to load campaigns');
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  useEffect(() => { load(); }, []);
-
-  const filtered = campaigns.filter((c) => {
-    if (statusFilter !== 'all' && c.status !== statusFilter) return false;
-    if (channelFilter !== 'all' && c.channel !== channelFilter) return false;
-    if (search) {
-      const s = search.toLowerCase();
-      return c.name.toLowerCase().includes(s) || (c.target_audience || '').toLowerCase().includes(s);
-    }
-    return true;
+  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [newCampaign, setNewCampaign] = useState({
+    name: '',
+    description: '',
+    channel: 'email' as Campaign['channel'],
+    budget: '',
+    target_audience: '',
   });
 
-  async function handleDelete(c: Campaign) {
-    setConfirmState({ open: true, id: c.id });
-  }
+  useEffect(() => {
+    if (!workspaceId) return;
+    getCampaigns(workspaceId).then(setCampaigns).finally(() => setLoading(false));
+  }, [workspaceId]);
 
-  async function onDeleteConfirm() {
-    if (!confirmState.id) return;
-    setConfirmState((prev) => ({ ...prev, loading: true }));
-    try {
-      await deleteCampaign(confirmState.id);
-      toast.success('Campaign deleted');
-      load();
-    } catch {
-      toast.error('Failed to delete campaign');
-    } finally {
-      setConfirmState({ open: false });
-    }
-  }
+  const handleCreateCampaign = async () => {
+    if (!newCampaign.name.trim()) return;
+    const campaign = await createCampaign(workspaceId, {
+      workspace_id: workspaceId,
+      name: newCampaign.name,
+      description: newCampaign.description,
+      channel: newCampaign.channel,
+      status: 'draft',
+      budget: newCampaign.budget ? Number(newCampaign.budget) : undefined,
+      spent: 0,
+      currency: 'USD',
+      target_audience: newCampaign.target_audience ? newCampaign.target_audience.split(',').map(s => s.trim()) : [],
+      content: {},
+      metrics: { impressions: 0, clicks: 0, conversions: 0, ctr: 0, cpc: 0, cpm: 0, roas: 0, spend: 0, revenue: 0 },
+    });
+    setCampaigns([campaign, ...campaigns]);
+    setShowCreateDialog(false);
+    setNewCampaign({ name: '', description: '', channel: 'email', budget: '', target_audience: '' });
+  };
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading campaigns...</p></div>;
-  }
+  const handleDeleteCampaign = async (id: string) => {
+    await deleteCampaign(workspaceId, id);
+    setCampaigns(campaigns.filter(c => c.campaign_id !== id));
+  };
+
+  const filtered = campaigns.filter(c => c.name.toLowerCase().includes(search.toLowerCase()));
+  const stats = {
+    total: campaigns.length,
+    running: campaigns.filter(c => c.status === 'running').length,
+    totalImpressions: campaigns.reduce((s, c) => s + (c.metrics?.impressions || 0), 0),
+    totalClicks: campaigns.reduce((s, c) => s + (c.metrics?.clicks || 0), 0),
+  };
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Campaigns</h2>
-          <p className="text-sm text-muted-foreground">Manage and track your marketing campaigns</p>
+          <h1 className="text-2xl font-bold tracking-tight">Campaign Center</h1>
+          <p className="text-muted-foreground">Create, manage, and track multi-channel campaigns</p>
         </div>
-        <Button onClick={() => { setEditingCampaign(null); setDialogOpen(true); }} className="w-full sm:w-auto">
-          <Plus size={16} className="mr-2" />
-          New Campaign
-        </Button>
+        <Button onClick={() => setShowCreateDialog(true)}><Plus size={16} className="mr-2" />New Campaign</Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1 max-w-md">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input placeholder="Search campaigns..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-        </div>
-        <div className="flex gap-2">
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="draft">Draft</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="paused">Paused</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={channelFilter} onValueChange={setChannelFilter}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Channel" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Channels</SelectItem>
-              <SelectItem value="email">Email</SelectItem>
-              <SelectItem value="social">Social</SelectItem>
-              <SelectItem value="paid">Paid</SelectItem>
-              <SelectItem value="sms">SMS</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" onClick={() => toast.message('Advanced filters coming soon')}>
-            <SlidersHorizontal size={16} />
-          </Button>
-        </div>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Total</p><p className="text-2xl font-bold">{stats.total}</p></div><BarChart3 className="h-8 w-8 text-primary" /></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Running</p><p className="text-2xl font-bold">{stats.running}</p></div><TrendingUp className="h-8 w-8 text-green-500" /></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Impressions</p><p className="text-2xl font-bold">{stats.totalImpressions.toLocaleString()}</p></div><Eye className="h-8 w-8 text-primary" /></div></CardContent></Card>
+        <Card><CardContent className="p-4"><div className="flex items-center justify-between"><div><p className="text-sm text-muted-foreground">Clicks</p><p className="text-2xl font-bold">{stats.totalClicks.toLocaleString()}</p></div><BarChart3 className="h-8 w-8 text-primary" /></div></CardContent></Card>
       </div>
 
-      {filtered.length > 0 ? (
-        <Card>
-          <CardContent className="p-0">
-            <ResponsiveTable
-              data={filtered}
-              keyExtractor={(c) => c.id}
-              mobileCardTitle={(c) => c.name}
-              columns={[
-                {
-                  key: 'name',
-                  header: 'Campaign',
-                  render: (c) => (
-                    <div className="flex items-center gap-3">
-                      <div className="h-8 w-8 shrink-0 rounded-lg bg-primary/10 flex items-center justify-center">
-                        <Megaphone size={14} className="text-primary" />
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium">{c.name}</p>
-                        {c.description && (
-                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">{c.description}</p>
-                        )}
-                      </div>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'channel',
-                  header: 'Channel',
-                  render: (c) => (
-                    <Badge variant="secondary" className={channelColors[c.channel] || ''}>
-                      {c.channel.charAt(0).toUpperCase() + c.channel.slice(1)}
-                    </Badge>
-                  ),
-                },
-                {
-                  key: 'status',
-                  header: 'Status',
-                  render: (c) => (
-                    <Badge variant="secondary" className={statusColors[c.status] || ''}>
-                      {c.status.charAt(0).toUpperCase() + c.status.slice(1)}
-                    </Badge>
-                  ),
-                },
-                {
-                  key: 'budget',
-                  header: 'Budget',
-                  render: (c) => (
-                    <div className="min-w-[140px]">
-                      <div className="flex items-center justify-between text-sm mb-1">
-                        <span className="font-medium">{c.budget ? formatCurrency(c.budget) : '—'}</span>
-                        {c.budget ? (
-                          <span className="text-xs text-muted-foreground">
-                            {c.spent ? formatCurrency(c.spent) : '$0'} spent
-                          </span>
-                        ) : null}
-                      </div>
-                      {c.budget ? (
-                        <div className="h-1.5 w-full rounded-full bg-muted overflow-hidden">
-                          <div
-                            className="h-full rounded-full bg-primary transition-all"
-                            style={{ width: `${Math.min((c.spent || 0) / c.budget * 100, 100)}%` }}
-                          />
-                        </div>
-                      ) : null}
-                    </div>
-                  ),
-                },
-                {
-                  key: 'dates',
-                  header: 'Dates',
-                  render: (c) => (
-                    <div className="text-sm text-muted-foreground">
-                      <p>{c.start_date ? new Date(c.start_date).toLocaleDateString() : '—'}</p>
-                      <p className="text-xs">{c.end_date ? `to ${new Date(c.end_date).toLocaleDateString()}` : ''}</p>
-                    </div>
-                  ),
-                },
-                {
-                  key: 'actions',
-                  header: '',
-                  className: 'w-10',
-                  render: (c) => (
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-9 w-9" aria-label="Campaign actions">
-                          <MoreHorizontal size={14} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => { setEditingCampaign(c); setDialogOpen(true); }}>
-                          <Pencil size={14} className="mr-2" /> Edit
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(c)}>
-                          <Trash2 size={14} className="mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  ),
-                },
-              ]}
-            />
-          </CardContent>
-        </Card>
+      <div className="relative"><Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search campaigns..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" /></div>
+
+      {filtered.length === 0 ? (
+        <Card><CardContent className="py-12 text-center"><BarChart3 className="h-12 w-12 text-muted-foreground mx-auto mb-4" /><h3 className="text-lg font-medium mb-2">No campaigns yet</h3><Button onClick={() => setShowCreateDialog(true)}><Plus size={16} className="mr-2" />Create Campaign</Button></CardContent></Card>
       ) : (
-        <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">No campaigns yet</p></CardContent></Card>
+        <div className="space-y-4">
+          {filtered.map((campaign) => (
+            <Card key={campaign.campaign_id}>
+              <CardContent className="p-6">
+                <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      <h3 className="text-lg font-semibold">{campaign.name}</h3>
+                      <Badge className={statusColors[campaign.status]}>{campaign.status}</Badge>
+                      <Badge variant="outline">{channelIcons[campaign.channel] || campaign.channel}</Badge>
+                    </div>
+                    {campaign.description && <p className="text-sm text-muted-foreground mb-3">{campaign.description}</p>}
+                  </div>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:min-w-[400px]">
+                    <div className="text-center"><p className="text-xs text-muted-foreground">Impressions</p><p className="text-sm font-semibold">{(campaign.metrics?.impressions || 0).toLocaleString()}</p></div>
+                    <div className="text-center"><p className="text-xs text-muted-foreground">Clicks</p><p className="text-sm font-semibold">{(campaign.metrics?.clicks || 0).toLocaleString()}</p></div>
+                    <div className="text-center"><p className="text-xs text-muted-foreground">Conversions</p><p className="text-sm font-semibold">{(campaign.metrics?.conversions || 0).toLocaleString()}</p></div>
+                    <div className="text-center"><p className="text-xs text-muted-foreground">ROAS</p><p className="text-sm font-semibold">{campaign.metrics?.roas ? `${campaign.metrics.roas}x` : '0x'}</p></div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm"><Pencil size={14} className="mr-1" />Edit</Button>
+                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteCampaign(campaign.campaign_id)}><Trash2 size={14} /></Button>
+                  </div>
+                </div>
+                {campaign.budget && campaign.budget > 0 && (
+                  <div className="mt-4 pt-4 border-t">
+                    <div className="flex items-center justify-between text-sm mb-2">
+                      <span className="text-muted-foreground">Budget</span>
+                      <span className="font-medium">${campaign.spent?.toLocaleString() || 0} / ${campaign.budget.toLocaleString()}</span>
+                    </div>
+                    <div className="w-full bg-muted rounded-full h-2"><div className="bg-primary h-2 rounded-full transition-all" style={{ width: `${Math.min(((campaign.spent || 0) / campaign.budget) * 100, 100)}%` }} /></div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
-      <CampaignDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSaved={load}
-        campaign={editingCampaign}
-      />
-      <ConfirmDialog
-        open={confirmState.open}
-        onOpenChange={(open) => setConfirmState({ open })}
-        title="Delete Campaign"
-        description="Are you sure you want to delete this campaign? This action cannot be undone."
-        onConfirm={onDeleteConfirm}
-      />
+      {showCreateDialog && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <Card className="w-full max-w-lg"><div className="p-6 space-y-4">
+            <h2 className="text-lg font-semibold">Create New Campaign</h2>
+            <div><label className="text-sm font-medium mb-2 block">Name *</label><Input placeholder="Campaign name" value={newCampaign.name} onChange={(e) => setNewCampaign({ ...newCampaign, name: e.target.value })} /></div>
+            <div><label className="text-sm font-medium mb-2 block">Description</label><Textarea placeholder="Description..." value={newCampaign.description} onChange={(e) => setNewCampaign({ ...newCampaign, description: e.target.value })} /></div>
+            <div><label className="text-sm font-medium mb-2 block">Channel</label>
+              <select value={newCampaign.channel} onChange={(e) => setNewCampaign({ ...newCampaign, channel: e.target.value as Campaign['channel'] })} className="w-full px-3 py-2 border rounded-md bg-background text-sm">
+                <option value="email">Email</option><option value="social">Social</option><option value="google_ads">Google Ads</option><option value="meta_ads">Meta Ads</option><option value="sms">SMS</option><option value="content">Content</option>
+              </select>
+            </div>
+            <div><label className="text-sm font-medium mb-2 block">Budget (USD)</label><Input type="number" placeholder="0" value={newCampaign.budget} onChange={(e) => setNewCampaign({ ...newCampaign, budget: e.target.value })} /></div>
+            <div className="flex justify-end gap-2 pt-4"><Button variant="outline" onClick={() => setShowCreateDialog(false)}>Cancel</Button><Button onClick={handleCreateCampaign}>Create</Button></div>
+          </div></Card>
+        </div>
+      )}
     </div>
   );
 }
