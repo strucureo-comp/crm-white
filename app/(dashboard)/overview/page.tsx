@@ -26,10 +26,7 @@ import {
   getContentItems,
 } from '@/lib/firebase/database';
 import type { Lead, Invoice, Project, User, ActivityLog, Campaign, ContentItem } from '@/lib/db/types';
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
+import { formatCurrency } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
   draft: 'bg-gray-50 text-gray-600 dark:bg-gray-950 dark:text-gray-400',

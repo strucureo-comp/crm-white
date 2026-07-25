@@ -3,12 +3,14 @@ import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import { AuthProvider } from '@/lib/firebase/auth-context';
 import { ThemeProvider } from '@/components/theme-provider';
+import { WorkspaceProvider } from '@/lib/settings/workspace-context';
+import { EventBridgeProvider } from '@/components/providers/event-bridge-provider';
 import { Toaster } from '@/components/ui/sonner';
 
 const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'Tagverse CRM - Intelligent Business Growth',
+  title: 'CRM - Intelligent Business Growth',
   description: 'All-in-one CRM platform for managing leads, deals, projects, and team collaboration',
 };
 
@@ -27,8 +29,12 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <AuthProvider>
-            {children}
-            <Toaster />
+            <WorkspaceProvider>
+              <EventBridgeProvider>
+                {children}
+              </EventBridgeProvider>
+              <Toaster />
+            </WorkspaceProvider>
           </AuthProvider>
         </ThemeProvider>
       </body>

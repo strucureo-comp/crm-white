@@ -54,7 +54,7 @@ import { getLeads, deleteLead } from '@/lib/firebase/database';
 import type { Lead } from '@/lib/db/types';
 import { LeadDialog } from '@/components/dialogs/lead-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import { cn } from '@/lib/utils';
+import { cn, formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 
 const statusColors: Record<string, string> = {
@@ -77,10 +77,6 @@ const stageTabs = [
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
 ] as const;
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
 
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([]);

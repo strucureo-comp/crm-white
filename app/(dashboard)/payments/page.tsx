@@ -35,6 +35,7 @@ import { getPayments, updatePayment, createPayment, deletePayment, getInvoices }
 import type { Payment, Invoice } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
+import { formatCurrency } from '@/lib/utils';
 
 const methodStyles: Record<string, string> = {
   UPI: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
@@ -53,10 +54,6 @@ const methodIcons: Record<string, typeof Smartphone> = {
   Card: CreditCard,
   Other: Receipt,
 };
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
-}
 
 const defaultPaymentForm = {
   invoice_id: '',

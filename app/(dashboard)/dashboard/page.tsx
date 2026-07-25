@@ -9,10 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getLeads, getInvoices, getActivityLogs } from '@/lib/firebase/database';
 import type { Lead, Invoice, ActivityLog } from '@/lib/db/types';
-
-function formatCurrency(value: number) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
-}
+import { formatCurrency } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
   new: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',

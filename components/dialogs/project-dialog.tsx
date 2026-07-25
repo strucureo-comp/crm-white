@@ -30,6 +30,7 @@ interface ProjectDialogProps {
   onSaved: () => void;
   project?: Project | null;
   defaultStatus?: string;
+  defaultClientId?: string;
 }
 
 const defaultForm = {
@@ -45,7 +46,7 @@ const defaultForm = {
   manual_client_company: '',
 };
 
-export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultStatus }: ProjectDialogProps) {
+export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultStatus, defaultClientId }: ProjectDialogProps) {
   const [form, setForm] = useState({ ...defaultForm, status: (defaultStatus as ProjectStatus) || 'pending' });
   const [saving, setSaving] = useState(false);
 
@@ -87,14 +88,14 @@ export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultSta
         await createProject({
           ...form,
           deadline: form.deadline || undefined,
-          client_id: '',
+          client_id: defaultClientId || '',
         });
         toast.success('Project created');
       }
       onSaved();
       onOpenChange(false);
-    } catch {
-      toast.error('Something went wrong');
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Something went wrong');
     } finally {
       setSaving(false);
     }
@@ -132,9 +133,11 @@ export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultSta
                 <SelectContent>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="under_review">Under Review</SelectItem>
+                  <SelectItem value="accepted">Accepted</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
                   <SelectItem value="testing">Testing</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
               </Select>
             </div>

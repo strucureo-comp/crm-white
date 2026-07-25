@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { getLeads } from '@/lib/firebase/database';
 import { useSidebar } from './sidebar-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import {
   Sheet,
   SheetContent,
@@ -20,7 +21,6 @@ import {
   DollarSign,
   FileText,
   FileSpreadsheet,
-  FileSignature,
   Megaphone,
   Image,
   Calendar,
@@ -28,7 +28,6 @@ import {
   CheckSquare,
   Users2,
   BarChart3,
-  LineChart,
   Puzzle,
   Bot,
   Settings,
@@ -78,7 +77,6 @@ function getNavGroups(leadCount: number): NavGroup[] {
         { title: 'Quotes', href: '/quotes', icon: FileText },
         { title: 'Invoices', href: '/invoices', icon: Receipt },
         { title: 'Proposals', href: '/proposals', icon: FileSpreadsheet },
-        { title: 'Contracts', href: '/contracts', icon: FileSignature },
         { title: 'Payments', href: '/payments', icon: Wallet },
       ],
     },
@@ -106,7 +104,6 @@ function getNavGroups(leadCount: number): NavGroup[] {
       title: 'Analytics',
       items: [
         { title: 'Analytics', href: '/analytics', icon: BarChart3 },
-        { title: 'Reports', href: '/reports', icon: LineChart },
         { title: 'Assets', href: '/assets', icon: Image },
       ],
     },
@@ -119,12 +116,14 @@ function getNavGroups(leadCount: number): NavGroup[] {
   ];
 }
 
-function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathname }: {
+function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathname, companyLogo, companyName }: {
   collapsed: boolean;
   onToggleGroup: (title: string) => void;
   expandedGroups: Record<string, boolean>;
   leadCount: number;
   pathname: string;
+  companyLogo: string;
+  companyName: string;
 }) {
   const navGroups = getNavGroups(leadCount);
 
@@ -132,12 +131,17 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
     <>
       <div className="flex items-center gap-2 px-4 h-16 border-b shrink-0">
         <div className="flex items-center gap-2 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-            <span className="text-primary-foreground font-bold text-sm">T</span>
-          </div>
+          {companyLogo ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={companyLogo} alt={companyName} className="w-8 h-8 rounded-lg object-contain shrink-0" />
+          ) : (
+            <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
+              <span className="text-primary-foreground font-bold text-sm">{companyName.charAt(0)}</span>
+            </div>
+          )}
           {!collapsed && (
             <span className="font-semibold text-lg tracking-tight whitespace-nowrap">
-              Tagverse
+              {companyName}
             </span>
           )}
         </div>
@@ -242,6 +246,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebar();
   const [leadCount, setLeadCount] = useState(0);
+  const { companyName, logoUrl } = useWorkspace();
 
   useEffect(() => {
     getLeads().then((leads) => setLeadCount(leads.length)).catch(() => {});
@@ -267,6 +272,8 @@ export function AppSidebar() {
       expandedGroups={expandedGroups}
       leadCount={leadCount}
       pathname={pathname}
+      companyLogo={logoUrl}
+      companyName={companyName}
     />
   );
 
@@ -285,10 +292,15 @@ export function AppSidebar() {
         <SheetContent side="left" className="w-[280px] p-0 [&>button]:hidden">
           <div className="flex h-16 items-center justify-between px-4 border-b">
             <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">T</span>
-              </div>
-              <SheetTitle className="font-semibold text-lg tracking-tight">Tagverse</SheetTitle>
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt={companyName} className="w-8 h-8 rounded-lg object-contain" />
+              ) : (
+                <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
+                  <span className="text-primary-foreground font-bold text-sm">{companyName.charAt(0)}</span>
+                </div>
+              )}
+              <SheetTitle className="font-semibold text-lg tracking-tight">{companyName}</SheetTitle>
             </div>
             <SheetDescription className="sr-only">Navigation menu</SheetDescription>
             <SheetClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">

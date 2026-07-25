@@ -13,16 +13,21 @@ import { ref, set, get, child } from 'firebase/database';
 import { auth, database } from './config';
 import { User, UserRole } from '@/lib/db/types';
 import { createUser } from './database';
+import { getUserWorkspace, createWorkspace } from '@/lib/workspace/api';
+import type { Workspace } from '@/lib/db/types';
 
 interface AuthContextType {
   user: User | null;
   firebaseUser: FirebaseUser | null;
   loading: boolean;
+  workspace: Workspace | null;
+  workspaceLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, role?: UserRole) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
   refreshUser: () => Promise<void>;
+  refreshWorkspace: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -31,6 +36,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaceLoading, setWorkspaceLoading] = useState(false);
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
     try {
@@ -91,6 +98,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const fetchWorkspace = async (userId: string) => {
+    try {
+      setWorkspaceLoading(true);
+      const ws = await getUserWorkspace(userId);
+      setWorkspace(ws);
+    } catch (error) {
+      console.error('Error fetching workspace:', error);
+      setWorkspace(null);
+    } finally {
+      setWorkspaceLoading(false);
+    }
+  };
+
+  const refreshWorkspace = async () => {
+    if (user) {
+      await fetchWorkspace(user.id);
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
@@ -109,6 +135,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       } else {
         setFirebaseUser(null);
         setUser(null);
+        setWorkspace(null);
         try {
           await fetch('/api/auth/session', { method: 'DELETE' });
         } catch (e) {
@@ -121,6 +148,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
+  // Fetch workspace when user changes
+  useEffect(() => {
+    if (user && !loading) {
+      fetchWorkspace(user.id);
+    }
+  }, [user, loading]);
+
   const signIn = async (email: string, password: string) => {
     try {
       await signInWithEmailAndPassword(auth, email, password);
@@ -131,10 +165,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, role: UserRole = 'client') => {
+  const signUp = async (email: string, password: string, fullName: string, companyName?: string) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
-      const user = userCredential.user;
+      const newUser = userCredential.user;
 
       // Check if this email is a known admin
       const adminEmails = [
@@ -142,17 +176,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'aathish@strucureo.works',
         'aathihacker2004@gmail.com',
       ];
-      const finalRole = adminEmails.includes(email.toLowerCase()) ? 'admin' : role;
+      const finalRole = adminEmails.includes(email.toLowerCase()) ? 'admin' : 'client';
 
       const userData: Omit<User, 'id'> = {
-        email: user.email!,
+        email: newUser.email!,
         full_name: fullName,
         role: finalRole,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
 
-      await createUser(user.uid, userData);
+      await createUser(newUser.uid, userData);
+
+      // Create workspace for the new user
+      const wsName = companyName || `${fullName}'s Workspace`;
+      const workspace = await createWorkspace(wsName, newUser.uid);
+      if (workspace) {
+        setWorkspace(workspace);
+      }
 
       return { error: null };
     } catch (error) {
@@ -182,11 +223,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         user,
         firebaseUser,
         loading,
+        workspace,
+        workspaceLoading,
         signIn,
         signUp,
         signOut,
         resetPassword,
         refreshUser,
+        refreshWorkspace,
       }}
     >
       {children}

@@ -54,7 +54,7 @@
     "eslint": "8.49.0",
     "eslint-config-next": "13.5.1",
     "firebase": "^12.7.0",
-    "firebase-admin": "^14.1.0",
+    "firebase-admin": "^14.2.0",
     "gapi-script": "^1.2.0",
     "html2canvas": "^1.4.1",
     "input-otp": "^1.2.4",
