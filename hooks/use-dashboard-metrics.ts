@@ -10,7 +10,7 @@ import {
 import { 
   NormalizedActivity,
   NormalizedLead,
-  NormalizedDeal,
+  Deal,
   NormalizedQuote,
   NormalizedInvoice,
   NormalizedPayment
@@ -147,7 +147,7 @@ export function useDashboardMetrics() {
 
       // Parse data
       const leads: NormalizedLead[] = Object.values(leadsSnapshot) as NormalizedLead[];
-      const deals: NormalizedDeal[] = Object.values(dealsSnapshot) as NormalizedDeal[];
+      const deals: Deal[] = Object.values(dealsSnapshot) as Deal[];
       const quotes: NormalizedQuote[] = Object.values(quotesSnapshot) as NormalizedQuote[];
       const invoices: NormalizedInvoice[] = Object.values(invoicesSnapshot) as NormalizedInvoice[];
       const payments: NormalizedPayment[] = Object.values(paymentsSnapshot) as NormalizedPayment[];

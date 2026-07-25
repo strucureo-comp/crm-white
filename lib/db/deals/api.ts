@@ -12,7 +12,7 @@ import {
   off
 } from 'firebase/database';
 import { database as db } from '@/lib/firebase/config';
-import { NormalizedDeal, DealStatus } from '../types';
+import { Deal, DealStatus } from '../types';
 import { emitEvent } from '../events';
 import { getCurrentUserId } from '@/lib/firebase/auth';
 
@@ -32,13 +32,13 @@ function dealRef(workspaceId: string, dealId: string) {
  */
 export async function createDeal(
   workspaceId: string,
-  data: Omit<NormalizedDeal, 'deal_id' | 'workspace_id' | 'created_at' | 'updated_at' | 'created_by'>
-): Promise<NormalizedDeal> {
+  data: Omit<Deal, 'deal_id' | 'workspace_id' | 'created_at' | 'updated_at' | 'created_by'>
+): Promise<Deal> {
   const newRef = push(dealsRef(workspaceId));
   const dealId = newRef.key!;
   
   const now = new Date().toISOString();
-  const deal: NormalizedDeal = {
+  const deal: Deal = {
     ...data,
     deal_id: dealId,
     workspace_id: workspaceId,
@@ -60,10 +60,10 @@ export async function createDeal(
 export async function getDeal(
   workspaceId: string, 
   dealId: string
-): Promise<NormalizedDeal | null> {
+): Promise<Deal | null> {
   const snapshot = await get(dealRef(workspaceId, dealId));
   if (snapshot.exists()) {
-    return snapshot.val() as NormalizedDeal;
+    return snapshot.val() as Deal;
   }
   return null;
 }
@@ -71,11 +71,11 @@ export async function getDeal(
 /**
  * Get all deals in a workspace
  */
-export async function getDeals(workspaceId: string): Promise<NormalizedDeal[]> {
+export async function getDeals(workspaceId: string): Promise<Deal[]> {
   const snapshot = await get(dealsRef(workspaceId));
   if (snapshot.exists()) {
     const data = snapshot.val();
-    return Object.values(data) as NormalizedDeal[];
+    return Object.values(data) as Deal[];
   }
   return [];
 }
@@ -86,13 +86,13 @@ export async function getDeals(workspaceId: string): Promise<NormalizedDeal[]> {
 export async function getCompanyDeals(
   workspaceId: string, 
   companyId: string
-): Promise<NormalizedDeal[]> {
+): Promise<Deal[]> {
   const q = query(dealsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
     const data = snapshot.val();
-    return Object.values(data) as NormalizedDeal[];
+    return Object.values(data) as Deal[];
   }
   return [];
 }
@@ -103,13 +103,13 @@ export async function getCompanyDeals(
 export async function getContactDeals(
   workspaceId: string, 
   contactId: string
-): Promise<NormalizedDeal[]> {
+): Promise<Deal[]> {
   const q = query(dealsRef(workspaceId), orderByChild('contact_id'), equalTo(contactId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
     const data = snapshot.val();
-    return Object.values(data) as NormalizedDeal[];
+    return Object.values(data) as Deal[];
   }
   return [];
 }
@@ -120,13 +120,13 @@ export async function getContactDeals(
 export async function getPipelineDeals(
   workspaceId: string, 
   pipelineId: string
-): Promise<NormalizedDeal[]> {
+): Promise<Deal[]> {
   const q = query(dealsRef(workspaceId), orderByChild('pipeline_id'), equalTo(pipelineId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
     const data = snapshot.val();
-    return Object.values(data) as NormalizedDeal[];
+    return Object.values(data) as Deal[];
   }
   return [];
 }
@@ -137,13 +137,13 @@ export async function getPipelineDeals(
 export async function getStageDeals(
   workspaceId: string, 
   stageId: string
-): Promise<NormalizedDeal[]> {
+): Promise<Deal[]> {
   const q = query(dealsRef(workspaceId), orderByChild('stage_id'), equalTo(stageId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
     const data = snapshot.val();
-    return Object.values(data) as NormalizedDeal[];
+    return Object.values(data) as Deal[];
   }
   return [];
 }
@@ -154,7 +154,7 @@ export async function getStageDeals(
 export async function updateDeal(
   workspaceId: string,
   dealId: string,
-  data: Partial<Omit<NormalizedDeal, 'deal_id' | 'workspace_id' | 'created_at' | 'created_by'>>
+  data: Partial<Omit<Deal, 'deal_id' | 'workspace_id' | 'created_at' | 'created_by'>>
 ): Promise<void> {
   const now = new Date().toISOString();
   await update(dealRef(workspaceId, dealId), {
@@ -203,7 +203,7 @@ export async function moveDealToStage(
   stageId: string,
   probability?: number
 ): Promise<void> {
-  const updateData: Partial<NormalizedDeal> = {
+  const updateData: Partial<Deal> = {
     stage_id: stageId,
   };
   
@@ -250,7 +250,7 @@ export async function markDealAsLost(
 export async function searchDeals(
   workspaceId: string, 
   searchTerm: string
-): Promise<NormalizedDeal[]> {
+): Promise<Deal[]> {
   const deals = await getDeals(workspaceId);
   const lowerSearch = searchTerm.toLowerCase();
   
@@ -265,13 +265,13 @@ export async function searchDeals(
 export async function getDealsByStatus(
   workspaceId: string, 
   status: DealStatus
-): Promise<NormalizedDeal[]> {
+): Promise<Deal[]> {
   const q = query(dealsRef(workspaceId), orderByChild('status'), equalTo(status));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
     const data = snapshot.val();
-    return Object.values(data) as NormalizedDeal[];
+    return Object.values(data) as Deal[];
   }
   return [];
 }
@@ -333,14 +333,14 @@ export async function getDealStats(
  */
 export function subscribeToDeals(
   workspaceId: string,
-  callback: (deals: NormalizedDeal[]) => void
+  callback: (deals: Deal[]) => void
 ): () => void {
   const q = dealsRef(workspaceId);
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
-      callback(Object.values(data) as NormalizedDeal[]);
+      callback(Object.values(data) as Deal[]);
     } else {
       callback([]);
     }
@@ -355,14 +355,14 @@ export function subscribeToDeals(
 export function subscribeToCompanyDeals(
   workspaceId: string,
   companyId: string,
-  callback: (deals: NormalizedDeal[]) => void
+  callback: (deals: Deal[]) => void
 ): () => void {
   const q = query(dealsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
-      callback(Object.values(data) as NormalizedDeal[]);
+      callback(Object.values(data) as Deal[]);
     } else {
       callback([]);
     }

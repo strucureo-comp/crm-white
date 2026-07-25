@@ -17,14 +17,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
-import { NormalizedDeal } from '@/lib/db/types';
+import { Deal } from '@/lib/db/types';
 import { getDeals, getCompanyDeals, searchDeals } from '@/lib/db/deals/api';
 import { useAuth } from '@/lib/firebase/auth-context';
 
 interface DealSelectorProps {
   companyId?: string; // Filter by company
   value?: string;
-  onChange: (dealId: string, deal: NormalizedDeal | null) => void;
+  onChange: (dealId: string, deal: Deal | null) => void;
   placeholder?: string;
   disabled?: boolean;
   showCreateButton?: boolean;
@@ -43,7 +43,7 @@ export function DealSelector({
   className,
 }: DealSelectorProps) {
   const [open, setOpen] = React.useState(false);
-  const [deals, setDeals] = React.useState<NormalizedDeal[]>([]);
+  const [deals, setDeals] = React.useState<Deal[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [search, setSearch] = React.useState('');
   const { workspace } = useAuth();

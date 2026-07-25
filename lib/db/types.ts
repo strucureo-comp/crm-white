@@ -788,53 +788,58 @@ export type NormalizedLeadStatus =
   | 'converted_deal'
   | 'lost';
 
-// ===== DEAL (Enhanced) =====
-export interface NormalizedDeal {
+export type DealStatus = 'open' | 'won' | 'lost';
+
+export type DealPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
+
+export interface Deal {
   deal_id: string;
   workspace_id: string;
-  company_id: string; // FK → Company
-  contact_id: string; // FK → Contact
-  lead_id: string; // FK → Lead
-  pipeline_id: string; // FK → Pipeline
-  stage_id: string; // FK → PipelineStage
-  owner_id: string; // FK → User
-  
-  // Basic Info
+
+  // Relationships
+  company_id: string;      // FK → Company
+  contact_id: string;      // FK → Contact
+  lead_id?: string;        // FK → Lead (optional)
+  pipeline_id: string;     // FK → Pipeline
+  stage_id: string;        // FK → PipelineStage
+  owner_id: string;        // FK → User
+
+  // Basic Information
   title: string;
-  description: string;
-  
-  // Value
+  description?: string;
+
+  // Deal Value
   value: number;
   currency: string;
-  
-  // Timeline
-  expected_close_date: string;
-  actual_close_date: string;
-  
+
   // Status
   status: DealStatus;
-  
-  // Probability
-  probability: number;
-  
+  priority?: DealPriority;
+  probability?: number;    // 0–100
+
   // Source
-  source: string;
-  
-  // Stats (computed on read)
+  source?: LeadSource;
+
+  // Timeline
+  expected_close_date?: string;
+  actual_close_date?: string;
+
+  // Additional Information
+  notes?: string;
+
+  // Computed (Read-only)
   quote_count?: number;
   invoice_count?: number;
   total_quoted?: number;
   total_invoiced?: number;
   total_paid?: number;
   days_in_pipeline?: number;
-  
+
   // Metadata
   created_at: string;
   updated_at: string;
   created_by: string;
 }
-
-export type DealStatus = 'open' | 'won' | 'lost' | 'abandoned';
 
 // ===== QUOTE (Enhanced) =====
 export interface NormalizedQuote {

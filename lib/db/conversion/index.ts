@@ -10,7 +10,7 @@
 import { 
   NormalizedLead, 
   Contact, 
-  NormalizedDeal, 
+  Deal, 
   NormalizedQuote, 
   NormalizedInvoice,
   NormalizedPayment,
@@ -99,7 +99,7 @@ export async function createDealFromContact(
     expected_close_date?: string;
     description?: string;
   }
-): Promise<NormalizedDeal> {
+): Promise<Deal> {
   // Get company for currency and other defaults
   const company = await getCompany(workspaceId, companyId);
   
@@ -118,7 +118,7 @@ export async function createDealFromContact(
     actual_close_date: '',
     status: 'open',
     probability: 50,
-    source: 'lead_conversion',
+    source: 'Manual',
   });
   
   // Log activity
@@ -333,7 +333,7 @@ export async function convertLeadToInvoice(
   }
 ): Promise<{
   contact: Contact;
-  deal: NormalizedDeal;
+  deal: Deal;
   quote: NormalizedQuote;
   invoice: NormalizedInvoice;
 }> {

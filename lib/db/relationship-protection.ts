@@ -10,7 +10,7 @@ import {
   RelationshipCheck, 
   DeleteCheckResult,
   Contact,
-  NormalizedDeal,
+  Deal,
   NormalizedQuote,
   NormalizedInvoice,
   NormalizedPayment
