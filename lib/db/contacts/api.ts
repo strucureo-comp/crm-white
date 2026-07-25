@@ -32,7 +32,7 @@ function contactRef(workspaceId: string, contactId: string) {
  */
 export async function createContact(
   workspaceId: string,
-  data: Omit<Contact, 'contact_id' | 'workspace_id' | 'created_at' | 'updated_at' | 'created_by'>
+  data: Omit<Contact, 'contact_id' | 'created_at' | 'updated_at'>
 ): Promise<Contact> {
   const newRef = push(contactsRef(workspaceId));
   const contactId = newRef.key!;
@@ -41,10 +41,8 @@ export async function createContact(
   const contact: Contact = {
     ...data,
     contact_id: contactId,
-    workspace_id: workspaceId,
     created_at: now,
     updated_at: now,
-    created_by: getCurrentUserId() || '',
   };
   
   await set(newRef, contact);
@@ -103,7 +101,7 @@ export async function getCompanyContacts(
 export async function updateContact(
   workspaceId: string,
   contactId: string,
-  data: Partial<Omit<Contact, 'contact_id' | 'workspace_id' | 'created_at' | 'created_by'>>
+  data: Partial<Omit<Contact, 'contact_id' | 'created_at'>>
 ): Promise<void> {
   const now = new Date().toISOString();
   await update(contactRef(workspaceId, contactId), {

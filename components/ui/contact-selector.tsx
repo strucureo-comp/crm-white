@@ -130,7 +130,7 @@ export function ContactSelector({
                     <span>{contact.name}</span>
                     <span className="text-xs text-muted-foreground">
                       {contact.email}
-                      {contact.role && ` • ${contact.role}`}
+                      {contact.designation && ` • ${contact.designation}`}
                     </span>
                   </div>
                 </CommandItem>

@@ -789,8 +789,8 @@ export default function PipelinePage() {
                   <p className="text-xs text-muted-foreground">Deal Value</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">{viewDeal || 0}%</p>
-                  <p className="text-xs text-muted-foreground">Probability</p>
+                  <p className="text-lg font-bold">{viewDeal.priority || '—'}</p>
+                  <p className="text-xs text-muted-foreground">Priority</p>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-3 text-sm">

@@ -715,40 +715,25 @@ export interface Company {
 // ===== CONTACT (New Entity) =====
 export interface Contact {
   contact_id: string;
-  workspace_id: string;
-  company_id: string; // FK → Company
-  
-  // Basic Info
+  company_id: string;
+
+  // Basic Information
   name: string;
   email: string;
-  phone: string;
-  
-  // Role
-  role: string;
-  department: string;
-  designation: string;
-  
-  // Flags
+  phone?: string;
+
+  // Professional Information
+  designation?: string;
+
+  // Contact Details
   is_primary: boolean;
-  is_decision_maker: boolean;
-  
-  // Social
-  linkedin: string;
-  whatsapp: string;
-  
+
   // Notes
-  notes: string;
-  
-  // Stats (computed on read)
-  deal_count?: number;
-  quote_count?: number;
-  invoice_count?: number;
-  last_activity?: string;
-  
-  // Metadata
+  notes?: string;
+
+  // Audit
   created_at: string;
   updated_at: string;
-  created_by: string;
 }
 
 // ===== LEAD (Enhanced) =====

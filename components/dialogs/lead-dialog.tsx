@@ -205,7 +205,7 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
             </div>
             <div>
               <Label htmlFor="source">Source</Label>
-              <Select value={form.source} onValueChange={(v) => set('source', v)}>
+              <Select value={form.source} onValueChange={(v: LeadSource) => set('source', v)}>
                 <SelectTrigger id="source">
                   <SelectValue />
                 </SelectTrigger>

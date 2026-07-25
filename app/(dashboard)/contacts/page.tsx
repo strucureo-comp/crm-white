@@ -14,7 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import {
   Users, UserPlus, Building2, Search, X, Eye, Pencil, Trash2,
-  MoreHorizontal, Mail, Phone, Calendar, Tag, Star, MapPin,
+  MoreHorizontal, Mail, Phone, Calendar, Star,
 } from 'lucide-react';
 import {
   DropdownMenu,
@@ -23,31 +23,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { getLeads, deleteLead } from '@/lib/firebase/database';
-import type { Lead } from '@/lib/db/types';
-import { LeadDialog } from '@/components/dialogs/lead-dialog';
+import { getContacts, deleteContact } from '@/lib/db/contacts/api';
+import type { Contact } from '@/lib/db/types';
+import { ContactDialog } from '@/components/dialogs/contact-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
 
-function parseTags(lead: Lead): string[] {
-  return lead.tags ?? [];
-}
+const WORKSPACE_ID = "default";
 
-function isRecentlyAdded(lead: Lead): boolean {
-  if (!lead.created_at) return false;
-  const d = new Date(lead.created_at);
+function isRecentlyAdded(contact: Contact): boolean {
+  if (!contact.created_at) return false;
+  const d = new Date(contact.created_at);
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   return d >= sevenDaysAgo;
-}
-
-function isKeyAccount(lead: Lead): boolean {
-  const tags = parseTags(lead);
-  return tags.some((t) => /vip|decision.?(maker)/i.test(t));
-}
-
-function isEngaged(lead: Lead): boolean {
-  return !!"";
 }
 
 function formatDate(dateStr: string | undefined | null): string {
@@ -62,23 +51,21 @@ function formatDate(dateStr: string | undefined | null): string {
 }
 
 export default function ContactsPage() {
-  const [leads, setLeads] = useState<Lead[]>([]);
+  const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
-  const [companyFilter, setCompanyFilter] = useState('');
-  const [tagsFilter, setTagsFilter] = useState('');
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState<'table' | 'cards'>('table');
 
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingLead, setEditingLead] = useState<Lead | null>(null);
-  const [viewingLead, setViewingLead] = useState<Lead | null>(null);
+  const [editingContact, setEditingContact] = useState<Contact | null>(null);
+  const [viewingContact, setViewingContact] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
     try {
-      const data = await getLeads();
-      setLeads(data);
+      const data = await getContacts(WORKSPACE_ID);
+      setContacts(data);
     } catch {
       // ignore
     } finally {
@@ -89,46 +76,33 @@ export default function ContactsPage() {
   useEffect(() => { load(); }, []);
 
   const filtered = useMemo(() => {
-    return leads.filter((c) => {
+    return contacts.filter((c) => {
       if (search) {
         const q = search.toLowerCase();
         if (!c.name.toLowerCase().includes(q) &&
-            !(c.company ?? '').toLowerCase().includes(q) &&
             !c.email.toLowerCase().includes(q)) {
           return false;
         }
       }
-      if (companyFilter) {
-        const q = companyFilter.toLowerCase();
-        if (!(c.company ?? '').toLowerCase().includes(q)) return false;
-      }
-      if (tagsFilter) {
-        const q = tagsFilter.toLowerCase();
-        const tags = parseTags(c);
-        if (!tags.some((t) => t.toLowerCase().includes(q))) return false;
-      }
       return true;
     });
-  }, [leads, search, companyFilter, tagsFilter]);
+  }, [contacts, search]);
 
-  const hasActiveFilters = !!(search || companyFilter || tagsFilter);
+  const hasActiveFilters = !!search;
 
   function clearFilters() {
     setSearch('');
-    setCompanyFilter('');
-    setTagsFilter('');
   }
 
   const kpis = useMemo(() => {
-    const total = leads.length;
-    const recently = leads.filter(isRecentlyAdded).length;
-    const keyAcc = leads.filter(isKeyAccount).length;
-    const engaged = leads.filter(isEngaged).length;
-    return { total, recently, keyAcc, engaged };
-  }, [leads]);
+    const total = contacts.length;
+    const recently = contacts.filter(isRecentlyAdded).length;
+    const primary = contacts.filter((c) => c.is_primary).length;
+    return { total, recently, primary };
+  }, [contacts]);
 
-  function handleDelete(lead: Lead) {
-    setConfirmState({ open: true, id: lead.id });
+  function handleDelete(contact: Contact) {
+    setConfirmState({ open: true, id: contact.contact_id });
   }
 
   async function onDeleteConfirm() {
@@ -136,7 +110,7 @@ export default function ContactsPage() {
     setDeleting(confirmState.id);
     setConfirmState((prev) => ({ ...prev, loading: true }));
     try {
-      await deleteLead(confirmState.id);
+      await deleteContact(WORKSPACE_ID, confirmState.id);
       toast.success('Contact deleted');
       load();
       setConfirmState({ open: false, loading: false });
@@ -160,14 +134,14 @@ export default function ContactsPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Contacts</h2>
           <p className="text-sm text-muted-foreground">Manage your contact relationships</p>
         </div>
-        <Button onClick={() => { setEditingLead(null); setDialogOpen(true); }} className="w-full sm:w-auto">
+        <Button onClick={() => { setEditingContact(null); setDialogOpen(true); }} className="w-full sm:w-auto">
           <UserPlus size={16} className="mr-2" />
           Add Contact
         </Button>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <KpiCard
           title="Total Contacts"
           value={kpis.total.toLocaleString()}
@@ -185,20 +159,12 @@ export default function ContactsPage() {
           description="new contacts"
         />
         <KpiCard
-          title="Key Accounts"
-          value={kpis.keyAcc.toLocaleString()}
-          change="VIP / Decision Maker"
-          trend={kpis.keyAcc > 0 ? 'up' : 'neutral'}
+          title="Primary Contacts"
+          value={kpis.primary.toLocaleString()}
+          change="Decision makers"
+          trend={kpis.primary > 0 ? 'up' : 'neutral'}
           icon={Star}
-          description="tagged accounts"
-        />
-        <KpiCard
-          title="Engaged"
-          value={kpis.engaged.toLocaleString()}
-          change="Recent interaction"
-          trend={kpis.engaged > 0 ? 'up' : 'neutral'}
-          icon={Building2}
-          description="last contacted"
+          description="tagged as primary"
         />
       </div>
 
@@ -208,25 +174,13 @@ export default function ContactsPage() {
           <div className="relative flex-1 max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
             <Input
-              placeholder="Search name, company, or email..."
+              placeholder="Search name or email..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               className="pl-9"
             />
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Input
-              placeholder="Filter by company"
-              value={companyFilter}
-              onChange={(e) => setCompanyFilter(e.target.value)}
-              className="w-44"
-            />
-            <Input
-              placeholder="Filter by tags"
-              value={tagsFilter}
-              onChange={(e) => setTagsFilter(e.target.value)}
-              className="w-44"
-            />
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" onClick={clearFilters} className="gap-1">
                 <X size={14} />
@@ -238,7 +192,7 @@ export default function ContactsPage() {
         {/* View toggle */}
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
-            {filtered.length} of {leads.length} contact{leads.length !== 1 ? 's' : ''}
+            {filtered.length} of {contacts.length} contact{contacts.length !== 1 ? 's' : ''}
           </p>
           <div className="flex items-center gap-1 border rounded-md p-0.5">
             <Button
@@ -269,19 +223,18 @@ export default function ContactsPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Company</TableHead>
                   <TableHead>Email</TableHead>
                   <TableHead>Phone</TableHead>
-                  <TableHead>Tags</TableHead>
+                  <TableHead>Designation</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Added</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {filtered.map((contact) => {
-                  const tags = parseTags(contact);
                   return (
-                    <TableRow key={contact.id}>
+                    <TableRow key={contact.contact_id}>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-7 w-7">
@@ -292,22 +245,15 @@ export default function ContactsPage() {
                           <span className="font-medium text-sm">{contact.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{contact.company || '—'}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{contact.email}</TableCell>
                       <TableCell className="text-sm text-muted-foreground">{contact.phone || '—'}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground">{contact.designation || '—'}</TableCell>
                       <TableCell>
-                        <div className="flex flex-wrap gap-1">
-                          {tags.length > 0 ? tags.slice(0, 3).map((tag) => (
-                            <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
-                              {tag}
-                            </Badge>
-                          )) : <span className="text-xs text-muted-foreground">—</span>}
-                          {tags.length > 3 && (
-                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
-                              +{tags.length - 3}
-                            </Badge>
-                          )}
-                        </div>
+                        {contact.is_primary ? (
+                          <Badge variant="default" className="text-[10px]">Primary</Badge>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">—</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {formatDate(contact.created_at)}
@@ -320,19 +266,19 @@ export default function ContactsPage() {
                             </Button>
                           </DropdownMenuTrigger>
                           <DropdownMenuContent align="end">
-                            <DropdownMenuItem onClick={() => setViewingLead(contact)}>
+                            <DropdownMenuItem onClick={() => setViewingContact(contact)}>
                               <Eye size={14} className="mr-2" /> View
                             </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setEditingLead(contact); setDialogOpen(true); }}>
+                            <DropdownMenuItem onClick={() => { setEditingContact(contact); setDialogOpen(true); }}>
                               <Pencil size={14} className="mr-2" /> Edit
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
                             <DropdownMenuItem
                               className="text-red-600"
                               onClick={() => handleDelete(contact)}
-                              disabled={deleting === contact.id}
+                              disabled={deleting === contact.contact_id}
                             >
-                              <Trash2 size={14} className="mr-2" /> {deleting === contact.id ? 'Deleting...' : 'Delete'}
+                              <Trash2 size={14} className="mr-2" /> {deleting === contact.contact_id ? 'Deleting...' : 'Delete'}
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -346,9 +292,8 @@ export default function ContactsPage() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {filtered.map((contact) => {
-              const tags = parseTags(contact);
               return (
-                <Card key={contact.id} className="hover:shadow-sm transition-all duration-200 group">
+                <Card key={contact.contact_id} className="hover:shadow-sm transition-all duration-200 group">
                   <CardContent className="p-5">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
@@ -359,7 +304,7 @@ export default function ContactsPage() {
                         </Avatar>
                         <div>
                           <p className="text-sm font-medium">{contact.name}</p>
-                          <p className="text-xs text-muted-foreground">{contact.status}</p>
+                          <p className="text-xs text-muted-foreground">{contact.designation || 'Contact'}</p>
                         </div>
                       </div>
                       <DropdownMenu>
@@ -369,28 +314,24 @@ export default function ContactsPage() {
                           </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => setViewingLead(contact)}>
+                          <DropdownMenuItem onClick={() => setViewingContact(contact)}>
                             <Eye size={14} className="mr-2" /> View
                           </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => { setEditingLead(contact); setDialogOpen(true); }}>
+                          <DropdownMenuItem onClick={() => { setEditingContact(contact); setDialogOpen(true); }}>
                             <Pencil size={14} className="mr-2" /> Edit
                           </DropdownMenuItem>
                           <DropdownMenuSeparator />
                           <DropdownMenuItem
                             className="text-red-600"
                             onClick={() => handleDelete(contact)}
-                            disabled={deleting === contact.id}
+                            disabled={deleting === contact.contact_id}
                           >
-                            <Trash2 size={14} className="mr-2" /> {deleting === contact.id ? 'Deleting...' : 'Delete'}
+                            <Trash2 size={14} className="mr-2" /> {deleting === contact.contact_id ? 'Deleting...' : 'Delete'}
                           </DropdownMenuItem>
                         </DropdownMenuContent>
                       </DropdownMenu>
                     </div>
                     <div className="space-y-2 text-sm">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Building2 size={14} />
-                        <span>{contact.company || '—'}</span>
-                      </div>
                       <div className="flex items-center gap-2 text-muted-foreground">
                         <Mail size={14} />
                         <span className="truncate">{contact.email}</span>
@@ -401,23 +342,11 @@ export default function ContactsPage() {
                           <span>{contact.phone}</span>
                         </div>
                       )}
-                      {contact.source && (
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                          <MapPin size={14} />
-                          <span>Source: {contact.source}</span>
+                      {contact.is_primary && (
+                        <div className="flex items-center gap-2 text-emerald-600">
+                          <Star size={14} />
+                          <span>Primary Contact</span>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex flex-wrap gap-1.5 mt-4">
-                      {tags.map((tag) => (
-                        <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">
-                          {tag}
-                        </Badge>
-                      ))}
-                      {contact.estimated_value != null && contact.estimated_value > 0 && (
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          ${contact.estimated_value.toLocaleString()}
-                        </Badge>
                       )}
                     </div>
                   </CardContent>
@@ -431,14 +360,15 @@ export default function ContactsPage() {
       )}
 
       {/* View Modal */}
-      <ViewContactDialog lead={viewingLead} onClose={() => setViewingLead(null)} />
+      <ViewContactDialog contact={viewingContact} onClose={() => setViewingContact(null)} />
 
       {/* Edit / Create Dialog */}
-      <LeadDialog
+      <ContactDialog
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         onSaved={load}
-        lead={editingLead}
+        contact={editingContact}
+        workspaceId={WORKSPACE_ID}
       />
 
       {/* Delete Confirm */}
@@ -454,59 +384,41 @@ export default function ContactsPage() {
   );
 }
 
-function ViewContactDialog({ lead, onClose }: { lead: Lead | null; onClose: () => void }) {
-  if (!lead) return null;
-  const tags = parseTags(lead);
+function ViewContactDialog({ contact, onClose }: { contact: Contact | null; onClose: () => void }) {
+  if (!contact) return null;
 
   return (
-    <Dialog open={!!lead} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Dialog open={!!contact} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent className="sm:max-w-[420px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="bg-primary/10 text-primary text-xs">
-                {lead.name.split(' ').map(n => n[0]).join('')}
+                {contact.name.split(' ').map(n => n[0]).join('')}
               </AvatarFallback>
             </Avatar>
-            {lead.name}
+            {contact.name}
+            {contact.is_primary && <Badge variant="default" className="ml-2 text-[10px]">Primary</Badge>}
           </DialogTitle>
-          <DialogDescription>Contact details and activity</DialogDescription>
+          <DialogDescription>{contact.designation || 'Contact details'}</DialogDescription>
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <div className="flex items-center gap-3">
             <Phone size={15} className="text-muted-foreground shrink-0" />
-            <span>{lead.phone || '—'}</span>
+            <span>{contact.phone || '—'}</span>
           </div>
           <div className="flex items-center gap-3">
             <Mail size={15} className="text-muted-foreground shrink-0" />
-            <span className="truncate">{lead.email}</span>
+            <span className="truncate">{contact.email}</span>
           </div>
-          <div className="flex items-center gap-3">
-            <Building2 size={15} className="text-muted-foreground shrink-0" />
-            <span>{lead.company || '—'}</span>
-          </div>
-          <div className="flex items-center gap-3">
-            <Star size={15} className="text-muted-foreground shrink-0" />
-            <span>{lead.status}</span>
-          </div>
-          {tags.length > 0 && (
-            <div className="flex items-start gap-3">
-              <Tag size={15} className="text-muted-foreground shrink-0 mt-0.5" />
-              <div className="flex flex-wrap gap-1">
-                {tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px] px-1.5 py-0">{tag}</Badge>
-                ))}
-              </div>
-            </div>
-          )}
           <div className="flex items-center gap-3">
             <Calendar size={15} className="text-muted-foreground shrink-0" />
-            <span>Added {formatDate(lead.created_at)}</span>
+            <span>Added {formatDate(contact.created_at)}</span>
           </div>
-          {"" && (
-            <div className="flex items-center gap-3">
-              <Calendar size={15} className="text-muted-foreground shrink-0" />
-              <span>Last contact {formatDate("")}</span>
+          {contact.notes && (
+            <div className="mt-4 pt-4 border-t">
+              <p className="text-xs text-muted-foreground font-medium mb-1">Notes</p>
+              <p className="text-sm">{contact.notes}</p>
             </div>
           )}
         </div>

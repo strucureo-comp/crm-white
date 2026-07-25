@@ -63,13 +63,8 @@ export async function convertLeadToContact(
     name: leadData.name,
     email: leadData.email,
     phone: leadData.phone || '',
-    role: additionalData?.role || '',
-    department: additionalData?.department || '',
     designation: additionalData?.designation || '',
     is_primary: additionalData?.is_primary ?? true,
-    is_decision_maker: additionalData?.is_decision_maker ?? false,
-    linkedin: additionalData?.linkedin || '',
-    whatsapp: additionalData?.whatsapp || '',
     notes: additionalData?.notes || '',
   });
   

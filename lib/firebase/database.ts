@@ -9,6 +9,7 @@ import {
   sendNotificationEmail,
   sendInvitationEmail
 } from '../services/email';
+import { createContact } from '@/lib/db/contacts/api';
 import type {
   Project,
   Invoice,
@@ -1121,6 +1122,20 @@ export async function createLead(lead: Omit<Lead, 'id' | 'created_at' | 'updated
     });
 
     await set(newRef, data);
+
+    try {
+      await createContact('default', {
+        name: lead.name,
+        email: lead.email,
+        company_id: lead.company || '',
+        phone: lead.phone || '',
+        is_primary: true,
+        notes: lead.notes || '',
+      });
+    } catch (contactError) {
+      console.error('Failed to auto-create contact for lead:', contactError);
+    }
+
     return newRef.key;
   } catch (error) {
     console.error('Error creating lead:', error);
