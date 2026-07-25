@@ -22,7 +22,9 @@ import {
 } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { createLead, updateLead } from '@/lib/firebase/database';
-import type { Lead, LeadStatus } from '@/lib/db/types';
+import { Badge } from '@/components/ui/badge';
+import type { Lead, LeadStatus, LeadSource, LeadTag, LeadPriority } from '@/lib/db/types';
+import { cn } from '@/lib/utils';
 
 interface LeadDialogProps {
   open: boolean;
@@ -37,16 +39,13 @@ interface LeadForm {
   company: string;
   phone: string;
   status: LeadStatus;
-  source: string;
-  potential_value: number;
-  probability: number;
+  source: LeadSource | '';
+  estimated_value: number;
+  owner_id: string;
   notes: string;
-  lead_score: number;
-  intent: string;
-  tags: string;
-  last_contacted: string;
+  tags: LeadTag[];
+  priority: LeadPriority | '';
   next_follow_up: string;
-  follow_up_notes: string;
 }
 
 const defaultForm: LeadForm = {
@@ -56,16 +55,19 @@ const defaultForm: LeadForm = {
   phone: '',
   status: 'new',
   source: '',
-  potential_value: 0,
-  probability: 0,
+  estimated_value: 0,
+  owner_id: '',
   notes: '',
-  lead_score: 0,
-  intent: '',
-  tags: '',
-  last_contacted: '',
+  tags: [],
+  priority: '',
   next_follow_up: '',
-  follow_up_notes: '',
 };
+
+const AVAILABLE_TAGS: LeadTag[] = [
+  'VIP', 'Hot', 'Warm', 'Cold', 'High Value', 'Returning Customer',
+  'Decision Maker', 'Follow Up', 'Demo Scheduled', 'Interested',
+  'Not Interested', 'Urgent'
+];
 
 function leadToForm(l: Lead): LeadForm {
   return {
@@ -75,15 +77,12 @@ function leadToForm(l: Lead): LeadForm {
     phone: l.phone || '',
     status: l.status,
     source: l.source || '',
-    potential_value: l.potential_value || 0,
-    probability: l.probability || 0,
+    estimated_value: l.estimated_value || 0,
+    owner_id: l.owner_id || '',
     notes: l.notes || '',
-    lead_score: l.lead_score || 0,
-    intent: l.intent || '',
-    tags: l.tags?.join(', ') || '',
-    last_contacted: l.last_contacted || '',
+    tags: l.tags || [],
+    priority: l.priority || '',
     next_follow_up: l.next_follow_up || '',
-    follow_up_notes: l.follow_up_notes || '',
   };
 }
 
@@ -95,15 +94,12 @@ function formToPayload(f: LeadForm) {
     phone: f.phone || null,
     status: f.status,
     source: f.source || null,
-    potential_value: f.potential_value || null,
-    probability: f.probability || null,
+    estimated_value: f.estimated_value || null,
+    owner_id: f.owner_id || null,
     notes: f.notes || null,
-    lead_score: f.lead_score || null,
-    intent: f.intent || null,
-    tags: f.tags ? f.tags.split(',').map(t => t.trim()).filter(Boolean) : null,
-    last_contacted: f.last_contacted || null,
+    tags: f.tags.length > 0 ? f.tags : null,
+    priority: f.priority || null,
     next_follow_up: f.next_follow_up || null,
-    follow_up_notes: f.follow_up_notes || null,
   };
 }
 
@@ -186,10 +182,24 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
                   <SelectItem value="new">New</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
                   <SelectItem value="qualified">Qualified</SelectItem>
-                  <SelectItem value="proposal">Proposal</SelectItem>
+                  <SelectItem value="proposal_sent">Proposal Sent</SelectItem>
                   <SelectItem value="negotiation">Negotiation</SelectItem>
                   <SelectItem value="won">Won</SelectItem>
                   <SelectItem value="lost">Lost</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={form.priority} onValueChange={(v: LeadPriority) => set('priority', v)}>
+                <SelectTrigger id="priority">
+                  <SelectValue placeholder="Select priority" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Urgent">Urgent</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -200,58 +210,57 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="website">Website</SelectItem>
-                  <SelectItem value="referral">Referral</SelectItem>
-                  <SelectItem value="social">Social Media</SelectItem>
-                  <SelectItem value="email">Email Campaign</SelectItem>
-                  <SelectItem value="event">Event</SelectItem>
-                  <SelectItem value="other">Other</SelectItem>
+                  <SelectItem value="Website">Website</SelectItem>
+                  <SelectItem value="Facebook">Facebook</SelectItem>
+                  <SelectItem value="Instagram">Instagram</SelectItem>
+                  <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                  <SelectItem value="Referral">Referral</SelectItem>
+                  <SelectItem value="Email">Email</SelectItem>
+                  <SelectItem value="Cold Call">Cold Call</SelectItem>
+                  <SelectItem value="Event">Event</SelectItem>
+                  <SelectItem value="Google Ads">Google Ads</SelectItem>
+                  <SelectItem value="Manual">Manual</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div>
-              <Label htmlFor="potential_value">Potential Value ($)</Label>
-              <Input id="potential_value" type="number" min={0} value={form.potential_value} onChange={(e) => set('potential_value', Number(e.target.value))} />
+              <Label htmlFor="estimated_value">Estimated Value ($)</Label>
+              <Input id="estimated_value" type="number" min={0} value={form.estimated_value} onChange={(e) => set('estimated_value', Number(e.target.value))} />
             </div>
             <div>
-              <Label htmlFor="probability">Probability (%)</Label>
-              <Input id="probability" type="number" min={0} max={100} value={form.probability} onChange={(e) => set('probability', Number(e.target.value))} />
+              <Label htmlFor="owner_id">Owner ID</Label>
+              <Input id="owner_id" value={form.owner_id} onChange={(e) => set('owner_id', e.target.value)} placeholder="User ID" />
             </div>
             <div className="col-span-2">
               <Label htmlFor="notes">Notes</Label>
               <Textarea id="notes" value={form.notes} onChange={(e) => set('notes', e.target.value)} placeholder="Any notes..." rows={2} />
             </div>
-            <div>
-              <Label htmlFor="lead_score">Lead Score</Label>
-              <Input id="lead_score" type="number" min={0} max={100} value={form.lead_score} onChange={(e) => set('lead_score', Number(e.target.value))} />
-            </div>
-            <div>
-              <Label htmlFor="intent">Intent</Label>
-              <Select value={form.intent} onValueChange={(v) => set('intent', v)}>
-                <SelectTrigger id="intent"><SelectValue placeholder="Select intent" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">High</SelectItem>
-                  <SelectItem value="medium">Medium</SelectItem>
-                  <SelectItem value="low">Low</SelectItem>
-                  <SelectItem value="exploratory">Exploratory</SelectItem>
-                </SelectContent>
-              </Select>
+            <div className="col-span-2">
+              <Label>Tags</Label>
+              <div className="flex flex-wrap gap-2 mt-2">
+                {AVAILABLE_TAGS.map((tag) => {
+                  const isSelected = form.tags.includes(tag);
+                  return (
+                    <Badge
+                      key={tag}
+                      variant={isSelected ? 'default' : 'outline'}
+                      className={cn('cursor-pointer select-none', isSelected ? '' : 'text-muted-foreground')}
+                      onClick={() => {
+                        const newTags = isSelected 
+                          ? form.tags.filter(t => t !== tag) 
+                          : [...form.tags, tag];
+                        set('tags', newTags);
+                      }}
+                    >
+                      {tag}
+                    </Badge>
+                  );
+                })}
+              </div>
             </div>
             <div className="col-span-2">
-              <Label htmlFor="tags">Tags (comma-separated)</Label>
-              <Input id="tags" value={form.tags} onChange={(e) => set('tags', e.target.value)} placeholder="hot, vip, follow-up" />
-            </div>
-            <div>
-              <Label htmlFor="last_contacted">Last Contacted</Label>
-              <Input id="last_contacted" type="date" value={form.last_contacted} onChange={(e) => set('last_contacted', e.target.value)} />
-            </div>
-            <div>
               <Label htmlFor="next_follow_up">Next Follow-up</Label>
               <Input id="next_follow_up" type="date" value={form.next_follow_up} onChange={(e) => set('next_follow_up', e.target.value)} />
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="follow_up_notes">Follow-up Notes</Label>
-              <Textarea id="follow_up_notes" value={form.follow_up_notes} onChange={(e) => set('follow_up_notes', e.target.value)} placeholder="Follow-up details..." rows={2} />
             </div>
           </div>
           <DialogFooter>

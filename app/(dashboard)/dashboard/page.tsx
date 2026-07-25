@@ -83,7 +83,7 @@ export default function DashboardPage() {
     { name: 'New', leads: leads.filter((l) => l.status === 'new'), color: 'bg-blue-500' },
     { name: 'Contacted', leads: leads.filter((l) => l.status === 'contacted'), color: 'bg-amber-500' },
     { name: 'Qualified', leads: leads.filter((l) => l.status === 'qualified'), color: 'bg-violet-500' },
-    { name: 'Proposal', leads: leads.filter((l) => l.status === 'proposal'), color: 'bg-purple-500' },
+    { name: 'Proposal', leads: leads.filter((l) => l.status === "proposal_sent"), color: 'bg-purple-500' },
     { name: 'Negotiation', leads: leads.filter((l) => l.status === 'negotiation'), color: 'bg-emerald-500' },
     { name: 'Won', leads: leads.filter((l) => l.status === 'won'), color: 'bg-green-500' },
   ];
@@ -92,7 +92,7 @@ export default function DashboardPage() {
     { name: 'Lead', count: leads.filter((l) => l.status === 'new').length },
     { name: 'Contacted', count: leads.filter((l) => l.status === 'contacted').length },
     { name: 'Qualified', count: leads.filter((l) => l.status === 'qualified').length },
-    { name: 'Proposal', count: leads.filter((l) => l.status === 'proposal').length },
+    { name: 'Proposal', count: leads.filter((l) => l.status === "proposal_sent").length },
     { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length },
     { name: 'Won', count: leads.filter((l) => l.status === 'won').length },
   ];
@@ -147,7 +147,7 @@ export default function DashboardPage() {
                       <div key={lead.id} className="p-2 rounded-lg border bg-card hover:shadow-sm transition-shadow cursor-pointer" onClick={() => router.push('/leads')}>
                         <p className="text-xs font-medium truncate">{lead.name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">{lead.company || '—'}</p>
-                        <p className="text-[10px] font-medium mt-1">{lead.potential_value ? formatCurrency(lead.potential_value) : '—'}</p>
+                        <p className="text-[10px] font-medium mt-1">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</p>
                       </div>
                     ))}
                     {stage.leads.length > 3 && (
@@ -234,9 +234,9 @@ export default function DashboardPage() {
                         <td className="py-3">
                           <div className="flex items-center gap-1">
                             <div className="w-8 h-1.5 bg-muted rounded-full overflow-hidden">
-                              <div className="h-full bg-primary rounded-full" style={{ width: `${lead.lead_score || 0}%` }} />
+                              <div className="h-full bg-primary rounded-full" style={{ width: `${0 || 0}%` }} />
                             </div>
-                            <span className="text-xs text-muted-foreground">{lead.lead_score || 0}</span>
+                            <span className="text-xs text-muted-foreground">{0 || 0}</span>
                           </div>
                         </td>
                         <td className="py-3 text-muted-foreground">—</td>
@@ -297,7 +297,7 @@ export default function DashboardPage() {
                   <div key={lead.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => router.push('/leads')}>
                     <div className="flex items-center gap-3">
                       <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 ${isOverdue ? 'border-red-400' : 'border-muted-foreground/30'}`} />
-                      <span className="text-sm">{lead.follow_up_notes || `Follow up with ${lead.name}`}</span>
+                      <span className="text-sm">{"" || `Follow up with ${lead.name}`}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${priorityColors[priority]}`}>

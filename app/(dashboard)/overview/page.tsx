@@ -82,7 +82,7 @@ export default function OverviewPage() {
   const activeDeals = leads.filter((l) => l.status !== 'won' && l.status !== 'lost').length;
   const pipelineValue = leads
     .filter((l) => l.status !== 'won' && l.status !== 'lost')
-    .reduce((sum, l) => sum + (l.potential_value || 0), 0);
+    .reduce((sum, l) => sum + (l.estimated_value || 0), 0);
 
   const today = new Date().toISOString().split('T')[0];
   const openTasksToday = leads.filter((l) => l.next_follow_up && l.next_follow_up.startsWith(today)).length;
@@ -100,7 +100,7 @@ export default function OverviewPage() {
       };
     }
     acc[company].leads.push(lead);
-    acc[company].totalValue += lead.potential_value || 0;
+    acc[company].totalValue += lead.estimated_value || 0;
     if (lead.status === 'won') acc[company].stage = 'closed_won';
     else if (lead.status === 'lost') acc[company].stage = 'closed_lost';
     else if (lead.status !== 'new') acc[company].stage = 'active';
@@ -109,16 +109,16 @@ export default function OverviewPage() {
   const companyList = Object.values(companies).slice(0, 10);
 
   const funnelStages = [
-    { name: 'Lead', count: leads.filter((l) => l.status === 'new').length, value: leads.filter((l) => l.status === 'new').reduce((s, l) => s + (l.potential_value || 0), 0) },
-    { name: 'Qualified', count: leads.filter((l) => l.status === 'qualified').length, value: leads.filter((l) => l.status === 'qualified').reduce((s, l) => s + (l.potential_value || 0), 0) },
-    { name: 'Proposal', count: leads.filter((l) => l.status === 'proposal').length, value: leads.filter((l) => l.status === 'proposal').reduce((s, l) => s + (l.potential_value || 0), 0) },
-    { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length, value: leads.filter((l) => l.status === 'negotiation').reduce((s, l) => s + (l.potential_value || 0), 0) },
-    { name: 'Closed Won', count: leads.filter((l) => l.status === 'won').length, value: leads.filter((l) => l.status === 'won').reduce((s, l) => s + (l.potential_value || 0), 0) },
+    { name: 'Lead', count: leads.filter((l) => l.status === 'new').length, value: leads.filter((l) => l.status === 'new').reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Qualified', count: leads.filter((l) => l.status === 'qualified').length, value: leads.filter((l) => l.status === 'qualified').reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Proposal', count: leads.filter((l) => l.status === "proposal_sent").length, value: leads.filter((l) => l.status === "proposal_sent").reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length, value: leads.filter((l) => l.status === 'negotiation').reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Closed Won', count: leads.filter((l) => l.status === 'won').length, value: leads.filter((l) => l.status === 'won').reduce((s, l) => s + (l.estimated_value || 0), 0) },
   ];
 
   const topDeals = leads
     .filter((l) => l.status !== 'won' && l.status !== 'lost')
-    .sort((a, b) => (b.potential_value || 0) - (a.potential_value || 0))
+    .sort((a, b) => (b.estimated_value || 0) - (a.estimated_value || 0))
     .slice(0, 4);
 
   const pendingInvoices = invoices
@@ -271,7 +271,7 @@ export default function OverviewPage() {
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${stageColors[deal.status] || ''}`}>
                         {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
                       </Badge>
-                      <span className="text-sm font-medium">{formatCurrency(deal.potential_value || 0)}</span>
+                      <span className="text-sm font-medium">{formatCurrency(deal.estimated_value || 0)}</span>
                       <span className="text-xs text-muted-foreground">{deal.next_follow_up ? new Date(deal.next_follow_up).toLocaleDateString() : '—'}</span>
                     </div>
                   </div>

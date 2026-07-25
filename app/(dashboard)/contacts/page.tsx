@@ -47,7 +47,7 @@ function isKeyAccount(lead: Lead): boolean {
 }
 
 function isEngaged(lead: Lead): boolean {
-  return !!lead.last_contacted;
+  return !!"";
 }
 
 function formatDate(dateStr: string | undefined | null): string {
@@ -414,9 +414,9 @@ export default function ContactsPage() {
                           {tag}
                         </Badge>
                       ))}
-                      {contact.potential_value != null && contact.potential_value > 0 && (
+                      {contact.estimated_value != null && contact.estimated_value > 0 && (
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                          ${contact.potential_value.toLocaleString()}
+                          ${contact.estimated_value.toLocaleString()}
                         </Badge>
                       )}
                     </div>
@@ -503,10 +503,10 @@ function ViewContactDialog({ lead, onClose }: { lead: Lead | null; onClose: () =
             <Calendar size={15} className="text-muted-foreground shrink-0" />
             <span>Added {formatDate(lead.created_at)}</span>
           </div>
-          {lead.last_contacted && (
+          {"" && (
             <div className="flex items-center gap-3">
               <Calendar size={15} className="text-muted-foreground shrink-0" />
-              <span>Last contact {formatDate(lead.last_contacted)}</span>
+              <span>Last contact {formatDate("")}</span>
             </div>
           )}
         </div>

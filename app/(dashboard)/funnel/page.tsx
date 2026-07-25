@@ -43,7 +43,7 @@ function formatCurrency(value: number) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(value);
 }
 
-const FUNNEL_STAGES = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won'] as const;
+const FUNNEL_STAGES = ['new', 'contacted', 'qualified', "proposal_sent", 'negotiation', 'won'] as const;
 
 const STAGE_COLORS: Record<string, string> = {
   new: '#3b82f6',
@@ -94,7 +94,7 @@ export default function FunnelPage() {
     const stageLeads = filteredLeads.filter((l) => l.status === stage);
     return {
       name: STAGE_LABELS[stage],
-      value: stageLeads.reduce((s, l) => s + (l.potential_value || 0), 0),
+      value: stageLeads.reduce((s, l) => s + (l.estimated_value || 0), 0),
       count: stageLeads.length,
       fill: STAGE_COLORS[stage],
     };
@@ -124,9 +124,9 @@ export default function FunnelPage() {
   const totalPipelineValue = stageData.reduce((s, d) => s + d.value, 0);
   const winRate = totalLeads > 0 ? ((wonCount / totalLeads) * 100) : 0;
   const avgDealValue = totalLeads > 0
-    ? Math.round(filteredLeads.reduce((s, l) => s + (l.potential_value || 0), 0) / totalLeads)
+    ? Math.round(filteredLeads.reduce((s, l) => s + (l.estimated_value || 0), 0) / totalLeads)
     : 0;
-  const lostValue = lostLeads.reduce((s, l) => s + (l.potential_value || 0), 0);
+  const lostValue = lostLeads.reduce((s, l) => s + (l.estimated_value || 0), 0);
 
   const wonPct = totalLeads > 0 ? (wonCount / totalLeads) * 100 : 0;
   const lostPct = totalLeads > 0 ? (lostCount / totalLeads) * 100 : 0;

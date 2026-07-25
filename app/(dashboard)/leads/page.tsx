@@ -61,7 +61,7 @@ const statusColors: Record<string, string> = {
   new: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
   contacted: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
   qualified: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400',
-  proposal: 'bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
+  proposal_sent: 'bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
   negotiation: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
   won: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400',
   lost: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
@@ -72,7 +72,7 @@ const stageTabs = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
   { value: 'qualified', label: 'Qualified' },
-  { value: 'proposal', label: 'Proposal' },
+  { value: 'proposal_sent', label: 'Proposal Sent' },
   { value: 'negotiation', label: 'Negotiation' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
@@ -117,9 +117,9 @@ export default function LeadsPage() {
   const kpis = useMemo(() => {
     const total = leads.length;
     const newThisWeek = leads.filter((l) => l.status === 'new').length;
-    const hotLeads = leads.filter((l) => (l.lead_score || 0) >= 80).length;
-    const avgScore = total > 0 ? Math.round(leads.reduce((s, l) => s + (l.lead_score || 0), 0) / total) : 0;
-    return { total, newThisWeek, hotLeads, avgScore };
+    const highValueLeads = leads.filter((l) => (l.estimated_value || 0) >= 10000).length;
+    const avgValue = total > 0 ? Math.round(leads.reduce((s, l) => s + (l.estimated_value || 0), 0) / total) : 0;
+    return { total, newThisWeek, highValueLeads, avgValue };
   }, [leads]);
 
   const filtered = useMemo(() => {
@@ -234,18 +234,18 @@ export default function LeadsPage() {
           description="Stage: New"
         />
         <KpiCard
-          title="Hot Leads"
-          value={kpis.hotLeads.toString()}
-          change={kpis.hotLeads > 0 ? `${Math.round((kpis.hotLeads / Math.max(leads.length, 1)) * 100)}% of total` : 'No hot leads'}
-          trend={kpis.hotLeads > 0 ? 'up' : 'neutral'}
+          title="High Value Leads"
+          value={kpis.highValueLeads.toString()}
+          change={kpis.highValueLeads > 0 ? `${Math.round((kpis.highValueLeads / Math.max(leads.length, 1)) * 100)}% of total` : 'No high value leads'}
+          trend={kpis.highValueLeads > 0 ? 'up' : 'neutral'}
           icon={Star}
-          description="Score &ge; 80"
+          description="Value &ge; $10k"
         />
         <KpiCard
-          title="Avg. Lead Score"
-          value={kpis.avgScore.toString()}
-          change={kpis.avgScore >= 60 ? 'Above average' : kpis.avgScore >= 30 ? 'Moderate' : 'Needs improvement'}
-          trend={kpis.avgScore >= 60 ? 'up' : kpis.avgScore >= 30 ? 'neutral' : 'down'}
+          title="Avg. Est. Value"
+          value={formatCurrency(kpis.avgValue)}
+          change={kpis.avgValue >= 10000 ? 'High' : kpis.avgValue >= 1000 ? 'Moderate' : 'Low'}
+          trend={kpis.avgValue >= 10000 ? 'up' : kpis.avgValue >= 1000 ? 'neutral' : 'down'}
           icon={TrendingUp}
           description="Across all leads"
         />
@@ -332,12 +332,16 @@ export default function LeadsPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Sources</SelectItem>
-                    <SelectItem value="website">Website</SelectItem>
-                    <SelectItem value="referral">Referral</SelectItem>
-                    <SelectItem value="social">Social Media</SelectItem>
-                    <SelectItem value="email">Email Campaign</SelectItem>
-                    <SelectItem value="event">Event</SelectItem>
-                    <SelectItem value="other">Other</SelectItem>
+                    <SelectItem value="Website">Website</SelectItem>
+                    <SelectItem value="Facebook">Facebook</SelectItem>
+                    <SelectItem value="Instagram">Instagram</SelectItem>
+                    <SelectItem value="LinkedIn">LinkedIn</SelectItem>
+                    <SelectItem value="Referral">Referral</SelectItem>
+                    <SelectItem value="Email">Email</SelectItem>
+                    <SelectItem value="Cold Call">Cold Call</SelectItem>
+                    <SelectItem value="Event">Event</SelectItem>
+                    <SelectItem value="Google Ads">Google Ads</SelectItem>
+                    <SelectItem value="Manual">Manual</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -355,7 +359,7 @@ export default function LeadsPage() {
                     <SelectItem value="new">New</SelectItem>
                     <SelectItem value="contacted">Contacted</SelectItem>
                     <SelectItem value="qualified">Qualified</SelectItem>
-                    <SelectItem value="proposal">Proposal</SelectItem>
+                    <SelectItem value="proposal_sent">Proposal Sent</SelectItem>
                     <SelectItem value="negotiation">Negotiation</SelectItem>
                     <SelectItem value="won">Won</SelectItem>
                     <SelectItem value="lost">Lost</SelectItem>
@@ -453,6 +457,24 @@ export default function LeadsPage() {
                   ),
                 },
                 {
+                  key: 'priority',
+                  header: 'Priority',
+                  render: (lead) => {
+                    if (!lead.priority) return <span className="text-sm text-muted-foreground">—</span>;
+                    const colors: Record<string, string> = {
+                      Low: 'text-slate-500 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/50',
+                      Medium: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/50',
+                      High: 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/50',
+                      Urgent: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/50',
+                    };
+                    return (
+                      <Badge variant="secondary" className={cn('text-xs font-medium', colors[lead.priority] || '')}>
+                        {lead.priority}
+                      </Badge>
+                    );
+                  },
+                },
+                {
                   key: 'status',
                   header: 'Stage',
                   render: (lead) => (
@@ -466,19 +488,7 @@ export default function LeadsPage() {
                   header: 'Source',
                   render: (lead) => <span className="text-sm">{lead.source || '—'}</span>,
                 },
-                {
-                  key: 'score',
-                  header: 'Score',
-                  render: (lead) => {
-                    const score = lead.lead_score ?? 0;
-                    return (
-                      <div className="flex items-center gap-2 min-w-[100px]">
-                        <Progress value={score} className="h-2 w-16" />
-                        <span className="text-xs font-medium tabular-nums w-6 text-right">{score}</span>
-                      </div>
-                    );
-                  },
-                },
+
                 {
                   key: 'wa',
                   header: 'WA',
@@ -492,7 +502,7 @@ export default function LeadsPage() {
                   key: 'value',
                   header: 'Value',
                   render: (lead) => (
-                    <span className="text-sm font-medium">{lead.potential_value ? formatCurrency(lead.potential_value) : '—'}</span>
+                    <span className="text-sm font-medium">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</span>
                   ),
                 },
                 {
@@ -580,26 +590,17 @@ export default function LeadsPage() {
                   <p className="text-sm mt-0.5">{viewingLead.source || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Lead Score</p>
-                  <div className="flex items-center gap-2 mt-0.5">
-                    <Progress value={viewingLead.lead_score ?? 0} className="h-2 w-20" />
-                    <span className="text-sm font-medium">{viewingLead.lead_score ?? 0}</span>
-                  </div>
+                  <p className="text-xs text-muted-foreground font-medium">Estimated Value</p>
+                  <p className="text-sm font-medium mt-0.5">{viewingLead.estimated_value ? formatCurrency(viewingLead.estimated_value) : '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Potential Value</p>
-                  <p className="text-sm font-medium mt-0.5">{viewingLead.potential_value ? formatCurrency(viewingLead.potential_value) : '—'}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Owner ID</p>
+                  <p className="text-sm mt-0.5">{viewingLead.owner_id || '—'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-muted-foreground font-medium">Probability</p>
-                  <p className="text-sm mt-0.5">{viewingLead.probability != null ? `${viewingLead.probability}%` : '—'}</p>
+                  <p className="text-xs text-muted-foreground font-medium">Priority</p>
+                  <p className="text-sm mt-0.5">{viewingLead.priority || '—'}</p>
                 </div>
-                {viewingLead.intent && (
-                  <div>
-                    <p className="text-xs text-muted-foreground font-medium">Intent</p>
-                    <p className="text-sm mt-0.5 capitalize">{viewingLead.intent}</p>
-                  </div>
-                )}
                 {viewingLead.tags && viewingLead.tags.length > 0 && (
                   <div>
                     <p className="text-xs text-muted-foreground font-medium">Tags</p>
@@ -619,11 +620,7 @@ export default function LeadsPage() {
                   <p className="text-sm mt-0.5 text-muted-foreground">{viewingLead.notes}</p>
                 </div>
               )}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground font-medium">Last Contacted</p>
-                  <p className="text-sm mt-0.5">{viewingLead.last_contacted ? new Date(viewingLead.last_contacted).toLocaleDateString() : '—'}</p>
-                </div>
+              <div className="grid grid-cols-1 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">Next Follow-up</p>
                   <p className="text-sm mt-0.5">{viewingLead.next_follow_up ? new Date(viewingLead.next_follow_up).toLocaleDateString() : '—'}</p>

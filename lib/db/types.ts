@@ -579,25 +579,73 @@ export interface TaskItem {
   updated_at: string;
 }
 
-export type LeadStatus = 'new' | 'contacted' | 'qualified' | 'proposal' | 'negotiation' | 'won' | 'lost';
+export type LeadStatus =
+  | 'new'
+  | 'contacted'
+  | 'qualified'
+  | 'proposal_sent'
+  | 'negotiation'
+  | 'won'
+  | 'lost';
+
+export type LeadSource =
+  | 'Website'
+  | 'Facebook'
+  | 'Instagram'
+  | 'LinkedIn'
+  | 'Referral'
+  | 'Email'
+  | 'Cold Call'
+  | 'Event'
+  | 'Google Ads'
+  | 'Manual';
+
+export type LeadTag =
+  | 'VIP'
+  | 'Hot'
+  | 'Warm'
+  | 'Cold'
+  | 'High Value'
+  | 'Returning Customer'
+  | 'Decision Maker'
+  | 'Follow Up'
+  | 'Demo Scheduled'
+  | 'Interested'
+  | 'Not Interested'
+  | 'Urgent';
+
+export type LeadPriority =
+  | 'Low'
+  | 'Medium'
+  | 'High'
+  | 'Urgent';
 
 export interface Lead {
   id: string;
+
+  // Contact Information
   name: string;
   email: string;
-  company?: string;
   phone?: string;
+  company?: string;
+
+  // Lead Information
   status: LeadStatus;
-  source?: string;
-  potential_value?: number;
-  probability?: number;
-  notes?: string;
-  last_contacted?: string;
+  source?: LeadSource;
+  estimated_value?: number;
+
+  // Assignment
+  owner_id: string;
+
+  // Follow-up
   next_follow_up?: string;
-  follow_up_notes?: string;
-  lead_score?: number;
-  intent?: string;
-  tags?: string[];
+
+  // Additional Details
+  notes?: string;
+  tags?: LeadTag[];
+  priority?: LeadPriority;
+
+  // Audit
   created_at: string;
   updated_at: string;
 }

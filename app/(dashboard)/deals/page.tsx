@@ -47,7 +47,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
 
-const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost'];
+const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal_sent", 'negotiation', 'won', 'lost'];
 
 const stageLabels: Record<string, string> = {
   new: 'New',
@@ -140,12 +140,12 @@ export default function DealsPage() {
     return result;
   }, [leads, selectedPipelineId, selectedPipeline, search, activeStage]);
 
-  const openStatuses: LeadStatus[] = ['new', 'contacted', 'qualified', 'proposal', 'negotiation'];
+  const openStatuses: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal_sent", 'negotiation'];
 
   const totalPipelineValue = useMemo(
     () => leads
       .filter(l => openStatuses.includes(l.status))
-      .reduce((sum, l) => sum + (l.potential_value || 0), 0),
+      .reduce((sum, l) => sum + (l.estimated_value || 0), 0),
     [leads]
   );
 
@@ -160,7 +160,7 @@ export default function DealsPage() {
         const d = new Date(l.updated_at || l.created_at);
         return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
       })
-      .reduce((sum, l) => sum + (l.potential_value || 0), 0),
+      .reduce((sum, l) => sum + (l.estimated_value || 0), 0),
     [leads]
   );
 
@@ -386,8 +386,8 @@ export default function DealsPage() {
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
                         <div className={`w-2 h-2 rounded-full shrink-0 ${
-                          (lead.probability || 0) <= 30 ? 'bg-blue-500' :
-                          (lead.probability || 0) <= 60 ? 'bg-amber-500' :
+                          (0 || 0) <= 30 ? 'bg-blue-500' :
+                          (0 || 0) <= 60 ? 'bg-amber-500' :
                           'bg-emerald-500'
                         }`} />
                         {lead.name}
@@ -399,7 +399,7 @@ export default function DealsPage() {
                         {lead.company || '—'}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono">{lead.potential_value ? formatCurrency(lead.potential_value) : '—'}</TableCell>
+                    <TableCell className="font-mono">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</TableCell>
                     <TableCell>
                       <Badge className={stageColors[lead.status]} variant="outline">
                         {stageLabels[lead.status]}
@@ -407,8 +407,8 @@ export default function DealsPage() {
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
-                        <Progress value={lead.probability || 0} className="h-1.5 w-16" />
-                        <span className="text-xs text-muted-foreground">{lead.probability || 0}%</span>
+                        <Progress value={0 || 0} className="h-1.5 w-16" />
+                        <span className="text-xs text-muted-foreground">{0 || 0}%</span>
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground">{daysInStage}d</TableCell>
@@ -487,8 +487,8 @@ export default function DealsPage() {
                         <div className="flex items-start justify-between mb-2">
                           <div className="flex items-center gap-2 min-w-0">
                             <div className={`w-2 h-2 rounded-full shrink-0 ${
-                              (lead.probability || 0) <= 30 ? 'bg-blue-500' :
-                              (lead.probability || 0) <= 60 ? 'bg-amber-500' :
+                              (0 || 0) <= 30 ? 'bg-blue-500' :
+                              (0 || 0) <= 60 ? 'bg-amber-500' :
                               'bg-emerald-500'
                             }`} />
                             <p className="text-sm font-medium truncate">{lead.name}</p>
@@ -520,7 +520,7 @@ export default function DealsPage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <DollarSign size={12} />
-                            {lead.potential_value ? formatCurrency(lead.potential_value) : '—'}
+                            {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
                           </div>
                           {lead.source && (
                             <div className="flex items-center gap-1">
@@ -533,10 +533,10 @@ export default function DealsPage() {
                               <Clock size={12} />
                               {daysBetween(lead.updated_at || lead.created_at)}d
                             </span>
-                            <span>{lead.probability || 0}%</span>
+                            <span>{0 || 0}%</span>
                           </div>
                         </div>
-                        <Progress value={lead.probability || 0} className="h-1 mt-2" />
+                        <Progress value={0 || 0} className="h-1 mt-2" />
                         <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={lead.status}
@@ -581,12 +581,8 @@ export default function DealsPage() {
               <div className="rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border p-5">
                 <p className="text-sm text-muted-foreground mb-1">Deal Value</p>
                 <p className="text-3xl font-bold">
-                  {selectedLead.potential_value ? formatCurrency(selectedLead.potential_value) : 'Not set'}
+                  {selectedLead.estimated_value ? formatCurrency(selectedLead.estimated_value) : 'Not set'}
                 </p>
-                <div className="flex items-center gap-2 mt-3">
-                  <Progress value={selectedLead.probability || 0} className="h-2 flex-1" />
-                  <span className="text-sm font-medium">{selectedLead.probability || 0}%</span>
-                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-4">
@@ -635,9 +631,6 @@ export default function DealsPage() {
                         : 'No follow-up scheduled'}
                     </span>
                   </div>
-                  {selectedLead.follow_up_notes && (
-                    <p className="text-muted-foreground pl-6">{selectedLead.follow_up_notes}</p>
-                  )}
                 </div>
               </div>
 

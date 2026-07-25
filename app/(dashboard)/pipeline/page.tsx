@@ -45,7 +45,7 @@ import { toast } from 'sonner';
 const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
   { id: 'qualified', name: 'Qualified', color: '#8b5cf6', order: 0 },
   { id: 'contacted', name: 'Contacted', color: '#f59e0b', order: 1 },
-  { id: 'proposal', name: 'Proposal', color: '#a855f7', order: 2 },
+  { id: "proposal_sent", name: 'Proposal', color: '#a855f7', order: 2 },
   { id: 'negotiation', name: 'Negotiation', color: '#10b981', order: 3 },
   { id: 'won', name: 'Closed Won', color: '#22c55e', order: 4 },
   { id: 'lost', name: 'Closed Lost', color: '#ef4444', order: 5 },
@@ -141,8 +141,8 @@ export default function PipelinePage() {
     grouped[stage.id] = leads.filter((l) => l.status === stage.id);
   }
 
-  const totalPipelineValue = leads.filter((l) => l.status !== 'lost').reduce((sum, l) => sum + (l.potential_value || 0), 0);
-  const confirmedOrders = leads.filter((l) => l.status === 'won').reduce((sum, l) => sum + (l.potential_value || 0), 0);
+  const totalPipelineValue = leads.filter((l) => l.status !== 'lost').reduce((sum, l) => sum + (l.estimated_value || 0), 0);
+  const confirmedOrders = leads.filter((l) => l.status === 'won').reduce((sum, l) => sum + (l.estimated_value || 0), 0);
   const activeDeals = leads.filter((l) => l.status !== 'won' && l.status !== 'lost').length;
   const avgDealSize = activeDeals > 0 ? Math.round(totalPipelineValue / (leads.length || 1)) : 0;
 
@@ -495,17 +495,17 @@ export default function PipelinePage() {
                           </div>
                           <div className="flex items-center gap-1">
                             <DollarSign size={12} />
-                            {lead.potential_value ? formatCurrency(lead.potential_value) : '—'}
+                            {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="flex items-center gap-1">
                               <Clock size={12} />
                               {lead.notes?.slice(0, 20) || '—'}
                             </span>
-                            <span className="font-medium">{lead.probability || 0}%</span>
+                            <span className="font-medium">{0 || 0}%</span>
                           </div>
                         </div>
-                        <Progress value={lead.probability || 0} className="h-1 mt-2" />
+                        <Progress value={0 || 0} className="h-1 mt-2" />
                         <div className="mt-2 flex items-center justify-between">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
@@ -578,7 +578,7 @@ export default function PipelinePage() {
                             ))}
                           </div>
                         </td>
-                        <td className="p-3 font-medium">{lead.potential_value ? formatCurrency(lead.potential_value) : '—'}</td>
+                        <td className="p-3 font-medium">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</td>
                         <td className="p-3">
                           <Badge className="text-[10px] px-1.5 py-0" style={{ backgroundColor: stageColors[lead.status] ? undefined : undefined }}>
                             {stageLabels[lead.status] || lead.status}
@@ -633,7 +633,7 @@ export default function PipelinePage() {
               </div>
               <div className="space-y-2">
                 <Label>Value</Label>
-                <Input type="number" placeholder="Deal value" defaultValue={editingDeal?.potential_value || ''} id="deal-value" />
+                <Input type="number" placeholder="Deal value" defaultValue={editingDeal?.estimated_value || ''} id="deal-value" />
               </div>
               <div className="space-y-2">
                 <Label>Pipeline Stage</Label>
@@ -788,11 +788,11 @@ export default function PipelinePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                 <div>
-                  <p className="text-lg font-bold">{viewDeal.potential_value ? formatCurrency(viewDeal.potential_value) : '—'}</p>
+                  <p className="text-lg font-bold">{viewDeal.estimated_value ? formatCurrency(viewDeal.estimated_value) : '—'}</p>
                   <p className="text-xs text-muted-foreground">Deal Value</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">{viewDeal.probability || 0}%</p>
+                  <p className="text-lg font-bold">{viewDeal || 0}%</p>
                   <p className="text-xs text-muted-foreground">Probability</p>
                 </div>
               </div>

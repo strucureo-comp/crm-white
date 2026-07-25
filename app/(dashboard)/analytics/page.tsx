@@ -68,7 +68,7 @@ export default function AnalyticsPage() {
   const activeUsers = Array.from(new Set(filteredProjects.map((p) => p.client_id).filter(Boolean))).length;
   const wonLeads = filteredLeads.filter((l) => l.status === 'won').length;
   const conversionRate = filteredLeads.length > 0 ? ((wonLeads / filteredLeads.length) * 100).toFixed(1) : '0.0';
-  const totalDeals = filteredLeads.filter((l) => l.status === 'negotiation' || l.status === 'proposal').length;
+  const totalDeals = filteredLeads.filter((l) => l.status === 'negotiation' || l.status === "proposal_sent").length;
   const avgDealSize = wonLeads > 0 ? Math.round(combinedRevenue / wonLeads) : 0;
 
   const kpiWidgets = [
@@ -83,7 +83,7 @@ export default function AnalyticsPage() {
   const dealFunnelStages = [
     { stage: 'Qualified', count: filteredLeads.filter((l) => l.status === 'qualified').length, pct: 100 },
     { stage: 'Contacted', count: filteredLeads.filter((l) => l.status === 'contacted').length, pct: 67 },
-    { stage: 'Proposal', count: filteredLeads.filter((l) => l.status === 'proposal').length, pct: 36 },
+    { stage: 'Proposal', count: filteredLeads.filter((l) => l.status === "proposal_sent").length, pct: 36 },
     { stage: 'Negotiation', count: filteredLeads.filter((l) => l.status === 'negotiation').length, pct: 19 },
     { stage: 'Closed Won', count: wonLeads, pct: wonLeads > 0 ? 10 : 0 },
   ];
