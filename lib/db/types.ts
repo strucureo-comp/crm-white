@@ -1122,7 +1122,7 @@ export interface DeleteCheckResult {
 // ===== Related Entities (for Context Panel) =====
 export interface RelatedEntities {
   contacts: Contact[];
-  deals: NormalizedDeal[];
+  deals: Deal[];
   quotes: NormalizedQuote[];
   invoices: NormalizedInvoice[];
   payments: NormalizedPayment[];

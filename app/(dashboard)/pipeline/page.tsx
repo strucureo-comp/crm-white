@@ -55,7 +55,7 @@ const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
 const stageLabels: Record<string, string> = {
   qualified: 'Qualified',
   contacted: 'Contacted',
-  proposal: 'Proposal',
+  proposal_sent: 'Proposal',
   negotiation: 'Negotiation',
   won: 'Closed Won',
   lost: 'Closed Lost',
@@ -65,7 +65,7 @@ const stageLabels: Record<string, string> = {
 const stageColors: Record<string, string> = {
   qualified: 'bg-violet-500',
   contacted: 'bg-amber-500',
-  proposal: 'bg-purple-500',
+  proposal_sent: 'bg-purple-500',
   negotiation: 'bg-emerald-500',
   won: 'bg-green-500',
   lost: 'bg-red-500',
