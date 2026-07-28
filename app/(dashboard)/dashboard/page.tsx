@@ -79,7 +79,7 @@ export default function DashboardPage() {
     { name: 'New', leads: leads.filter((l) => l.status === 'new'), color: 'bg-blue-500' },
     { name: 'Contacted', leads: leads.filter((l) => l.status === 'contacted'), color: 'bg-amber-500' },
     { name: 'Qualified', leads: leads.filter((l) => l.status === 'qualified'), color: 'bg-violet-500' },
-    { name: 'Proposal', leads: leads.filter((l) => l.status === "proposal_sent"), color: 'bg-purple-500' },
+    { name: 'Proposal', leads: leads.filter((l) => l.status === "proposal"), color: 'bg-purple-500' },
     { name: 'Negotiation', leads: leads.filter((l) => l.status === 'negotiation'), color: 'bg-emerald-500' },
     { name: 'Won', leads: leads.filter((l) => l.status === 'won'), color: 'bg-green-500' },
   ];
@@ -88,7 +88,7 @@ export default function DashboardPage() {
     { name: 'Lead', count: leads.filter((l) => l.status === 'new').length },
     { name: 'Contacted', count: leads.filter((l) => l.status === 'contacted').length },
     { name: 'Qualified', count: leads.filter((l) => l.status === 'qualified').length },
-    { name: 'Proposal', count: leads.filter((l) => l.status === "proposal_sent").length },
+    { name: 'Proposal', count: leads.filter((l) => l.status === "proposal").length },
     { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length },
     { name: 'Won', count: leads.filter((l) => l.status === 'won').length },
   ];

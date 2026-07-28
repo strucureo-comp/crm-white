@@ -677,7 +677,7 @@ export type LeadStatus =
   | 'new'
   | 'contacted'
   | 'qualified'
-  | 'proposal_sent'
+  | 'proposal'
   | 'negotiation'
   | 'won'
   | 'lost';

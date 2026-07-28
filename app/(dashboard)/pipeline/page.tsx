@@ -46,7 +46,7 @@ import { formatCurrency } from '@/lib/utils';
 const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
   { id: 'qualified', name: 'Qualified', color: '#8b5cf6', order: 0 },
   { id: 'contacted', name: 'Contacted', color: '#f59e0b', order: 1 },
-  { id: "proposal_sent", name: 'Proposal', color: '#a855f7', order: 2 },
+  { id: "proposal", name: 'Proposal', color: '#a855f7', order: 2 },
   { id: 'negotiation', name: 'Negotiation', color: '#10b981', order: 3 },
   { id: 'won', name: 'Closed Won', color: '#22c55e', order: 4 },
   { id: 'lost', name: 'Closed Lost', color: '#ef4444', order: 5 },
@@ -55,7 +55,7 @@ const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
 const stageLabels: Record<string, string> = {
   qualified: 'Qualified',
   contacted: 'Contacted',
-  proposal_sent: 'Proposal',
+  proposal: 'Proposal',
   negotiation: 'Negotiation',
   won: 'Closed Won',
   lost: 'Closed Lost',
@@ -65,7 +65,7 @@ const stageLabels: Record<string, string> = {
 const stageColors: Record<string, string> = {
   qualified: 'bg-violet-500',
   contacted: 'bg-amber-500',
-  proposal_sent: 'bg-purple-500',
+  proposal: 'bg-purple-500',
   negotiation: 'bg-emerald-500',
   won: 'bg-green-500',
   lost: 'bg-red-500',

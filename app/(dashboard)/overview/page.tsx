@@ -108,7 +108,7 @@ export default function OverviewPage() {
   const funnelStages = [
     { name: 'Lead', count: leads.filter((l) => l.status === 'new').length, value: leads.filter((l) => l.status === 'new').reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Qualified', count: leads.filter((l) => l.status === 'qualified').length, value: leads.filter((l) => l.status === 'qualified').reduce((s, l) => s + (l.estimated_value || 0), 0) },
-    { name: 'Proposal', count: leads.filter((l) => l.status === "proposal_sent").length, value: leads.filter((l) => l.status === "proposal_sent").reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Proposal', count: leads.filter((l) => l.status === "proposal").length, value: leads.filter((l) => l.status === "proposal").reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length, value: leads.filter((l) => l.status === 'negotiation').reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Closed Won', count: leads.filter((l) => l.status === 'won').length, value: leads.filter((l) => l.status === 'won').reduce((s, l) => s + (l.estimated_value || 0), 0) },
   ];

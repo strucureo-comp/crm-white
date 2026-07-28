@@ -33,7 +33,7 @@ import type { Lead, Pipeline } from '@/lib/db/types';
 
 import { formatCurrency } from '@/lib/utils';
 
-const FUNNEL_STAGES = ['new', 'contacted', 'qualified', "proposal_sent", 'negotiation', 'won'] as const;
+const FUNNEL_STAGES = ['new', 'contacted', 'qualified', "proposal", 'negotiation', 'won'] as const;
 
 const STAGE_COLORS: Record<string, string> = {
   new: '#3b82f6',
@@ -211,8 +211,13 @@ export default function FunnelPage() {
               {filteredLeads.length > 0 ? (
                 <div className="py-4 space-y-1">
                   {stageData.map((stage, index) => {
-                    const maxCount = Math.max(...stageData.map((s) => s.count), 1);
-                    const widthPercent = Math.max((stage.count / maxCount) * 100, 8);
+                    const N = stageData.length;
+                    const topWidth = 100 - (60 * (index / N));
+                    const bottomWidth = 100 - (60 * ((index + 1) / N));
+                    const topLeft = (100 - topWidth) / 2;
+                    const topRight = 100 - topLeft;
+                    const bottomLeft = (100 - bottomWidth) / 2;
+                    const bottomRight = 100 - bottomLeft;
 
                     return (
                       <div key={stage.name} className="flex items-center gap-4">
@@ -221,11 +226,10 @@ export default function FunnelPage() {
                         </span>
                         <div className="flex-1 flex items-center justify-center">
                           <div
-                            className="h-10 rounded-md flex items-center justify-center transition-all duration-300"
+                            className="h-10 w-full flex items-center justify-center transition-all duration-300"
                             style={{
-                              width: `${widthPercent}%`,
                               backgroundColor: stage.fill,
-                              minWidth: '40px',
+                              clipPath: `polygon(${topLeft}% 0%, ${topRight}% 0%, ${bottomRight}% 100%, ${bottomLeft}% 100%)`,
                             }}
                           >
                             <span className="text-white text-sm font-medium drop-shadow-sm">

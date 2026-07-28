@@ -48,13 +48,13 @@ import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 
-const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal_sent", 'negotiation', 'won', 'lost'];
+const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal", 'negotiation', 'won', 'lost'];
 
 const stageLabels: Record<string, string> = {
   new: 'New',
   contacted: 'Contacted',
   qualified: 'Qualified',
-  proposal_sent: 'Proposal',
+  proposal: 'Proposal',
   negotiation: 'Negotiation',
   won: 'Closed Won',
   lost: 'Closed Lost',
@@ -63,8 +63,8 @@ const stageLabels: Record<string, string> = {
 const stageColors: Record<string, string> = {
   new: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
   contacted: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
-  qualified: 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200',
-  proposal_sent: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+  qualified: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+  proposal: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
   negotiation: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
   won: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
   lost: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
@@ -137,7 +137,7 @@ export default function DealsPage() {
     return result;
   }, [leads, selectedPipelineId, selectedPipeline, search, activeStage]);
 
-  const openStatuses: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal_sent", 'negotiation'];
+  const openStatuses: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal", 'negotiation'];
 
   const totalPipelineValue = useMemo(
     () => leads

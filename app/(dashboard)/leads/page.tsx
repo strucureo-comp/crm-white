@@ -61,7 +61,7 @@ const statusColors: Record<string, string> = {
   new: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
   contacted: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
   qualified: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400',
-  proposal_sent: 'bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
+  proposal: 'bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
   negotiation: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
   won: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400',
   lost: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
@@ -72,7 +72,7 @@ const stageTabs = [
   { value: 'new', label: 'New' },
   { value: 'contacted', label: 'Contacted' },
   { value: 'qualified', label: 'Qualified' },
-  { value: 'proposal_sent', label: 'Proposal Sent' },
+  { value: 'proposal', label: 'Proposal' },
   { value: 'negotiation', label: 'Negotiation' },
   { value: 'won', label: 'Won' },
   { value: 'lost', label: 'Lost' },
@@ -355,7 +355,7 @@ export default function LeadsPage() {
                     <SelectItem value="new">New</SelectItem>
                     <SelectItem value="contacted">Contacted</SelectItem>
                     <SelectItem value="qualified">Qualified</SelectItem>
-                    <SelectItem value="proposal_sent">Proposal Sent</SelectItem>
+                    <SelectItem value="proposal">Proposal</SelectItem>
                     <SelectItem value="negotiation">Negotiation</SelectItem>
                     <SelectItem value="won">Won</SelectItem>
                     <SelectItem value="lost">Lost</SelectItem>
