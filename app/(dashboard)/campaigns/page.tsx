@@ -128,7 +128,7 @@ export default function CampaignsPage() {
                   </div>
                   <div className="flex items-center gap-2">
                     <Button variant="outline" size="sm"><Pencil size={14} className="mr-1" />Edit</Button>
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteCampaign(campaign.campaign_id)}><Trash2 size={14} /></Button>
+                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => campaign.campaign_id && handleDeleteCampaign(campaign.campaign_id)}><Trash2 size={14} /></Button>
                   </div>
                 </div>
                 {campaign.budget && campaign.budget > 0 && (

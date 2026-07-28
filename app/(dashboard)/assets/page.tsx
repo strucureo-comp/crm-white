@@ -76,12 +76,8 @@ export default function AssetsPage() {
   const stats = useMemo(() => {
     const total = items.length;
     const totalSize = items.reduce((acc, item) => {
-      const sizeMatch = item.size.match(/^([\d.]+)/);
-      const num = sizeMatch ? parseFloat(sizeMatch[1]) : 0;
-      if (item.size.includes('GB')) return acc + num * 1024;
-      if (item.size.includes('MB')) return acc + num;
-      if (item.size.includes('KB')) return acc + num / 1024;
-      return acc;
+      const size = typeof item.size === 'string' ? parseFloat(item.size) : item.size;
+      return acc + (size || 0) / (1024 * 1024);
     }, 0);
     const recent = items.filter((i) => {
       const diff = Date.now() - new Date(i.created_at).getTime();

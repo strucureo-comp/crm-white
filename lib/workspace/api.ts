@@ -28,6 +28,7 @@ export async function createWorkspace(
 
     const workspace: Workspace = {
       id: workspaceId,
+      workspace_id: workspaceId,
       name,
       slug: workspaceSlug,
       owner_id: ownerId,
@@ -117,6 +118,7 @@ export async function createWorkspaceMember(
 
     const member: WorkspaceMember = {
       id: memberId,
+      workspace_member_id: memberId,
       workspace_id: workspaceId,
       user_id: userId,
       role,

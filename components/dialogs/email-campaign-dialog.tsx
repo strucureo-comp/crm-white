@@ -50,11 +50,11 @@ export function EmailCampaignDialog({ open, onOpenChange, onSaved, item, templat
       setForm({
         name: item.name,
         subject: item.subject,
-        template_id: item.template_id,
-        recipient_list: item.recipient_list.join(', '),
+        template_id: item.template_id || '',
+        recipient_list: (item.recipient_list || []).join(', '),
         scheduled_at: item.scheduled_at || '',
         status: item.status,
-        created_by: item.created_by,
+        created_by: item.created_by || '',
       });
     } else {
       setForm({ ...defaultForm });

@@ -90,7 +90,7 @@ export default function MediaLibraryPage() {
       {subFolders.length > 0 && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {subFolders.map(f => (
-            <Card key={f.folder_id} className="cursor-pointer hover:bg-muted/50" onClick={() => setCurrentFolder(f.folder_id)}>
+            <Card key={f.folder_id} className="cursor-pointer hover:bg-muted/50" onClick={() => f.folder_id && setCurrentFolder(f.folder_id)}>
               <CardContent className="p-4 flex items-center gap-3"><Folder className="h-8 w-8 text-orange-500" /><span className="font-medium">{f.name}</span></CardContent>
             </Card>
           ))}
@@ -107,7 +107,7 @@ export default function MediaLibraryPage() {
                 <div className={`w-full h-32 rounded-lg flex items-center justify-center mb-3 ${typeColors[f.type]}`}>{typeIcons[f.type]}</div>
                 <p className="font-medium truncate">{f.name}</p>
                 <p className="text-xs text-muted-foreground">{formatFileSize(f.size)}</p>
-                <Button variant="ghost" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-600" onClick={() => handleDeleteFile(f.file_id)}><Trash2 size={14} /></Button>
+                <Button variant="ghost" size="sm" className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 text-red-600" onClick={() => f.file_id && handleDeleteFile(f.file_id)}><Trash2 size={14} /></Button>
               </CardContent>
             </Card>
           ))}
@@ -117,7 +117,7 @@ export default function MediaLibraryPage() {
           {filteredFiles.map(f => (
             <Card key={f.file_id}><CardContent className="p-4 flex items-center justify-between">
               <div className="flex items-center gap-3">{typeIcons[f.type]}<div><p className="font-medium">{f.name}</p><p className="text-xs text-muted-foreground">{formatFileSize(f.size)} - {f.type}</p></div></div>
-              <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteFile(f.file_id)}><Trash2 size={14} /></Button>
+              <Button variant="ghost" size="sm" className="text-red-600" onClick={() => f.file_id && handleDeleteFile(f.file_id)}><Trash2 size={14} /></Button>
             </CardContent></Card>
           ))}
         </div>

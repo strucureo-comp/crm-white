@@ -37,7 +37,7 @@ const defaultForm = {
   channel: 'email' as CampaignChannel,
   status: 'draft' as CampaignStatus,
   budget: 0,
-  target_audience: '',
+  target_audience: [] as string[],
   start_date: '',
   end_date: '',
   created_by: '',
@@ -55,10 +55,10 @@ export function CampaignDialog({ open, onOpenChange, onSaved, campaign }: Campai
         channel: campaign.channel,
         status: campaign.status,
         budget: campaign.budget || 0,
-        target_audience: campaign.target_audience || '',
+        target_audience: Array.isArray(campaign.target_audience) ? campaign.target_audience : campaign.target_audience ? [campaign.target_audience] : [],
         start_date: campaign.start_date || '',
         end_date: campaign.end_date || '',
-        created_by: campaign.created_by,
+        created_by: campaign.created_by || '',
       });
     } else {
       setForm({ ...defaultForm });
@@ -89,7 +89,7 @@ export function CampaignDialog({ open, onOpenChange, onSaved, campaign }: Campai
         await updateCampaign(campaign.id, form);
         toast.success('Campaign updated successfully');
       } else {
-        await createCampaign(form);
+        await createCampaign({ ...form, workspace_id: '', currency: 'USD', content: {}, metrics: { impressions: 0, clicks: 0, conversions: 0, ctr: 0, cpc: 0, cpm: 0, roas: 0, spend: 0, revenue: 0 } } as Omit<Campaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>);
         toast.success('Campaign created successfully');
       }
       onSaved();
@@ -108,10 +108,10 @@ export function CampaignDialog({ open, onOpenChange, onSaved, campaign }: Campai
       channel: campaign.channel,
       status: campaign.status,
       budget: campaign.budget || 0,
-      target_audience: campaign.target_audience || '',
+      target_audience: Array.isArray(campaign.target_audience) ? campaign.target_audience : campaign.target_audience ? [campaign.target_audience] : [],
       start_date: campaign.start_date || '',
       end_date: campaign.end_date || '',
-      created_by: campaign.created_by,
+      created_by: campaign.created_by || '',
     } : { ...defaultForm });
     onOpenChange(false);
   }
@@ -165,7 +165,7 @@ export function CampaignDialog({ open, onOpenChange, onSaved, campaign }: Campai
             </div>
             <div className="col-span-2 sm:col-span-1">
               <Label htmlFor="target_audience">Target Audience</Label>
-              <Input id="target_audience" value={form.target_audience} onChange={(e) => set('target_audience', e.target.value)} placeholder="Small business owners" />
+              <Input id="target_audience" value={form.target_audience.join(', ')} onChange={(e) => set('target_audience', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="Small business owners" />
             </div>
             <div className="col-span-2 sm:col-span-1">
               <Label htmlFor="start_date">Start Date *</Label>

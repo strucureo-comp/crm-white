@@ -50,9 +50,9 @@ export function SocialPostDialog({ open, onOpenChange, onSaved, post }: SocialPo
         platform: post.platform,
         content: post.content,
         media_url: post.media_url || '',
-        scheduled_at: post.scheduled_at,
+        scheduled_at: post.scheduled_at || '',
         status: post.status,
-        created_by: post.created_by,
+        created_by: post.created_by || '',
       });
     } else {
       setForm({ ...defaultForm });
@@ -96,9 +96,9 @@ export function SocialPostDialog({ open, onOpenChange, onSaved, post }: SocialPo
       platform: post.platform,
       content: post.content,
       media_url: post.media_url || '',
-      scheduled_at: post.scheduled_at,
+      scheduled_at: post.scheduled_at || '',
       status: post.status,
-      created_by: post.created_by,
+      created_by: post.created_by || '',
     } : { ...defaultForm });
     onOpenChange(false);
   }

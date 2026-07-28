@@ -10,7 +10,25 @@ import {
   Phone,
   ArrowRight,
   DollarSign,
-  Calendar
+  Calendar,
+  Plus,
+  Edit,
+  Trash2,
+  UserMinus,
+  Upload,
+  Download,
+  RotateCcw,
+  Archive,
+  LogIn,
+  FileSignature,
+  FolderPlus,
+  Megaphone,
+  Zap,
+  GitMerge,
+  CheckCircle,
+  MousePointer,
+  RefreshCw,
+  Eye
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -125,9 +143,9 @@ export function EntityContextSidebar({
                     {/* Activity icon */}
                     <div className={cn(
                       "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
-                      getActivityColor(activity.type)
+                      getActivityColor(activity.type || activity.action || 'entity_created')
                     )}>
-                      <ActivityIcon type={activity.type} className="h-4 w-4" />
+                      <ActivityIcon type={activity.type || activity.action || 'entity_created'} className="h-4 w-4" />
                     </div>
                     
                     {/* Activity content */}
@@ -135,7 +153,7 @@ export function EntityContextSidebar({
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium">{activity.title}</p>
                         <Badge variant="outline" className="text-xs">
-                          {activity.type.split('_').pop()}
+                          {(activity.type || activity.action || 'entity_created').split('_').pop()}
                         </Badge>
                       </div>
                       {activity.description && (
@@ -219,6 +237,8 @@ function ActivityIcon({ type, className }: { type: ActivityType; className?: str
     meeting_cancelled: <Calendar className={className} />,
     email_sent: <Mail className={className} />,
     email_received: <Mail className={className} />,
+    email_opened: <Eye className={className} />,
+    email_clicked: <MousePointer className={className} />,
     note_added: <FileText className={className} />,
     task_created: <CheckSquare className={className} />,
     task_completed: <CheckSquare className={className} />,
@@ -228,8 +248,33 @@ function ActivityIcon({ type, className }: { type: ActivityType; className?: str
     document_uploaded: <FileText className={className} />,
     document_downloaded: <FileText className={className} />,
     status_changed: <ArrowRight className={className} />,
+    stage_changed: <ArrowRight className={className} />,
     comment_added: <MessageSquare className={className} />,
     mention_added: <MessageSquare className={className} />,
+    entity_created: <Plus className={className} />,
+    entity_updated: <Edit className={className} />,
+    entity_deleted: <Trash2 className={className} />,
+    assigned: <ArrowRight className={className} />,
+    unassigned: <ArrowRight className={className} />,
+    file_uploaded: <Upload className={className} />,
+    file_downloaded: <Download className={className} />,
+    approval_requested: <Clock className={className} />,
+    approval_approved: <CheckCircle className={className} />,
+    approval_rejected: <Trash2 className={className} />,
+    lead_converted: <ArrowRight className={className} />,
+    project_created: <FolderPlus className={className} />,
+    project_updated: <Edit className={className} />,
+    campaign_created: <Megaphone className={className} />,
+    automation_executed: <Zap className={className} />,
+    webhook_triggered: <Zap className={className} />,
+    import_completed: <Upload className={className} />,
+    export_completed: <Download className={className} />,
+    merged: <GitMerge className={className} />,
+    restored: <RotateCcw className={className} />,
+    archived: <Archive className={className} />,
+    user_login: <LogIn className={className} />,
+    user_created: <ArrowRight className={className} />,
+    contract_signed: <FileSignature className={className} />,
   };
   
   return <>{iconMap[type] || <Clock className={className} />}</>;

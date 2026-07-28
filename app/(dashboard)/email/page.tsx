@@ -119,7 +119,7 @@ export default function EmailMarketingPage() {
                   <div className="text-center"><p className="text-xs text-muted-foreground">Sent</p><p className="text-sm font-semibold">{(c.metrics?.sent || 0).toLocaleString()}</p></div>
                   <div className="text-center"><p className="text-xs text-muted-foreground">Open Rate</p><p className="text-sm font-semibold">{(c.metrics?.open_rate || 0).toFixed(1)}%</p></div>
                   <div className="text-center"><p className="text-xs text-muted-foreground">Click Rate</p><p className="text-sm font-semibold">{(c.metrics?.click_rate || 0).toFixed(1)}%</p></div>
-                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteCampaign(c.campaign_id)}><Trash2 size={14} /></Button>
+                  <Button variant="ghost" size="sm" className="text-red-600" onClick={() => c.campaign_id && handleDeleteCampaign(c.campaign_id)}><Trash2 size={14} /></Button>
                 </div>
               </CardContent>
             </Card>

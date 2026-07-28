@@ -137,7 +137,7 @@ export default function ContentHubPage() {
                         <Badge variant="outline" className="text-[10px] px-1.5 py-0">{item.type}</Badge>
                         <div className="flex items-center gap-2">
                           <Avatar className="h-5 w-5">
-                            <AvatarFallback className="text-[8px] bg-muted">{item.author[0]}</AvatarFallback>
+                            <AvatarFallback className="text-[8px] bg-muted">{item.author?.[0] || '?'}</AvatarFallback>
                           </Avatar>
                           <span>{timeAgo(item.updated_at)}</span>
                         </div>

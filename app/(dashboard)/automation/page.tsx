@@ -272,7 +272,7 @@ export default function AutomationHubPage() {
           ) : (
             <div className="space-y-3">
               {rules
-                .filter(r => r.name.toLowerCase().includes(search.toLowerCase()))
+                .filter(r => r.name?.toLowerCase().includes(search.toLowerCase()))
                 .map((rule) => (
                 <Card key={rule.rule_id}>
                   <CardContent className="p-4">
@@ -291,7 +291,7 @@ export default function AutomationHubPage() {
                               {rule.trigger.replace(/_/g, ' ')}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {rule.actions.length} actions
+                              {rule.actions?.length || 0} actions
                             </span>
                             <span className="text-xs text-muted-foreground">
                               {rule.execution_count} runs
@@ -302,7 +302,7 @@ export default function AutomationHubPage() {
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={rule.enabled}
-                          onCheckedChange={(checked) => toggleRule(workspaceId, rule.rule_id, checked)}
+                          onCheckedChange={(checked) => rule.rule_id && toggleRule(workspaceId, rule.rule_id, checked)}
                         />
                         <Button variant="ghost" size="icon">
                           <MoreHorizontal size={16} />
@@ -375,7 +375,7 @@ export default function AutomationHubPage() {
                         variant="ghost" 
                         size="sm" 
                         className="text-red-600"
-                        onClick={() => disconnectApp(workspaceId, app.app_id)}
+                        onClick={() => app.app_id && disconnectApp(workspaceId, app.app_id)}
                       >
                         Disconnect
                       </Button>
@@ -432,7 +432,7 @@ export default function AutomationHubPage() {
                             {log.trigger_source} trigger
                           </h3>
                           <p className="text-sm text-muted-foreground">
-                            {log.steps.length} steps • {log.duration_ms ? `${log.duration_ms}ms` : 'In progress'}
+                            {log.steps?.length || 0} steps • {log.duration_ms ? `${log.duration_ms}ms` : 'In progress'}
                           </p>
                         </div>
                       </div>
@@ -500,7 +500,7 @@ export default function AutomationHubPage() {
                               {webhook.direction}
                             </Badge>
                             <span className="text-xs text-muted-foreground">
-                              {webhook.events.length} events
+                              {webhook.events?.length || 0} events
                             </span>
                             <span className="text-xs text-green-600">
                               {webhook.success_count} ✓
@@ -564,7 +564,7 @@ export default function AutomationHubPage() {
                         <div>
                           <h3 className="font-medium">{secret.name}</h3>
                           <p className="text-sm text-muted-foreground">
-                            {secret.category.replace(/_/g, ' ')}
+                            {(secret.category || '').replace(/_/g, ' ')}
                             {secret.platform && ` • ${secret.platform.replace(/_/g, ' ')}`}
                           </p>
                         </div>
@@ -725,7 +725,7 @@ export default function AutomationHubPage() {
                             {key.key_prefix}...
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            {key.scopes.map((scope) => (
+                            {key.scopes?.map((scope) => (
                               <Badge key={scope} variant="outline" className="text-xs">
                                 {scope}
                               </Badge>

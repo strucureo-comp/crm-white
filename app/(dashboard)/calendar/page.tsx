@@ -68,9 +68,9 @@ export default function MarketingCalendarPage() {
   let day = calendarStart;
   while (day <= calendarEnd) { calendarDays.push(day); day = addDays(day, 1); }
 
-  const getEventsForDate = (date: Date) => events.filter(e => isSameDay(parseISO(e.start_date), date));
+  const getEventsForDate = (date: Date) => events.filter(e => e.start_date && isSameDay(parseISO(e.start_date), date));
   const selectedDateEvents = selectedDate ? getEventsForDate(selectedDate) : [];
-  const stats = { total: events.length, thisMonth: events.filter(e => isSameMonth(parseISO(e.start_date), currentDate)).length, upcoming: events.filter(e => parseISO(e.start_date) >= new Date()).length };
+  const stats = { total: events.length, thisMonth: events.filter(e => e.start_date && isSameMonth(parseISO(e.start_date), currentDate)).length, upcoming: events.filter(e => e.start_date && parseISO(e.start_date) >= new Date()).length };
 
   return (
     <div className="space-y-6">
@@ -122,7 +122,7 @@ export default function MarketingCalendarPage() {
                   <div key={e.event_id} className="p-3 border rounded-lg">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2"><Badge className={eventTypeColors[e.type]}>{e.type}</Badge></div>
-                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteEvent(e.event_id)}><Trash2 size={12} /></Button>
+                      <Button variant="ghost" size="sm" className="text-red-600" onClick={() => e.event_id && handleDeleteEvent(e.event_id)}><Trash2 size={12} /></Button>
                     </div>
                     <p className="font-medium mt-1">{e.title}</p>
                     {e.description && <p className="text-xs text-muted-foreground mt-1">{e.description}</p>}

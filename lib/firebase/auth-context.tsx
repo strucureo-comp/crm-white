@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const userData = snapshot.val();
         setUser({
           id: firebaseUser.uid,
+          user_id: firebaseUser.uid,
           email: firebaseUser.email!,
           ...userData,
         });
@@ -55,6 +56,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // User record doesn't exist yet, create a minimal user object
         setUser({
           id: firebaseUser.uid,
+          user_id: firebaseUser.uid,
           email: firebaseUser.email!,
           full_name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
           role: 'client',
@@ -80,6 +82,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Still allow user to access the app with basic info
         setUser({
           id: firebaseUser.uid,
+          user_id: firebaseUser.uid,
           email: firebaseUser.email!,
           full_name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
           role: isAdmin ? 'admin' : 'client',
@@ -178,7 +181,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       ];
       const finalRole = adminEmails.includes(email.toLowerCase()) ? 'admin' : 'client';
 
-      const userData: Omit<User, 'id'> = {
+      const userData: Omit<User, 'id' | 'user_id'> = {
         email: newUser.email!,
         full_name: fullName,
         role: finalRole,

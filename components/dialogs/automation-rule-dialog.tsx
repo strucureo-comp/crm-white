@@ -31,9 +31,12 @@ interface AutomationRuleDialogProps {
 }
 
 const defaultForm = {
+  name: '',
   trigger: '',
-  action: '',
+  actions: [] as string[],
   status: 'Active',
+  enabled: true as boolean,
+  execution_count: 0,
 };
 
 export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: AutomationRuleDialogProps) {
@@ -43,9 +46,12 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
   useEffect(() => {
     if (rule) {
       setForm({
+        name: rule.name || '',
         trigger: rule.trigger,
-        action: rule.action,
-        status: rule.status,
+        actions: (rule.actions || []).map(a => typeof a === 'string' ? a : a.type),
+        status: rule.status || 'Active',
+        enabled: rule.enabled ?? true,
+        execution_count: rule.execution_count || 0,
       });
     } else {
       setForm({ ...defaultForm });
@@ -58,17 +64,17 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!form.trigger.trim() || !form.action.trim()) {
-      toast.error('Trigger and action are required');
+    if (!form.name.trim() || !form.trigger.trim()) {
+      toast.error('Name and trigger are required');
       return;
     }
     setSaving(true);
     try {
       if (rule) {
-        await updateAutomationRule(rule.id, form);
+        await updateAutomationRule(rule.id, form as unknown as Partial<AutomationRule>);
         toast.success('Rule updated');
       } else {
-        await createAutomationRule(form);
+        await createAutomationRule({ ...form, workspace_id: '', description: '', trigger_config: {}, conditions: [], actions: form.actions.map(a => ({ type: a, config: {} })) } as unknown as Omit<AutomationRule, 'id' | 'rule_id' | 'created_at' | 'updated_at'>);
         toast.success('Rule created');
       }
       onSaved();
@@ -92,12 +98,16 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-4">
             <div>
+              <Label htmlFor="name">Name *</Label>
+              <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="Lead Scoring & Routing" />
+            </div>
+            <div>
               <Label htmlFor="trigger">Trigger *</Label>
               <Input id="trigger" value={form.trigger} onChange={(e) => set('trigger', e.target.value)} placeholder="Lead Created" />
             </div>
             <div>
               <Label htmlFor="action">Action *</Label>
-              <Input id="action" value={form.action} onChange={(e) => set('action', e.target.value)} placeholder="Send Slack notification" />
+              <Input id="action" value={form.actions[0] || ''} onChange={(e) => set('actions', [e.target.value])} placeholder="Send Slack notification" />
             </div>
             <div>
               <Label htmlFor="status">Status</Label>

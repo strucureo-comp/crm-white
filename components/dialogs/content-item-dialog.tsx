@@ -46,7 +46,7 @@ export function ContentItemDialog({ open, onOpenChange, onSaved, item }: Content
       setForm({
         title: item.title,
         type: item.type,
-        author: item.author,
+        author: item.author || '',
         status: item.status,
       });
     } else {
