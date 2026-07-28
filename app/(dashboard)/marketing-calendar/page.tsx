@@ -110,7 +110,7 @@ export default function MarketingCalendarPage() {
               <div key={`empty-${i}`} className="bg-background p-2 min-h-[100px]" />
             ))}
             {days.map((day) => {
-              const dayEvents = events.filter((e) => isSameDay(parseISO(e.date), day));
+              const dayEvents = events.filter((e) => e.date && isSameDay(parseISO(e.date), day));
               return (
                 <div
                   key={day.toISOString()}
@@ -166,7 +166,7 @@ export default function MarketingCalendarPage() {
               events.slice(0, 5).map((event) => (
                 <div key={event.id} className="flex items-center justify-between text-sm p-2 rounded-lg hover:bg-muted/50 cursor-pointer" onClick={() => { setEditing(event); setDialogOpen(true); }}>
                   <span>{event.title}</span>
-                  <Badge variant="secondary" className="text-[10px]">{format(parseISO(event.date), 'MMM d')}</Badge>
+                  <Badge variant="secondary" className="text-[10px]">{event.date ? format(parseISO(event.date), 'MMM d') : ''}</Badge>
                 </div>
               ))
             )}

@@ -387,13 +387,14 @@ export async function revokeApiKey(workspaceId: string, keyId: string): Promise<
 
 // ===== Campaigns =====
 
-export async function createCampaign(workspaceId: string, campaign: Omit<Campaign, 'campaign_id' | 'created_at' | 'updated_at'>): Promise<Campaign> {
+export async function createCampaign(workspaceId: string, campaign: Omit<Campaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>): Promise<Campaign> {
   const newRef = push(campaignsRef(workspaceId));
   const campaignId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullCampaign: Campaign = {
     ...campaign,
+    id: campaignId,
     campaign_id: campaignId,
     created_at: now,
     updated_at: now,
@@ -430,13 +431,14 @@ export async function deleteCampaign(workspaceId: string, campaignId: string): P
 
 // ===== Social Posts =====
 
-export async function createSocialPost(workspaceId: string, post: Omit<SocialPost, 'post_id' | 'created_at' | 'updated_at'>): Promise<SocialPost> {
+export async function createSocialPost(workspaceId: string, post: Omit<SocialPost, 'id' | 'post_id' | 'created_at' | 'updated_at'>): Promise<SocialPost> {
   const newRef = push(socialPostsRef(workspaceId));
   const postId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullPost: SocialPost = {
     ...post,
+    id: postId,
     post_id: postId,
     created_at: now,
     updated_at: now,
@@ -473,13 +475,14 @@ export async function deleteSocialPost(workspaceId: string, postId: string): Pro
 
 // ===== Email Campaigns =====
 
-export async function createEmailCampaign(workspaceId: string, campaign: Omit<EmailCampaign, 'campaign_id' | 'created_at' | 'updated_at'>): Promise<EmailCampaign> {
+export async function createEmailCampaign(workspaceId: string, campaign: Omit<EmailCampaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>): Promise<EmailCampaign> {
   const newRef = push(emailCampaignsRef(workspaceId));
   const campaignId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullCampaign: EmailCampaign = {
     ...campaign,
+    id: campaignId,
     campaign_id: campaignId,
     created_at: now,
     updated_at: now,
@@ -509,13 +512,14 @@ export async function deleteEmailCampaign(workspaceId: string, campaignId: strin
 
 // ===== Email Segments =====
 
-export async function createEmailSegment(workspaceId: string, segment: Omit<EmailSegment, 'segment_id' | 'created_at' | 'updated_at'>): Promise<EmailSegment> {
+export async function createEmailSegment(workspaceId: string, segment: Omit<EmailSegment, 'id' | 'segment_id' | 'created_at' | 'updated_at'>): Promise<EmailSegment> {
   const newRef = push(emailSegmentsRef(workspaceId));
   const segmentId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullSegment: EmailSegment = {
     ...segment,
+    id: segmentId,
     segment_id: segmentId,
     created_at: now,
     updated_at: now,
@@ -533,13 +537,14 @@ export async function getEmailSegments(workspaceId: string): Promise<EmailSegmen
 
 // ===== Content Hub =====
 
-export async function createContent(workspaceId: string, content: Omit<ContentItem, 'content_id' | 'created_at' | 'updated_at'>): Promise<ContentItem> {
+export async function createContent(workspaceId: string, content: Omit<ContentItem, 'id' | 'content_id' | 'created_at' | 'updated_at'>): Promise<ContentItem> {
   const newRef = push(contentRef(workspaceId));
   const contentId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullContent: ContentItem = {
     ...content,
+    id: contentId,
     content_id: contentId,
     created_at: now,
     updated_at: now,
@@ -576,12 +581,13 @@ export async function deleteContent(workspaceId: string, contentId: string): Pro
 
 // ===== Media Library =====
 
-export async function createMediaFolder(workspaceId: string, folder: Omit<MediaFolder, 'folder_id' | 'created_at'>): Promise<MediaFolder> {
+export async function createMediaFolder(workspaceId: string, folder: Omit<MediaFolder, 'id' | 'folder_id' | 'created_at'>): Promise<MediaFolder> {
   const newRef = push(mediaFoldersRef(workspaceId));
   const folderId = newRef.key!;
   
   const fullFolder: MediaFolder = {
     ...folder,
+    id: folderId,
     folder_id: folderId,
     created_at: new Date().toISOString(),
   };
@@ -596,13 +602,14 @@ export async function getMediaFolders(workspaceId: string): Promise<MediaFolder[
   return Object.values(snapshot.val()) as MediaFolder[];
 }
 
-export async function uploadMedia(workspaceId: string, file: Omit<MediaFile, 'file_id' | 'created_at' | 'updated_at'>): Promise<MediaFile> {
+export async function uploadMedia(workspaceId: string, file: Omit<MediaFile, 'id' | 'file_id' | 'created_at' | 'updated_at'>): Promise<MediaFile> {
   const newRef = push(mediaRef(workspaceId));
   const fileId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullFile: MediaFile = {
     ...file,
+    id: fileId,
     file_id: fileId,
     created_at: now,
     updated_at: now,
@@ -636,13 +643,14 @@ export async function deleteMedia(workspaceId: string, fileId: string): Promise<
 
 // ===== Calendar =====
 
-export async function createCalendarEvent(workspaceId: string, event: Omit<CalendarEvent, 'event_id' | 'created_at' | 'updated_at'>): Promise<CalendarEvent> {
+export async function createCalendarEvent(workspaceId: string, event: Omit<CalendarEvent, 'id' | 'event_id' | 'created_at' | 'updated_at'>): Promise<CalendarEvent> {
   const newRef = push(calendarRef(workspaceId));
   const eventId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullEvent: CalendarEvent = {
     ...event,
+    id: eventId,
     event_id: eventId,
     created_at: now,
     updated_at: now,
@@ -659,13 +667,13 @@ export async function getCalendarEvents(workspaceId: string, startDate?: string,
   let events = Object.values(snapshot.val()) as CalendarEvent[];
   
   if (startDate) {
-    events = events.filter(e => e.start_date >= startDate);
+    events = events.filter(e => (e.start_date || '') >= startDate);
   }
   if (endDate) {
-    events = events.filter(e => e.start_date <= endDate);
+    events = events.filter(e => (e.start_date || '') <= endDate);
   }
   
-  return events.sort((a, b) => new Date(a.start_date).getTime() - new Date(b.start_date).getTime());
+  return events.sort((a, b) => new Date(a.start_date || 0).getTime() - new Date(b.start_date || 0).getTime());
 }
 
 export async function updateCalendarEvent(workspaceId: string, eventId: string, updates: Partial<CalendarEvent>): Promise<void> {
@@ -682,13 +690,14 @@ export async function deleteCalendarEvent(workspaceId: string, eventId: string):
 
 // ===== MCP Servers =====
 
-export async function createMcpServer(workspaceId: string, server: Omit<McpServer, 'server_id' | 'created_at' | 'updated_at'>): Promise<McpServer> {
+export async function createMcpServer(workspaceId: string, server: Omit<McpServer, 'id' | 'server_id' | 'created_at' | 'updated_at'>): Promise<McpServer> {
   const newRef = push(ref(database, `workspaces/${workspaceId}/mcp_servers`));
   const serverId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullServer: McpServer = {
     ...server,
+    id: serverId,
     server_id: serverId,
     created_at: now,
     updated_at: now,

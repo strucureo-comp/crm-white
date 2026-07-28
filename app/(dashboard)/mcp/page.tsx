@@ -94,11 +94,11 @@ export default function McpPage() {
                     <p className="text-xs text-muted-foreground font-mono">{s.url}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {s.api_key && (<Button variant="ghost" size="sm" onClick={() => toggleApiKeyVisibility(s.server_id)}>{showApiKey[s.server_id] ? <EyeOff size={14} /> : <Eye size={14} />}</Button>)}
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteServer(s.server_id)}><Trash2 size={14} /></Button>
+                    {s.api_key && s.server_id && (<Button variant="ghost" size="sm" onClick={() => toggleApiKeyVisibility(s.server_id!)}>{showApiKey[s.server_id!] ? <EyeOff size={14} /> : <Eye size={14} />}</Button>)}
+                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => s.server_id && handleDeleteServer(s.server_id)}><Trash2 size={14} /></Button>
                   </div>
                 </div>
-                {s.api_key && showApiKey[s.server_id] && (
+                {s.api_key && s.server_id && showApiKey[s.server_id] && (
                   <div className="mt-3 p-3 bg-muted rounded-lg"><code className="text-xs break-all">{s.api_key}</code></div>
                 )}
               </CardContent>

@@ -45,7 +45,7 @@ export function CalendarEventDialog({ open, onOpenChange, onSaved, event }: Cale
       setForm({
         title: event.title,
         type: event.type,
-        date: event.date.split('T')[0],
+        date: (event.date || '').split('T')[0],
       });
     } else {
       setForm({ ...defaultForm });

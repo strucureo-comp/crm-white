@@ -99,7 +99,7 @@ export default function ContentHubPage() {
                   </div>
                   {item.excerpt && <p className="text-sm text-muted-foreground line-clamp-2">{item.excerpt}</p>}
                 </div>
-                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeleteItem(item.content_id)}><Trash2 size={14} /></Button>
+                <Button variant="ghost" size="sm" className="text-red-600" onClick={() => item.content_id && handleDeleteItem(item.content_id)}><Trash2 size={14} /></Button>
               </CardContent>
             </Card>
           ))}

@@ -74,15 +74,15 @@ export default function AiAssistantPage() {
         created_by: user?.id || '',
       });
       if (!id) return;
-      conv = { id, title: message.slice(0, 40), assistant: 'tara', messages: [], created_by: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
+      conv = { id, ai_conversation_id: id, title: message.slice(0, 40), assistant: 'tara', messages: [], created_by: '', created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
       setConversations((prev) => [conv!, ...prev]);
       setActiveId(id);
     }
 
     setSending(true);
     const userMsg: AiMessage = { role: 'user', message, timestamp: new Date().toISOString() };
-    const updatedMessages = [...(conv.messages || []), userMsg];
-    await updateAiConversation(conv.id, { messages: updatedMessages });
+    const updatedMessages = [...(conv!.messages || []), userMsg];
+    await updateAiConversation(conv!.id, { messages: updatedMessages });
     setMessage('');
 
     let aiMessage = 'No response available.';
@@ -90,7 +90,7 @@ export default function AiAssistantPage() {
       const res = await fetch('/api/ai/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assistant: conv.assistant, message: userMsg.message, messages: updatedMessages }),
+        body: JSON.stringify({ assistant: conv!.assistant, message: userMsg.message, messages: updatedMessages }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -102,7 +102,7 @@ export default function AiAssistantPage() {
 
     const aiMsg: AiMessage = { role: 'assistant', message: aiMessage, timestamp: new Date().toISOString() };
     const finalMessages = [...updatedMessages, aiMsg];
-    await updateAiConversation(conv.id, { messages: finalMessages, title: conv.messages.length === 0 ? userMsg.message.slice(0, 40) : conv.title });
+    await updateAiConversation(conv!.id, { messages: finalMessages, title: conv!.messages.length === 0 ? userMsg.message.slice(0, 40) : conv!.title });
     setSending(false);
     load();
   }

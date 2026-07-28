@@ -1,4 +1,5 @@
 import { PdfTemplateStyle } from '@/lib/pdf-engine/types';
+import { TeamMember as DbTeamMember, ApiKey as DbApiKey } from '@/lib/db/types';
 
 // ─── General Settings ───────────────────────────────────────────────
 export interface GeneralSettings {
@@ -105,12 +106,7 @@ export interface SecuritySettings {
 }
 
 // ─── Team Settings ──────────────────────────────────────────────────
-export interface TeamSettings {
-  default_role: string;
-  allow_invitations: boolean;
-  members: TeamMember[];
-}
-
+/** Settings-specific team member view (lighter than the full DB TeamMember) */
 export interface TeamMember {
   id: string;
   name: string;
@@ -120,11 +116,14 @@ export interface TeamMember {
   avatar?: string;
 }
 
-// ─── API Settings ───────────────────────────────────────────────────
-export interface ApiSettings {
-  keys: ApiKey[];
+export interface TeamSettings {
+  default_role: string;
+  allow_invitations: boolean;
+  members: TeamMember[];
 }
 
+// ─── API Settings ───────────────────────────────────────────────────
+/** Settings-specific API key view (lighter than the full DB ApiKey) */
 export interface ApiKey {
   id: string;
   name: string;
@@ -133,6 +132,10 @@ export interface ApiKey {
   expires_at: string;
   last_used_at?: string;
   created_at: string;
+}
+
+export interface ApiSettings {
+  keys: ApiKey[];
 }
 
 // ─── Combined Workspace Settings ────────────────────────────────────
@@ -146,6 +149,9 @@ export interface WorkspaceSettings {
   api: ApiSettings;
   updated_at: string;
 }
+
+// ─── Re-export DB types for convenience ─────────────────────────────
+export type { DbTeamMember, DbApiKey };
 
 // ─── Default Settings ───────────────────────────────────────────────
 export const DEFAULT_GENERAL_SETTINGS: GeneralSettings = {

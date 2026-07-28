@@ -7,8 +7,8 @@ import { Users, DollarSign, Receipt, Mail, TrendingUp, Zap, CheckCircle, Clock, 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { getLeads, getInvoices, getActivityLogs } from '@/lib/firebase/database';
-import type { Lead, Invoice, ActivityLog } from '@/lib/db/types';
+import { getLeads, getInvoices, getActivityLogs, getAutomationRules, getEmailCampaigns } from '@/lib/firebase/database';
+import type { Lead, Invoice, ActivityLog, AutomationRule, EmailCampaign } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
@@ -27,33 +27,30 @@ const priorityColors: Record<string, string> = {
   low: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400',
 };
 
-const dashboardWorkflows = [
-  { id: '1', name: 'Lead Scoring & Routing', runs: 1247, lastRun: '2 min ago' },
-  { id: '2', name: 'Invoice → WhatsApp Notify', runs: 892, lastRun: '5 min ago' },
-  { id: '3', name: 'Follow-up Reminder Engine', runs: 3451, lastRun: '1 min ago' },
-  { id: '4', name: 'Contact Sync (HubSpot)', runs: 567, lastRun: '12 min ago' },
-  { id: '5', name: 'Slack Alert for Won Deals', runs: 234, lastRun: '8 min ago' },
-  { id: '6', name: 'Daily Backup to S3', runs: 180, lastRun: '3 hours ago' },
-];
-
 export default function DashboardPage() {
   const router = useRouter();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
+  const [emailCampaigns, setEmailCampaigns] = useState<EmailCampaign[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function load() {
       try {
-        const [leadData, invoiceData, activityData] = await Promise.all([
+        const [leadData, invoiceData, activityData, ruleData, emailData] = await Promise.all([
           getLeads(),
           getInvoices(),
           getActivityLogs(10),
+          getAutomationRules(),
+          getEmailCampaigns(),
         ]);
         setLeads(leadData);
         setInvoices(invoiceData);
         setActivityLogs(activityData);
+        setAutomationRules(ruleData);
+        setEmailCampaigns(emailData);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
       } finally {
@@ -74,7 +71,9 @@ export default function DashboardPage() {
 
   const invoicesOverdue = invoices.filter((i) => i.status === 'overdue').length;
 
-  const emailClicked = 34.2;
+  const totalEmailsSent = emailCampaigns.reduce((sum, c) => sum + (c.stats?.sent || 0), 0);
+  const totalEmailsClicked = emailCampaigns.reduce((sum, c) => sum + (c.stats?.clicked || 0), 0);
+  const emailClicked = totalEmailsSent > 0 ? Math.round((totalEmailsClicked / totalEmailsSent) * 1000) / 10 : 0;
 
   const pipelineStages = [
     { name: 'New', leads: leads.filter((l) => l.status === 'new'), color: 'bg-blue-500' },
@@ -315,33 +314,43 @@ export default function DashboardPage() {
       <div className="space-y-4">
         <div className="flex items-center gap-2">
           <Zap className="h-5 w-5 text-primary" />
-          <h3 className="text-lg font-semibold">Automation Hub (n8n)</h3>
+          <h3 className="text-lg font-semibold">Automation Hub</h3>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-          {dashboardWorkflows.map((wf) => (
-            <Card key={wf.id} className="hover:shadow-sm transition-shadow">
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <p className="text-sm font-medium truncate">{wf.name}</p>
+        {automationRules.length > 0 ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            {automationRules.map((rule) => (
+              <Card key={rule.id} className="hover:shadow-sm transition-shadow">
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Activity className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <p className="text-sm font-medium truncate">{rule.name}</p>
+                    </div>
                   </div>
-                </div>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <Clock className="h-3.5 w-3.5" />
-                    <span>{wf.runs.toLocaleString()} runs</span>
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <Clock className="h-3.5 w-3.5" />
+                      <span>{(rule.execution_count || 0).toLocaleString()} runs</span>
+                    </div>
+                    {rule.last_executed_at && (
+                      <span>Last: {new Date(rule.last_executed_at).toLocaleDateString()}</span>
+                    )}
                   </div>
-                  <span>Last: {wf.lastRun}</span>
-                </div>
-                <div className="flex items-center gap-1.5 text-xs text-green-600 dark:text-green-400">
-                  <CheckCircle className="h-3.5 w-3.5" />
-                  <span className="font-medium">All systems operational</span>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
+                  <div className={`flex items-center gap-1.5 text-xs ${rule.enabled ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                    {rule.enabled ? (
+                      <CheckCircle className="h-3.5 w-3.5" />
+                    ) : (
+                      <Clock className="h-3.5 w-3.5" />
+                    )}
+                    <span className="font-medium">{rule.enabled ? 'Active' : 'Paused'}</span>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-muted-foreground text-center py-8">No automation rules configured</p>
+        )}
       </div>
     </div>
   );

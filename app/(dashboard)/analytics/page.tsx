@@ -87,10 +87,11 @@ export default function AnalyticsPage() {
     { stage: 'Negotiation', count: filteredLeads.filter((l) => l.status === 'negotiation').length, pct: 19 },
     { stage: 'Closed Won', count: wonLeads, pct: wonLeads > 0 ? 10 : 0 },
   ];
+  const maxFunnelCount = Math.max(...dealFunnelStages.map((s) => s.count), 1);
 
-  const revenueTarget = Math.max(combinedRevenue * 1.5, 500000);
-  const leadTarget = Math.max(filteredLeads.length * 1.5, 100);
-  const dealTarget = Math.max(totalDeals * 1.5, 40);
+  const revenueTarget = combinedRevenue > 0 ? combinedRevenue * 1.5 : 0;
+  const leadTarget = filteredLeads.length > 0 ? Math.ceil(filteredLeads.length * 1.5) : 0;
+  const dealTarget = totalDeals > 0 ? Math.ceil(totalDeals * 1.5) : 0;
 
   return (
     <div className="space-y-6">
@@ -189,7 +190,7 @@ export default function AnalyticsPage() {
                     <div className="w-full bg-muted rounded-full h-2">
                       <div
                         className="bg-primary rounded-full h-2 transition-all"
-                        style={{ width: `${stage.pct}%` }}
+                        style={{ width: `${(stage.count / maxFunnelCount) * 100}%` }}
                       />
                     </div>
                   </div>

@@ -112,7 +112,7 @@ export default function SocialMediaPage() {
                       <Badge className={statusColors[post.status]}>{post.status}</Badge>
                     </div>
                     <p className="text-sm whitespace-pre-wrap">{post.content}</p>
-                    {post.hashtags.length > 0 && (
+                    {post.hashtags && post.hashtags.length > 0 && (
                       <div className="flex flex-wrap gap-1 mt-2">{post.hashtags.map(h => <Badge key={h} variant="outline">#{h}</Badge>)}</div>
                     )}
                   </div>
@@ -121,7 +121,7 @@ export default function SocialMediaPage() {
                     <div className="flex items-center gap-1 text-sm text-muted-foreground"><MessageCircle size={14} />{post.metrics?.comments || 0}</div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground"><Share2 size={14} />{post.metrics?.shares || 0}</div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground"><Eye size={14} />{post.metrics?.impressions || 0}</div>
-                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => handleDeletePost(post.post_id)}><Trash2 size={14} /></Button>
+                    <Button variant="ghost" size="sm" className="text-red-600" onClick={() => post.post_id && handleDeletePost(post.post_id)}><Trash2 size={14} /></Button>
                   </div>
                 </div>
               </CardContent>

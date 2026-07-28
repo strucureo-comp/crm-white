@@ -6,6 +6,7 @@ export type WorkspaceRole = 'owner' | 'admin' | 'manager' | 'employee' | 'viewer
 
 export interface Workspace {
   id: string;
+  workspace_id?: string;
   name: string;
   slug: string;
   owner_id: string;
@@ -17,6 +18,7 @@ export interface Workspace {
 
 export interface WorkspaceMember {
   id: string;
+  workspace_member_id?: string;
   workspace_id: string;
   user_id: string;
   role: WorkspaceRole;
@@ -76,6 +78,7 @@ export interface Transaction {
 
 export interface User {
   id: string;
+  user_id?: string;
   email: string;
   full_name: string;
   role: UserRole;
@@ -201,17 +204,44 @@ export interface MeetingRequest {
 
 export interface Invoice {
   id: string;
-  project_id: string;
-  client_id: string;
+  project_id?: string;
+  client_id?: string;
+  contact_id?: string;
+  workspace_id?: string;
+  company_id?: string;
+  deal_id?: string;
+  quote_id?: string;
   invoice_number: string;
+  items?: InvoiceItem[];
+  subtotal?: number;
+  discount?: number;
+  discount_type?: 'percentage' | 'fixed';
+  discount_amount?: number;
+  tax?: number;
+  tax_rate?: number;
+  total?: number;
   amount: number;
+  currency?: string;
+  currency_symbol?: string;
   due_date: string;
+  issue_date?: string;
+  paid_date?: string;
+  paid_at?: string;
+  amount_paid?: number;
+  amount_due?: number;
   status: InvoiceStatus;
   description?: string;
   notes?: string;
+  terms_and_conditions?: string;
   payment_qr_url?: string;
+  payment_method?: string;
+  payment_terms?: string;
+  billing_address?: string;
+  shipping_address?: string;
+  recurring?: boolean;
+  recurring_interval?: string;
+  tax_enabled?: boolean;
   bank_details?: Record<string, any>;
-  paid_at?: string;
   created_at: string;
   updated_at: string;
 }
@@ -283,14 +313,22 @@ export interface FieldAlert {
   created_at: string;
 }
 
-export type ContentStatus = 'Draft' | 'In Review' | 'Scheduled' | 'Published';
+export type ContentStatus = 'Draft' | 'draft' | 'In Review' | 'in_review' | 'Scheduled' | 'scheduled' | 'Published' | 'published';
 
 export interface ContentItem {
   id: string;
+  content_id?: string;
+  workspace_id?: string;
   title: string;
   type: string;
-  author: string;
+  slug?: string;
+  content?: string;
+  excerpt?: string;
+  author?: string;
+  author_id?: string;
   status: ContentStatus;
+  tags?: string[];
+  seo?: Record<string, any>;
   updated_at: string;
   created_at: string;
 }
@@ -307,15 +345,23 @@ export interface MediaItem {
 
 export interface CalendarEvent {
   id: string;
+  event_id?: string;
+  workspace_id?: string;
   title: string;
   type: string;
-  date: string;
+  date?: string;
+  start_date?: string;
+  end_date?: string;
   time?: string;
   description?: string;
-  attendees?: string;
+  attendees?: string | string[];
+  attendees_list?: string[];
+  all_day?: boolean;
   color?: string;
+  location?: string;
   project_id?: string;
   created_by?: string;
+  recurrence?: string;
   created_at: string;
   updated_at: string;
 }
@@ -335,11 +381,26 @@ export interface Integration {
 
 export interface AutomationRule {
   id: string;
+  rule_id?: string;
+  workspace_id?: string;
+  name?: string;
+  description?: string;
   trigger: string;
+  trigger_config?: Record<string, any>;
   action: string;
+  actions?: AutomationAction[];
   status: string;
+  enabled?: boolean;
+  execution_count?: number;
+  last_executed_at?: string;
+  conditions?: any[];
   created_at: string;
   updated_at: string;
+}
+
+export interface AutomationAction {
+  type: string;
+  config: Record<string, any>;
 }
 
 export interface AiMessage {
@@ -350,6 +411,7 @@ export interface AiMessage {
 
 export interface AiConversation {
   id: string;
+  ai_conversation_id?: string;
   title: string;
   assistant: string;
   messages: AiMessage[];
@@ -413,22 +475,37 @@ export interface PlanningNote {
 
 // ===== TAGS TO ADD FROM TAGVERSE CRM =====
 
-export type CampaignStatus = 'draft' | 'active' | 'paused' | 'completed';
+export type CampaignStatus = 'draft' | 'active' | 'running' | 'paused' | 'completed' | 'archived';
 export type CampaignChannel = 'email' | 'social' | 'paid' | 'sms';
 
 export interface Campaign {
   id: string;
+  campaign_id?: string;
+  workspace_id?: string;
   name: string;
   description?: string;
   channel: CampaignChannel;
   status: CampaignStatus;
   budget?: number;
   spent?: number;
-  target_audience?: string;
+  currency?: string;
+  target_audience?: string | string[];
   start_date?: string;
   end_date?: string;
   kpi_metrics?: Record<string, number>;
-  created_by: string;
+  content?: Record<string, any>;
+  metrics?: {
+    impressions?: number;
+    clicks?: number;
+    conversions?: number;
+    ctr?: number;
+    cpc?: number;
+    cpm?: number;
+    roas?: number;
+    spend?: number;
+    revenue?: number;
+  };
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -437,15 +514,20 @@ export type SocialPlatform = 'facebook' | 'instagram' | 'linkedin' | 'twitter' |
 
 export interface SocialPost {
   id: string;
+  post_id?: string;
+  workspace_id?: string;
   platform: SocialPlatform;
   content: string;
   media_url?: string;
-  scheduled_at: string;
+  media_urls?: string[];
+  scheduled_at?: string;
   published_at?: string;
   status: 'scheduled' | 'publishing' | 'published' | 'failed' | 'draft';
+  hashtags?: string[];
   engagement?: { likes?: number; comments?: number; shares?: number };
+  metrics?: { likes: number; comments: number; shares: number; impressions: number; reach: number; engagement_rate: number };
   campaign_id?: string;
-  created_by: string;
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -519,11 +601,12 @@ export interface ActivityLog {
   entity_id?: string;
   user_id: string;
   user_name: string;
+  title?: string;
   metadata?: Record<string, any>;
   created_at: string;
 }
 
-export type EmailCampaignStatus = 'draft' | 'scheduling' | 'active' | 'completed' | 'paused';
+export type EmailCampaignStatus = 'draft' | 'scheduling' | 'scheduled' | 'sent' | 'active' | 'completed' | 'paused';
 
 export interface EmailTemplate {
   id: string;
@@ -538,15 +621,21 @@ export interface EmailTemplate {
 
 export interface EmailCampaign {
   id: string;
+  campaign_id?: string;
+  workspace_id?: string;
   name: string;
   subject: string;
-  template_id: string;
-  recipient_list: string[];
+  preview_text?: string;
+  content?: string;
+  template_id?: string;
+  recipient_list?: string[];
+  recipients?: string[];
   scheduled_at?: string;
-  sequence_step: number;
+  sequence_step?: number;
   status: EmailCampaignStatus;
-  stats?: { sent: number; opened: number; clicked: number; bounced: number };
-  created_by: string;
+  stats?: { sent: number; delivered?: number; opened: number; clicked: number; bounced: number; complaints?: number; unsubscribes?: number; unsubscribed?: number; bounce_rate?: number; open_rate: number; click_rate: number; unsubscribe_rate: number };
+  metrics?: { sent: number; delivered?: number; opened: number; clicked: number; bounced: number; complaints?: number; unsubscribes?: number; unsubscribed?: number; bounce_rate?: number; open_rate: number; click_rate: number; unsubscribe_rate: number };
+  created_by?: string;
   created_at: string;
   updated_at: string;
 }
@@ -1033,6 +1122,7 @@ export interface NormalizedActivity {
   
   // Type
   type: ActivityType;
+  action?: ActivityType;
   
   // Content
   title: string;
@@ -1053,6 +1143,7 @@ export type ActivityType =
   | 'lead_qualified'
   | 'lead_converted_contact'
   | 'lead_converted_deal'
+  | 'lead_converted'
   | 'contact_created'
   | 'contact_updated'
   | 'deal_created'
@@ -1077,6 +1168,8 @@ export type ActivityType =
   | 'meeting_cancelled'
   | 'email_sent'
   | 'email_received'
+  | 'email_opened'
+  | 'email_clicked'
   | 'note_added'
   | 'task_created'
   | 'task_completed'
@@ -1086,8 +1179,32 @@ export type ActivityType =
   | 'document_uploaded'
   | 'document_downloaded'
   | 'status_changed'
+  | 'stage_changed'
   | 'comment_added'
-  | 'mention_added';
+  | 'mention_added'
+  | 'entity_created'
+  | 'entity_updated'
+  | 'entity_deleted'
+  | 'assigned'
+  | 'unassigned'
+  | 'file_uploaded'
+  | 'file_downloaded'
+  | 'approval_requested'
+  | 'approval_approved'
+  | 'approval_rejected'
+  | 'project_created'
+  | 'project_updated'
+  | 'campaign_created'
+  | 'automation_executed'
+  | 'webhook_triggered'
+  | 'import_completed'
+  | 'export_completed'
+  | 'merged'
+  | 'restored'
+  | 'archived'
+  | 'user_login'
+  | 'user_created'
+  | 'contract_signed';
 
 // ===== PIPELINE (Enhanced) =====
 export interface NormalizedPipeline {
@@ -1220,3 +1337,846 @@ export type EventType =
   | 'payment:failed'
   | 'activity:created'
   | 'dashboard:refresh';
+
+
+// ============================================================================
+// NEW MODULES - Extended CRM Features
+// ============================================================================
+
+// ===== 1. CUSTOM FIELDS =====
+export interface CustomField {
+  custom_field_id: string;
+  workspace_id: string;
+  entity_type: string;
+  field_name: string;
+  field_type: string;
+  options: string[];
+  is_required: boolean;
+  order: number;
+}
+
+export interface CustomFieldValue {
+  custom_field_value_id: string;
+  custom_field_id: string;
+  entity_id: string;
+  entity_type: string;
+  value: string;
+}
+
+// ===== 2. TAGS =====
+export interface Tag {
+  tag_id: string;
+  workspace_id: string;
+  name: string;
+  color: string;
+}
+
+export interface TagRelation {
+  tag_relation_id: string;
+  tag_id: string;
+  entity_id: string;
+  entity_type: string;
+}
+
+// ===== 3. COMMENTS =====
+export interface Comment {
+  comment_id: string;
+  workspace_id: string;
+  entity_id: string;
+  entity_type: string;
+  content: string;
+  author_id: string;
+  parent_id: string;
+}
+
+// ===== 4. MENTIONS =====
+export interface Mention {
+  mention_id: string;
+  comment_id: string;
+  user_id: string;
+  mentioned_at: string;
+}
+
+// ===== 5. ATTACHMENTS =====
+export interface Attachment {
+  attachment_id: string;
+  workspace_id: string;
+  entity_id: string;
+  entity_type: string;
+  file_url: string;
+  file_name: string;
+  file_type: string;
+  file_size: number;
+  uploaded_by: string;
+}
+
+// ===== 6. WATCHERS =====
+export interface Watcher {
+  watcher_id: string;
+  entity_id: string;
+  entity_type: string;
+  user_id: string;
+  notify_on: string;
+}
+
+// ===== 7. ACTIVITY FEED =====
+// ActivityLog interface already exists above with all required fields:
+// activity_id, workspace_id, type, title, description, company_id, contact_id,
+// deal_id, quote_id, invoice_id, project_id, task_id, user_id, metadata
+
+// ===== 8. APPROVAL WORKFLOW =====
+export interface Approval {
+  approval_id: string;
+  workspace_id: string;
+  entity_id: string;
+  entity_type: string;
+  status: string;
+  requested_by: string;
+  approved_by: string;
+  approved_at: string;
+  notes: string;
+}
+
+// ===== 9. IMPORT/EXPORT =====
+export interface ImportJob {
+  import_job_id: string;
+  workspace_id: string;
+  entity_type: string;
+  file_url: string;
+  status: string;
+  total_rows: number;
+  processed_rows: number;
+  error_count: number;
+}
+
+export interface ExportJob {
+  export_job_id: string;
+  workspace_id: string;
+  entity_type: string;
+  status: string;
+  file_url: string;
+  filters: Record<string, any>;
+}
+
+// ===== 10. DUPLICATE DETECTION =====
+export interface DuplicateRecord {
+  duplicate_record_id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id_1: string;
+  entity_id_2: string;
+  similarity_score: number;
+  status: string;
+}
+
+// ===== 11. MERGE HISTORY =====
+export interface MergeHistory {
+  merge_history_id: string;
+  workspace_id: string;
+  entity_type: string;
+  primary_id: string;
+  merged_id: string;
+  merged_by: string;
+  merged_at: string;
+}
+
+// ===== 12. TRASH/RESTORE =====
+export interface TrashRecord {
+  trash_record_id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  deleted_by: string;
+  deleted_at: string;
+  expires_at: string;
+}
+
+// ===== 13. ARCHIVE =====
+export interface ArchiveRecord {
+  archive_record_id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  archived_by: string;
+  archived_at: string;
+}
+
+// ===== 14. VERSION HISTORY =====
+export interface VersionHistory {
+  version_history_id: string;
+  entity_type: string;
+  entity_id: string;
+  field_name: string;
+  old_value: string;
+  new_value: string;
+  changed_by: string;
+  changed_at: string;
+}
+
+// ===== 15. RECURRING INVOICES =====
+export interface RecurringInvoice {
+  recurring_invoice_id: string;
+  workspace_id: string;
+  invoice_template_id: string;
+  frequency: string;
+  next_date: string;
+  end_date: string;
+  status: string;
+}
+
+// ===== 16. SUBSCRIPTIONS =====
+export interface Subscription {
+  subscription_id: string;
+  workspace_id: string;
+  contact_id: string;
+  company_id: string;
+  plan_id: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  next_billing_date: string;
+}
+
+export interface SubscriptionPlan {
+  subscription_plan_id: string;
+  workspace_id: string;
+  name: string;
+  price: number;
+  billing_cycle: string;
+  features: string[];
+}
+
+// ===== 17. PRODUCT CATALOG =====
+export interface Product {
+  product_id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  price: number;
+  currency: string;
+  sku: string;
+  category: string;
+  status: string;
+  is_active: boolean;
+}
+
+// ===== 18. PURCHASE ORDERS =====
+export interface PurchaseOrder {
+  purchase_order_id: string;
+  workspace_id: string;
+  company_id: string;
+  contact_id: string;
+  order_number: string;
+  items: InvoiceItem[];
+  subtotal: number;
+  tax: number;
+  total: number;
+  status: string;
+  expected_delivery_date: string;
+}
+
+// ===== 19. CONTRACTS =====
+export interface Contract {
+  contract_id: string;
+  workspace_id: string;
+  company_id: string;
+  contact_id: string;
+  deal_id: string;
+  title: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  value: number;
+  terms: string;
+}
+
+// ===== 20. ESIGNATURE =====
+export interface Esignature {
+  esignature_id: string;
+  contract_id: string;
+  signer_name: string;
+  signer_email: string;
+  status: string;
+  signed_at: string;
+  signature_data: string;
+}
+
+// ===== 21. CALL LOGS =====
+export interface CallLog {
+  call_log_id: string;
+  workspace_id: string;
+  contact_id: string;
+  company_id: string;
+  direction: string;
+  duration: number;
+  notes: string;
+  outcome: string;
+  call_date: string;
+}
+
+// ===== 22. EMAIL INBOX SYNC =====
+export interface EmailAccount {
+  email_account_id: string;
+  workspace_id: string;
+  email: string;
+  provider: string;
+  status: string;
+  last_synced_at: string;
+}
+
+export interface EmailThread {
+  email_thread_id: string;
+  workspace_id: string;
+  subject: string;
+  contact_id: string;
+  last_message_at: string;
+  message_count: number;
+}
+
+export interface EmailMessage {
+  email_message_id: string;
+  thread_id: string;
+  from_address: string;
+  to_addresses: string[];
+  subject: string;
+  body: string;
+  sent_at: string;
+  is_read: boolean;
+}
+
+// ===== 23. WHATSAPP CONVERSATIONS =====
+export interface WhatsAppConversation {
+  whatsapp_conversation_id: string;
+  workspace_id: string;
+  contact_id: string;
+  phone_number: string;
+  status: string;
+  last_message_at: string;
+}
+
+export interface WhatsAppMessage {
+  whatsapp_message_id: string;
+  conversation_id: string;
+  direction: string;
+  content: string;
+  media_url: string;
+  sent_at: string;
+  status: string;
+}
+
+// ===== 24. CALENDAR SYNC =====
+export interface CalendarSync {
+  calendar_sync_id: string;
+  workspace_id: string;
+  provider: string;
+  calendar_id: string;
+  status: string;
+  last_synced_at: string;
+}
+
+// ===== 25. NOTIFICATION CHANNELS =====
+export interface NotificationChannel {
+  notification_channel_id: string;
+  workspace_id: string;
+  type: string;
+  name: string;
+  config: Record<string, any>;
+  is_active: boolean;
+}
+
+// ===== 26. AUDIT LOGS =====
+export interface AuditLog {
+  audit_log_id: string;
+  workspace_id: string;
+  user_id: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  old_value: Record<string, any>;
+  new_value: Record<string, any>;
+  ip_address: string;
+  user_agent: string;
+  created_at: string;
+}
+
+// ===== 27. API RATE LIMITS =====
+// ApiKey is defined in automation types
+export interface ApiRateLimit {
+  api_rate_limit_id: string;
+  workspace_id: string;
+  endpoint: string;
+  method: string;
+  limit: number;
+  window_seconds: number;
+  current_count: number;
+}
+
+// ===== 28. FEATURE FLAGS =====
+export interface FeatureFlag {
+  feature_flag_id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  is_enabled: boolean;
+  rollout_percentage: number;
+  created_by: string;
+}
+
+// ===== 29. BILLING USAGE =====
+export interface BillingUsage {
+  billing_usage_id: string;
+  workspace_id: string;
+  period: string;
+  api_calls: number;
+  storage_used_mb: number;
+  active_users: number;
+  cost: number;
+}
+
+// ===== 30. SEARCH INDEX =====
+export interface SearchIndex {
+  search_index_id: string;
+  workspace_id: string;
+  entity_type: string;
+  entity_id: string;
+  title: string;
+  content: string;
+  tags: string[];
+  indexed_at: string;
+}
+
+// ===== 31. SAVED FILTERS =====
+export interface SavedFilter {
+  saved_filter_id: string;
+  workspace_id: string;
+  user_id: string;
+  name: string;
+  entity_type: string;
+  filters: Record<string, any>;
+  is_shared: boolean;
+}
+
+// ===== 32. DASHBOARD WIDGETS =====
+export interface DashboardWidget {
+  dashboard_widget_id: string;
+  workspace_id: string;
+  user_id: string;
+  widget_type: string;
+  title: string;
+  config: Record<string, any>;
+  position: number;
+  size: string;
+}
+
+// ===== 33. SLA =====
+export interface SLAPolicy {
+  sla_policy_id: string;
+  workspace_id: string;
+  name: string;
+  entity_type: string;
+  response_time_hours: number;
+  resolution_time_hours: number;
+  escalation_chain: string[];
+}
+
+// ===== 34. KNOWLEDGE BASE =====
+export interface KnowledgeBaseCategory {
+  knowledge_base_category_id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  order: number;
+}
+
+export interface KnowledgeBaseArticle {
+  knowledge_base_article_id: string;
+  workspace_id: string;
+  category_id: string;
+  title: string;
+  content: string;
+  author_id: string;
+  status: string;
+  view_count: number;
+}
+
+// ===== 35. CUSTOMER PORTAL =====
+export interface PortalUser {
+  portal_user_id: string;
+  workspace_id: string;
+  contact_id: string;
+  company_id: string;
+  role: string;
+  last_login_at: string;
+}
+
+export interface PortalSession {
+  portal_session_id: string;
+  portal_user_id: string;
+  token: string;
+  expires_at: string;
+}
+
+// ===== 36. MOBILE PUSH TOKENS =====
+export interface MobilePushToken {
+  mobile_push_token_id: string;
+  workspace_id: string;
+  user_id: string;
+  token: string;
+  platform: string;
+  device_name: string;
+  is_active: boolean;
+}
+
+// ===== 37. AI MEMORY =====
+export interface AiMemory {
+  ai_memory_id: string;
+  workspace_id: string;
+  user_id: string;
+  entity_type: string;
+  entity_id: string;
+  context: string;
+  embedding: number[];
+  created_at: string;
+}
+
+// ===== AUTOMATION / MARKETING / ADDITIONAL TYPES =====
+
+// Automation Rules
+export type TriggerType = 'record_created' | 'record_updated' | 'record_deleted' | 'field_changed' | 'schedule' | 'webhook' | 'manual';
+export type ActionType = 'send_email' | 'create_record' | 'update_record' | 'delete_record' | 'add_tag' | 'remove_tag' | 'send_notification' | 'run_webhook' | 'update_field' | 'assign_to' | 'create_task';
+export type ConditionOperator = 'equals' | 'not_equals' | 'contains' | 'not_contains' | 'greater_than' | 'less_than' | 'is_empty' | 'is_not_empty' | 'in' | 'not_in' | 'starts_with' | 'ends_with';
+export interface AutomationCondition {
+  field: string;
+  operator: ConditionOperator;
+  value: any;
+}
+
+// Workflows
+export type WorkflowNodeType = 'trigger' | 'action' | 'condition' | 'delay' | 'branch' | 'loop' | 'end';
+export interface WorkflowNode {
+  id: string;
+  type: WorkflowNodeType;
+  config: Record<string, any>;
+  next?: string[];
+  position?: { x: number; y: number };
+}
+export interface Workflow {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description?: string;
+  nodes: WorkflowNode[];
+  edges: Array<{ source: string; target: string }>;
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Execution
+export type ExecutionStatus = 'running' | 'completed' | 'failed' | 'cancelled' | 'pending' | 'timeout';
+export type TriggerSource = 'manual' | 'schedule' | 'webhook' | 'event';
+export interface ExecutionLog {
+  id: string;
+  log_id?: string;
+  rule_id?: string;
+  workflow_id?: string;
+  status: ExecutionStatus;
+  trigger_source: TriggerSource;
+  input?: Record<string, any>;
+  output?: Record<string, any>;
+  error?: string;
+  steps?: ExecutionStep[];
+  duration_ms?: number;
+  started_at: string;
+  completed_at?: string;
+  created_at: string;
+}
+export interface ExecutionStep {
+  id: string;
+  execution_id: string;
+  node_id?: string;
+  action_type?: string;
+  status: ExecutionStatus;
+  input?: Record<string, any>;
+  output?: Record<string, any>;
+  error?: string;
+  started_at: string;
+  completed_at?: string;
+}
+
+// Secrets
+export interface Secret {
+  id: string;
+  secret_id?: string;
+  workspace_id: string;
+  name: string;
+  value: string;
+  description?: string;
+  category?: string;
+  platform?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Variables
+export type VariableCategory = 'system' | 'user' | 'workspace' | 'global';
+export interface Variable {
+  id: string;
+  variable_id?: string;
+  workspace_id?: string;
+  name: string;
+  value: any;
+  category?: VariableCategory;
+  description?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Automation Templates
+export type AutomationTemplateType = 'prebuilt' | 'custom' | 'community';
+export interface AutomationTemplate {
+  id: string;
+  template_id?: string;
+  name: string;
+  description?: string;
+  type: AutomationTemplateType;
+  category?: string;
+  trigger?: string;
+  content?: string;
+  actions?: AutomationAction[];
+  conditions?: AutomationCondition[];
+  config?: Record<string, any>;
+  usage_count?: number;
+  rating?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Webhooks
+export type WebhookDirection = 'inbound' | 'outbound' | 'incoming' | 'outgoing';
+export type WebhookStatus = 'active' | 'inactive' | 'error' | 'pending' | 'disabled';
+export interface Webhook {
+  id: string;
+  webhook_id?: string;
+  workspace_id: string;
+  name: string;
+  url: string;
+  direction?: WebhookDirection;
+  events?: string[];
+  headers?: Record<string, string>;
+  secret?: string;
+  status: WebhookStatus;
+  success_count?: number;
+  failure_count?: number;
+  last_triggered_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+export interface WebhookLog {
+  id: string;
+  webhook_id: string;
+  direction?: WebhookDirection;
+  request?: Record<string, any>;
+  response?: Record<string, any>;
+  status_code?: number;
+  error?: string;
+  created_at: string;
+}
+
+// Connected Apps / Integrations
+export type IntegrationPlatform = 'google' | 'microsoft' | 'slack' | 'zapier' | 'hubspot' | 'salesforce' | 'quickbooks' | 'stripe' | 'custom';
+export interface ConnectedApp {
+  id: string;
+  app_id?: string;
+  workspace_id?: string;
+  platform: IntegrationPlatform;
+  name: string;
+  status: string;
+  api_key?: string;
+  config?: Record<string, any>;
+  last_synced_at?: string;
+  connected_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// Campaign Metrics
+export interface CampaignMetrics {
+  impressions?: number;
+  clicks?: number;
+  conversions?: number;
+  ctr?: number;
+  cpc?: number;
+  cpm?: number;
+  roas?: number;
+  spend?: number;
+  revenue?: number;
+}
+
+// Social
+export type PostStatus = 'scheduled' | 'publishing' | 'published' | 'failed' | 'draft';
+export interface SocialMetrics {
+  likes: number;
+  comments: number;
+  shares: number;
+  impressions: number;
+  reach: number;
+  engagement_rate: number;
+}
+
+// Email
+export type EmailTemplateStatus = 'draft' | 'active' | 'archived' | 'scheduled';
+export type EmailRecipientStatus = 'pending' | 'sent' | 'delivered' | 'opened' | 'clicked' | 'bounced' | 'failed';
+export interface EmailRecipient {
+  id?: string;
+  email: string;
+  name?: string;
+  status?: EmailRecipientStatus;
+  opened_at?: string;
+  clicked_at?: string;
+}
+export interface EmailMetrics {
+  sent: number;
+  delivered: number;
+  opened: number;
+  clicked: number;
+  bounced: number;
+  complaints: number;
+  unsubscribes: number;
+  open_rate: number;
+  click_rate: number;
+  unsubscribe_rate: number;
+}
+export interface EmailSegment {
+  id: string;
+  segment_id?: string;
+  workspace_id?: string;
+  name: string;
+  description?: string;
+  conditions?: Record<string, any>[];
+  contact_count?: number;
+  created_at: string;
+  updated_at: string;
+}
+
+// Content
+export type ContentType = 'blog' | 'page' | 'landing_page' | 'email' | 'social' | 'document' | 'template';
+export interface SEOData {
+  title?: string;
+  description?: string;
+  keywords?: string[];
+  og_image?: string;
+  canonical_url?: string;
+  no_index?: boolean;
+}
+
+// Media
+export type MediaType = 'image' | 'video' | 'document' | 'audio' | 'other';
+export interface MediaFolder {
+  id: string;
+  folder_id?: string;
+  workspace_id?: string;
+  name: string;
+  parent_id?: string;
+  path?: string;
+  created_at: string;
+}
+export interface MediaVersion {
+  id: string;
+  file_id?: string;
+  url: string;
+  size: number;
+  dimensions?: string;
+  created_at: string;
+}
+export interface MediaFile {
+  id: string;
+  file_id?: string;
+  workspace_id?: string;
+  name: string;
+  type: MediaType;
+  size: number;
+  dimensions: string;
+  url: string;
+  folder_id?: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+// Calendar
+export type CalendarEventType = 'meeting' | 'task' | 'deadline' | 'reminder' | 'call' | 'campaign' | 'other';
+
+// MCP
+export type McpServerStatus = 'connected' | 'disconnected' | 'error' | 'pending';
+export interface McpServer {
+  id: string;
+  server_id?: string;
+  workspace_id?: string;
+  name: string;
+  status: McpServerStatus;
+  url?: string;
+  description?: string;
+  api_key?: string;
+  capabilities?: string[];
+  tools?: McpTool[];
+  config?: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+export interface McpTool {
+  id: string;
+  tool_id?: string;
+  server_id?: string;
+  name: string;
+  description?: string;
+  parameters?: Record<string, any>;
+  enabled?: boolean;
+}
+
+// Docs
+export type DocCategory = 'getting_started' | 'api' | 'guides' | 'faq' | 'changelog' | 'support' | 'other';
+export interface DocPage {
+  id: string;
+  page_id?: string;
+  title: string;
+  slug?: string;
+  content?: string;
+  category?: DocCategory;
+  tags?: string[];
+  published?: boolean;
+  author?: string;
+  created_at: string;
+  updated_at: string;
+}
+export interface IntegrationDoc {
+  id: string;
+  integration_id?: string;
+  title: string;
+  content?: string;
+  url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+// API Keys
+export type ApiKeyScope = 'read' | 'write' | 'admin' | 'full_access';
+export interface ApiKey {
+  id: string;
+  key_id?: string;
+  workspace_id?: string;
+  name: string;
+  key: string;
+  key_prefix?: string;
+  scopes?: ApiKeyScope[];
+  rate_limit?: number;
+  expires_at?: string;
+  last_used_at?: string;
+  created_at: string;
+}
+
+// ===== TYPE ALIASES (Backward Compatibility) =====
+// Note: Some aliases (TaskItem, NormalizedActivity, NormalizedDeal, NormalizedLead,
+// NormalizedQuote, NormalizedInvoice, NormalizedPayment, NormalizedQuoteStatus,
+// NormalizedInvoiceStatus, ActivityType, TeamMember, MediaItem) already exist as
+// interfaces or types in this file. These aliases are intentionally omitted to
+// avoid duplicate identifier conflicts. The existing definitions serve the same purpose.

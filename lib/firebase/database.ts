@@ -97,7 +97,7 @@ export async function getProject(projectId: string): Promise<Project | null> {
   }
 }
 
-export async function createProject(project: Omit<Project, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createProject(project: Omit<Project, 'id' | 'project_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const projectsRef = ref(database, 'projects');
     const newProjectRef = push(projectsRef);
@@ -235,7 +235,7 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
 
       // Also notify client that payment was received
       await createNotification({
-        user_id: invoice.client_id,
+        user_id: invoice.contact_id || '',
         title: 'Payment Received',
         message: `We have received your payment for Invoice ${invoice.invoice_number}. Thank you!`,
         type: 'payment',
@@ -245,7 +245,7 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
     } else if (invoice) {
       // For any other update (like status change to pending/overdue or amount update), notify client
       await createNotification({
-        user_id: invoice.client_id,
+        user_id: invoice.contact_id || '',
         title: 'Invoice Updated',
         message: `Invoice ${invoice.invoice_number} has been updated.`,
         type: 'payment',
@@ -261,7 +261,7 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
   }
 }
 
-export async function createInvoice(invoice: Omit<Invoice, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const invoicesRef = ref(database, 'invoices');
     const newInvoiceRef = push(invoicesRef);
@@ -276,7 +276,7 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'created_at' |
 
     // Notify Client
     await createNotification({
-      user_id: invoice.client_id,
+      user_id: invoice.contact_id || '',
       title: 'New Invoice Issued',
       message: `A new invoice ${invoice.invoice_number} for $${invoice.amount} has been issued.`,
       type: 'payment',
@@ -356,7 +356,7 @@ export async function updateSupportRequest(requestId: string, updates: Partial<S
   }
 }
 
-export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 'support_request_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const supportRef = ref(database, 'support_requests');
     const newRequestRef = push(supportRef);
@@ -455,7 +455,7 @@ async function getAdmins(): Promise<User[]> {
   return allUsers.filter(u => u.role === 'admin');
 }
 
-export async function createNotification(notification: Omit<Notification, 'id' | 'created_at'>): Promise<string | null> {
+export async function createNotification(notification: Omit<Notification, 'id' | 'notification_id' | 'created_at'>): Promise<string | null> {
   try {
     const notificationsRef = ref(database, 'notifications');
     const newNotificationRef = push(notificationsRef);
@@ -574,7 +574,7 @@ export async function getInvitations(): Promise<any[]> {
   }
 }
 
-export async function createMeetingRequest(meeting: Omit<MeetingRequest, 'id' | 'created_at' | 'updated_at' | 'status'>): Promise<string | null> {
+export async function createMeetingRequest(meeting: Omit<MeetingRequest, 'id' | 'meeting_request_id' | 'created_at' | 'updated_at' | 'status'>): Promise<string | null> {
   try {
     const meetingsRef = ref(database, 'meeting_requests');
     const newMeetingRef = push(meetingsRef);
@@ -672,7 +672,7 @@ export async function getTransactions(): Promise<Transaction[]> {
   }
 }
 
-export async function createTransaction(transaction: Omit<Transaction, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createTransaction(transaction: Omit<Transaction, 'id' | 'transaction_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const transactionsRef = ref(database, 'transactions');
     const newTransactionRef = push(transactionsRef);
@@ -754,7 +754,7 @@ export async function getPlanningNotes(): Promise<PlanningNote[]> {
   }
 }
 
-export async function createPlanningNote(note: Omit<PlanningNote, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createPlanningNote(note: Omit<PlanningNote, 'id' | 'planning_note_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const notesRef = ref(database, 'admin_notes');
     const newNoteRef = push(notesRef);
@@ -834,7 +834,7 @@ export async function getQuotation(quotationId: string): Promise<Quotation | nul
   }
 }
 
-export async function createQuotation(quotation: Omit<Quotation, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createQuotation(quotation: Omit<Quotation, 'id' | 'quote_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const quotationsRef = ref(database, 'quotations');
     const newQuotationRef = push(quotationsRef);
@@ -883,10 +883,29 @@ export async function convertQuotationToInvoice(quotation: Quotation): Promise<s
     const invoiceId = await createInvoice({
       project_id: quotation.project_id || '',
       client_id: quotation.client_id,
+      workspace_id: '',
+      company_id: '',
+      contact_id: quotation.client_id,
+      deal_id: '',
+      quote_id: '',
       invoice_number: `INV-${Date.now()}`,
+      items: [],
+      subtotal: quotation.amount,
+      discount: 0,
+      discount_type: 'percentage',
+      tax: 0,
+      tax_rate: 0,
+      total: quotation.amount,
       amount: quotation.amount,
-      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      currency: 'USD',
       status: 'pending',
+      issue_date: new Date().toISOString(),
+      due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      paid_date: '',
+      amount_paid: 0,
+      amount_due: quotation.amount,
+      notes: '',
+      terms_and_conditions: '',
       description: quotation.description || `Invoice for ${quotation.quotation_number}`,
     });
 
@@ -962,7 +981,7 @@ export async function getEnquiries(): Promise<Enquiry[]> {
   }
 }
 
-export async function createEnquiry(enquiry: Omit<Enquiry, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createEnquiry(enquiry: Omit<Enquiry, 'id' | 'enquiry_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'enquiries');
     const newRef = push(refPath);
@@ -1018,7 +1037,7 @@ export async function getTasks(): Promise<TaskItem[]> {
   }
 }
 
-export async function createTask(task: Omit<TaskItem, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createTask(task: Omit<TaskItem, 'id' | 'task_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'tasks');
     const newRef = push(refPath);
@@ -1110,7 +1129,7 @@ export async function deleteUser(userId: string): Promise<boolean> {
   }
 }
 
-export async function createLead(lead: Omit<Lead, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createLead(lead: Omit<Lead, 'id' | 'lead_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'leads');
     const newRef = push(refPath);
@@ -1198,7 +1217,7 @@ export async function getFieldAgents(): Promise<FieldAgent[]> {
   }
 }
 
-export async function createFieldAgent(data: Omit<FieldAgent, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createFieldAgent(data: Omit<FieldAgent, 'id' | 'field_agent_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'field_agents');
     const newRef = push(refPath);
@@ -1243,7 +1262,7 @@ export async function getFieldAlerts(): Promise<FieldAlert[]> {
   }
 }
 
-export async function createFieldAlert(data: Omit<FieldAlert, 'id' | 'created_at'>): Promise<string | null> {
+export async function createFieldAlert(data: Omit<FieldAlert, 'id' | 'field_alert_id' | 'created_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'field_alerts');
     const newRef = push(refPath);
@@ -1273,7 +1292,7 @@ export async function getContentItems(): Promise<ContentItem[]> {
   }
 }
 
-export async function createContentItem(data: Omit<ContentItem, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createContentItem(data: Omit<ContentItem, 'id' | 'content_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'content_items');
     const newRef = push(refPath);
@@ -1362,7 +1381,7 @@ export async function getCalendarEvents(): Promise<CalendarEvent[]> {
   }
 }
 
-export async function createCalendarEvent(data: Omit<CalendarEvent, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createCalendarEvent(data: Omit<CalendarEvent, 'id' | 'calendar_event_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'calendar_events');
     const newRef = push(refPath);
@@ -1413,7 +1432,7 @@ export async function getIntegrations(): Promise<Integration[]> {
   }
 }
 
-export async function createIntegration(data: Omit<Integration, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createIntegration(data: Omit<Integration, 'id' | 'integration_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'integrations');
     const newRef = push(refPath);
@@ -1458,7 +1477,7 @@ export async function getAutomationRules(): Promise<AutomationRule[]> {
   }
 }
 
-export async function createAutomationRule(data: Omit<AutomationRule, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createAutomationRule(data: Omit<AutomationRule, 'id' | 'rule_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'automation_rules');
     const newRef = push(refPath);
@@ -1507,7 +1526,7 @@ export async function getAiConversations(): Promise<AiConversation[]> {
   }
 }
 
-export async function createAiConversation(data: Omit<AiConversation, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createAiConversation(data: Omit<AiConversation, 'id' | 'ai_conversation_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'ai_conversations');
     const newRef = push(refPath);
@@ -1571,7 +1590,7 @@ export async function getTeamMember(id: string): Promise<TeamMember | null> {
   }
 }
 
-export async function createTeamMember(data: Omit<TeamMember, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createTeamMember(data: Omit<TeamMember, 'id' | 'team_member_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'team_members');
     const newRef = push(refPath);
@@ -1640,7 +1659,7 @@ export async function getSalaryPayments(teamMemberId?: string): Promise<SalaryPa
   }
 }
 
-export async function createSalaryPayment(data: Omit<SalaryPayment, 'id' | 'created_at'>): Promise<string | null> {
+export async function createSalaryPayment(data: Omit<SalaryPayment, 'id' | 'salary_payment_id' | 'created_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'salary_payments');
     const newRef = push(refPath);
@@ -1685,7 +1704,7 @@ export async function getProjectFiles(projectId: string): Promise<ProjectFile[]>
   }
 }
 
-export async function createProjectFile(data: Omit<ProjectFile, 'id' | 'created_at'>): Promise<string | null> {
+export async function createProjectFile(data: Omit<ProjectFile, 'id' | 'project_file_id' | 'created_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'project_files');
     const newRef = push(refPath);
@@ -1730,7 +1749,7 @@ export async function getProjectUpdates(projectId: string): Promise<ProjectUpdat
   }
 }
 
-export async function createProjectUpdate(data: Omit<ProjectUpdate, 'id' | 'created_at'>): Promise<string | null> {
+export async function createProjectUpdate(data: Omit<ProjectUpdate, 'id' | 'project_update_id' | 'created_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'project_updates');
     const newRef = push(refPath);
@@ -1766,7 +1785,7 @@ export async function getSupportMessages(requestId: string): Promise<SupportMess
   }
 }
 
-export async function createSupportMessage(data: Omit<SupportMessage, 'id' | 'created_at'>): Promise<string | null> {
+export async function createSupportMessage(data: Omit<SupportMessage, 'id' | 'support_message_id' | 'created_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'support_messages');
     const newRef = push(refPath);
@@ -1820,7 +1839,7 @@ export async function updatePayment(id: string, updates: Partial<Payment>): Prom
   }
 }
 
-export async function createPayment(data: Omit<Payment, 'id' | 'created_at'>): Promise<string | null> {
+export async function createPayment(data: Omit<Payment, 'id' | 'payment_id' | 'created_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'transactions');
     const newRef = push(refPath);
@@ -1857,7 +1876,7 @@ export async function getCampaigns(): Promise<Campaign[]> {
   } catch { return []; }
 }
 
-export async function createCampaign(data: Omit<Campaign, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createCampaign(data: Omit<Campaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'campaigns');
     const newRef = push(refPath);
@@ -1899,11 +1918,11 @@ export async function getSocialPosts(): Promise<SocialPost[]> {
     snapshot.forEach((child) => {
       items.push({ id: child.key, ...child.val() } as SocialPost);
     });
-    return items.sort((a, b) => new Date(b.scheduled_at).getTime() - new Date(a.scheduled_at).getTime());
+    return items.sort((a, b) => new Date(b.scheduled_at || 0).getTime() - new Date(a.scheduled_at || 0).getTime());
   } catch { return []; }
 }
 
-export async function createSocialPost(data: Omit<SocialPost, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createSocialPost(data: Omit<SocialPost, 'id' | 'social_post_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'social_posts');
     const newRef = push(refPath);
@@ -1943,7 +1962,7 @@ export async function getDeliveries(): Promise<Delivery[]> {
   } catch { return []; }
 }
 
-export async function createDelivery(data: Omit<Delivery, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createDelivery(data: Omit<Delivery, 'id' | 'delivery_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const refPath = ref(database, 'deliveries');
     const newRef = push(refPath);
@@ -2124,11 +2143,11 @@ export async function getPipeline(id: string): Promise<Pipeline | null> {
   } catch { return null; }
 }
 
-export async function createPipeline(data: Omit<Pipeline, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createPipeline(data: Omit<Pipeline, 'id' | 'pipeline_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
     const newRef = push(ref(database, 'pipelines'));
     await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', user_id: 'system', user_name: 'System' });
+    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', entity_id: newRef.key || '', user_id: 'system', user_name: 'System', title: 'Pipeline Created', metadata: {} });
     return newRef.key;
   } catch { return null; }
 }
