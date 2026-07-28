@@ -37,11 +37,12 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
-import { getLeads, updateLead, deleteLead, getPipelines, createPipeline, updatePipeline, deletePipeline } from '@/lib/firebase/database';
+import { getLeads, updateLead, deleteLead, getPipelines, createPipeline, updatePipeline, deletePipeline, createLead } from '@/lib/firebase/database';
 import type { Lead, LeadStatus, Pipeline, PipelineStage } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
+import { Switch } from '@/components/ui/switch';
 
 const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
   { id: 'qualified', name: 'Qualified', color: '#8b5cf6', order: 0 },
@@ -93,15 +94,25 @@ export default function PipelinePage() {
   const [dealDialogOpen, setDealDialogOpen] = useState(false);
   const [editingDeal, setEditingDeal] = useState<Lead | null>(null);
   const [dealFormStage, setDealFormStage] = useState<LeadStatus>('qualified');
+  const [dealFormName, setDealFormName] = useState('');
+  const [dealFormCompany, setDealFormCompany] = useState('');
+  const [dealFormValue, setDealFormValue] = useState<number | ''>('');
 
   const [boardDialogOpen, setBoardDialogOpen] = useState(false);
   const [boardDialogMode, setBoardDialogMode] = useState<'create' | 'rename' | 'delete'>('create');
   const [boardNameInput, setBoardNameInput] = useState('');
+  const [boardDescInput, setBoardDescInput] = useState('');
+  const [boardIsActiveInput, setBoardIsActiveInput] = useState(true);
+  const [boardIsDefaultInput, setBoardIsDefaultInput] = useState(false);
 
   const [stageDialogOpen, setStageDialogOpen] = useState(false);
   const [stageDialogMode, setStageDialogMode] = useState<'create' | 'rename'>('create');
   const [stageNameInput, setStageNameInput] = useState('');
   const [stageColorInput, setStageColorInput] = useState('#8b5cf6');
+  const [stageDescInput, setStageDescInput] = useState('');
+  const [stageProbInput, setStageProbInput] = useState(10);
+  const [stageTypeInput, setStageTypeInput] = useState<'open' | 'won' | 'lost'>('open');
+  const [stageFoldedInput, setStageFoldedInput] = useState(false);
   const [editingStageId, setEditingStageId] = useState<string | null>(null);
 
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
@@ -156,7 +167,41 @@ export default function PipelinePage() {
   function openDealDialog(stageKey?: string, lead?: Lead) {
     setEditingDeal(lead || null);
     setDealFormStage((lead?.status || stageKey || 'qualified') as LeadStatus);
+    setDealFormName(lead?.name || '');
+    setDealFormCompany(lead?.company || '');
+    setDealFormValue(lead?.estimated_value || '');
     setDealDialogOpen(true);
+  }
+
+  async function handleDealSubmit() {
+    if (!dealFormName.trim()) {
+      toast.error('Deal name is required');
+      return;
+    }
+    try {
+      if (editingDeal) {
+        await updateLead(editingDeal.id, {
+          name: dealFormName,
+          company: dealFormCompany,
+          estimated_value: dealFormValue === '' ? 0 : Number(dealFormValue),
+          status: dealFormStage,
+        });
+        toast.success('Deal updated');
+      } else {
+        await createLead({
+          name: dealFormName,
+          company: dealFormCompany,
+          estimated_value: dealFormValue === '' ? 0 : Number(dealFormValue),
+          status: dealFormStage,
+          email: 'placeholder@example.com'
+        });
+        toast.success('Deal created');
+      }
+      setDealDialogOpen(false);
+      load();
+    } catch {
+      toast.error('Failed to save deal');
+    }
   }
 
   async function handleDelete(lead: Lead) {
@@ -183,6 +228,9 @@ export default function PipelinePage() {
   function openBoardDialog(mode: 'create' | 'rename' | 'delete') {
     setBoardDialogMode(mode);
     setBoardNameInput(mode === 'rename' && activePipeline ? activePipeline.name : '');
+    setBoardDescInput(mode === 'rename' && activePipeline?.description ? activePipeline.description : '');
+    setBoardIsActiveInput(mode === 'rename' && activePipeline?.is_active !== undefined ? activePipeline.is_active : true);
+    setBoardIsDefaultInput(mode === 'rename' && (activePipeline as any)?.is_default ? true : false);
     setBoardDialogOpen(true);
   }
 
@@ -193,10 +241,22 @@ export default function PipelinePage() {
     }
     try {
       if (boardDialogMode === 'create') {
-        await createPipeline({ name: boardNameInput.trim(), stages: DEFAULT_PIPELINE_STAGES });
+        await createPipeline({ 
+          name: boardNameInput.trim(), 
+          description: boardDescInput.trim(),
+          is_active: boardIsActiveInput,
+          is_default: boardIsDefaultInput,
+          entity_type: 'deal',
+          stages: DEFAULT_PIPELINE_STAGES 
+        } as any);
         toast.success('Pipeline created');
       } else if (boardDialogMode === 'rename' && activePipelineId) {
-        await updatePipeline(activePipelineId, { name: boardNameInput.trim() });
+        await updatePipeline(activePipelineId, { 
+          name: boardNameInput.trim(),
+          description: boardDescInput.trim(),
+          is_active: boardIsActiveInput,
+          is_default: boardIsDefaultInput
+        } as any);
         toast.success('Pipeline renamed');
       }
       setBoardDialogOpen(false);
@@ -226,9 +286,17 @@ export default function PipelinePage() {
       const stage = activePipeline.stages.find((s) => s.id === stageId);
       setStageNameInput(stage?.name || '');
       setStageColorInput(stage?.color || '#8b5cf6');
+      setStageDescInput(stage?.description || '');
+      setStageProbInput(stage?.probability ?? 10);
+      setStageTypeInput(stage?.stage_type || 'open');
+      setStageFoldedInput(stage?.is_folded || false);
     } else {
       setStageNameInput('');
       setStageColorInput('#8b5cf6');
+      setStageDescInput('');
+      setStageProbInput(10);
+      setStageTypeInput('open');
+      setStageFoldedInput(false);
     }
     setStageDialogOpen(true);
   }
@@ -247,11 +315,23 @@ export default function PipelinePage() {
           name: stageNameInput.trim(),
           color: stageColorInput,
           order: updatedStages.length,
+          description: stageDescInput.trim(),
+          probability: stageProbInput,
+          stage_type: stageTypeInput,
+          is_folded: stageFoldedInput,
         };
         updatedStages.push(newStage);
       } else if (stageDialogMode === 'rename' && editingStageId) {
         updatedStages = updatedStages.map((s) =>
-          s.id === editingStageId ? { ...s, name: stageNameInput.trim(), color: stageColorInput } : s
+          s.id === editingStageId ? { 
+            ...s, 
+            name: stageNameInput.trim(), 
+            color: stageColorInput,
+            description: stageDescInput.trim(),
+            probability: stageProbInput,
+            stage_type: stageTypeInput,
+            is_folded: stageFoldedInput
+          } : s
         );
       }
       await updatePipeline(activePipelineId, { stages: updatedStages });
@@ -618,23 +698,19 @@ export default function PipelinePage() {
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label>Deal Name</Label>
-                <Input placeholder="Enter deal name" defaultValue={editingDeal?.name || ''} id="deal-name" />
+                <Input placeholder="Enter deal name" value={dealFormName} onChange={(e) => setDealFormName(e.target.value)} id="deal-name" />
               </div>
               <div className="space-y-2">
-                <Label>Client Name</Label>
-                <Input placeholder="Client name" defaultValue={editingDeal?.name || ''} id="deal-client" />
-              </div>
-              <div className="space-y-2">
-                <Label>Company</Label>
-                <Input placeholder="Company name" defaultValue={editingDeal?.company || ''} id="deal-company" />
+                <Label>Client Name / Company</Label>
+                <Input placeholder="Company name" value={dealFormCompany} onChange={(e) => setDealFormCompany(e.target.value)} id="deal-company" />
               </div>
               <div className="space-y-2">
                 <Label>Value</Label>
-                <Input type="number" placeholder="Deal value" defaultValue={editingDeal?.estimated_value || ''} id="deal-value" />
+                <Input type="number" placeholder="Deal value" value={dealFormValue} onChange={(e) => setDealFormValue(e.target.value === '' ? '' : Number(e.target.value))} id="deal-value" />
               </div>
               <div className="space-y-2">
                 <Label>Pipeline Stage</Label>
-                <Select defaultValue={dealFormStage} onValueChange={(v) => setDealFormStage(v as LeadStatus)}>
+                <Select value={dealFormStage} onValueChange={(v) => setDealFormStage(v as LeadStatus)}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -691,11 +767,7 @@ export default function PipelinePage() {
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setDealDialogOpen(false)}>Cancel</Button>
-            <Button onClick={async () => {
-              toast.success(editingDeal ? 'Deal updated' : 'Deal created');
-              setDealDialogOpen(false);
-              load();
-            }}>
+            <Button onClick={handleDealSubmit}>
               {editingDeal ? 'Update Deal' : 'Create Deal'}
             </Button>
           </DialogFooter>
@@ -715,20 +787,39 @@ export default function PipelinePage() {
             </DialogDescription>
           </DialogHeader>
           {boardDialogMode !== 'delete' ? (
-            <>
-              <Input
-                placeholder="Pipeline name"
-                value={boardNameInput}
-                onChange={(e) => setBoardNameInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') handleBoardSubmit(); }}
-              />
+            <div className="space-y-4 pt-4">
+              <div className="space-y-2">
+                <Label>Pipeline Name</Label>
+                <Input
+                  placeholder="Pipeline name"
+                  value={boardNameInput}
+                  onChange={(e) => setBoardNameInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') handleBoardSubmit(); }}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Description</Label>
+                <Textarea
+                  placeholder="Optional description"
+                  value={boardDescInput}
+                  onChange={(e) => setBoardDescInput(e.target.value)}
+                />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Set as Default</Label>
+                <Switch checked={boardIsDefaultInput} onCheckedChange={setBoardIsDefaultInput} />
+              </div>
+              <div className="flex items-center justify-between">
+                <Label>Active Pipeline</Label>
+                <Switch checked={boardIsActiveInput} onCheckedChange={setBoardIsActiveInput} />
+              </div>
               <DialogFooter>
                 <Button variant="outline" onClick={() => setBoardDialogOpen(false)}>Cancel</Button>
                 <Button onClick={handleBoardSubmit}>
                   {boardDialogMode === 'create' ? 'Create' : 'Rename'}
                 </Button>
               </DialogFooter>
-            </>
+            </div>
           ) : (
             <DialogFooter>
               <Button variant="outline" onClick={() => setBoardDialogOpen(false)}>Cancel</Button>
@@ -752,6 +843,39 @@ export default function PipelinePage() {
                 value={stageNameInput}
                 onChange={(e) => setStageNameInput(e.target.value)}
               />
+            </div>
+            <div className="space-y-2">
+              <Label>Description</Label>
+              <Textarea
+                placeholder="Optional stage description"
+                value={stageDescInput}
+                onChange={(e) => setStageDescInput(e.target.value)}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Probability (%)</Label>
+                <Input
+                  type="number" min="0" max="100"
+                  value={stageProbInput}
+                  onChange={(e) => setStageProbInput(Number(e.target.value))}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Stage Type</Label>
+                <Select value={stageTypeInput} onValueChange={(v: 'open'|'won'|'lost') => setStageTypeInput(v)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="open">Open</SelectItem>
+                    <SelectItem value="won">Won</SelectItem>
+                    <SelectItem value="lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label>Folded by default</Label>
+              <Switch checked={stageFoldedInput} onCheckedChange={setStageFoldedInput} />
             </div>
             <div className="space-y-2">
               <Label>Color</Label>

@@ -563,6 +563,10 @@ export interface PipelineStage {
   name: string;
   color: string;
   order: number;
+  description?: string;
+  probability?: number;
+  stage_type?: "open" | "won" | "lost";
+  is_folded?: boolean;
 }
 
 export interface Pipeline {
@@ -571,6 +575,10 @@ export interface Pipeline {
   stages: PipelineStage[];
   created_at: string;
   updated_at: string;
+  description?: string;
+  is_active?: boolean;
+  entity_type?: "deal";
+  created_by?: string;
 }
 
 export type ActivityAction =
@@ -1202,10 +1210,21 @@ export type ActivityType =
 export interface NormalizedPipeline {
   pipeline_id: string;
   workspace_id: string;
+
+  // Basic Information
   name: string;
-  description: string;
-  stages: NormalizedPipelineStage[];
+  description?: string;
+
+  // Pipeline Configuration
   is_default: boolean;
+  is_active: boolean;
+  entity_type: "deal";
+  created_by: string;
+
+  // Relationships
+  stages: NormalizedPipelineStage[];
+
+  // Audit
   created_at: string;
   updated_at: string;
 }
@@ -1213,13 +1232,25 @@ export interface NormalizedPipeline {
 export interface NormalizedPipelineStage {
   stage_id: string;
   pipeline_id: string;
+
+  // Basic Information
   name: string;
-  description: string;
+  description?: string;
+
+  // Stage Configuration
   order: number;
   color: string;
   probability: number;
+  stage_type: "open" | "won" | "lost";
+  is_folded: boolean;
+
+  // Analytics (Computed Fields)
   deal_count?: number;
   total_value?: number;
+
+  // Audit
+  created_at: string;
+  updated_at: string;
 }
 
 // ===== Relationship Check Types =====
