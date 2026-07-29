@@ -29,6 +29,7 @@ type Campaign = {
   channel?: string; // Legacy API support
   startDate?: string;
   endDate?: string;
+  currency?: string;
 };
 
 const MetaIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
@@ -59,6 +60,7 @@ const MOCK_INTERNAL_CAMPAIGNS: Campaign[] = [
     lastSynced: new Date().toISOString(),
     startDate: "2026-06-01",
     endDate: "2026-08-31",
+    currency: "USD",
   },
   {
     id: "INT-002",
@@ -72,6 +74,7 @@ const MOCK_INTERNAL_CAMPAIGNS: Campaign[] = [
     lastSynced: new Date().toISOString(),
     startDate: "2026-07-01",
     endDate: "2026-09-30",
+    currency: "USD",
   },
 ];
 
@@ -86,6 +89,7 @@ const MOCK_EXTERNAL_CAMPAIGNS: Campaign[] = [
     impressions: 80000,
     clicks: 3200,
     lastSynced: new Date().toISOString(),
+    currency: "USD",
   },
   {
     id: "GOOG-001",
@@ -97,6 +101,7 @@ const MOCK_EXTERNAL_CAMPAIGNS: Campaign[] = [
     impressions: 250000,
     clicks: 12500,
     lastSynced: new Date().toISOString(),
+    currency: "USD",
   },
 ];
 
@@ -176,12 +181,13 @@ export default function CampaignsPage() {
         source: "internal",
         status: formData.status || "Draft",
         budget: Number(formData.budget) || 0,
-        spent: 0,
+        spent: Number(formData.spent) || 0,
         impressions: 0,
         clicks: 0,
         lastSynced: new Date().toISOString(),
         startDate: formData.startDate,
         endDate: formData.endDate,
+        currency: formData.currency || "USD",
         ...formData
       };
       setInternalCampaigns((prev) => [newCampaign, ...prev]);
@@ -207,7 +213,7 @@ export default function CampaignsPage() {
 
   const openCreateModal = () => {
     setEditingCampaign(null);
-    setFormData({ status: "Draft" });
+    setFormData({ status: "Draft", currency: "USD", spent: 0 });
     setIsModalOpen(true);
   };
 
@@ -225,7 +231,7 @@ export default function CampaignsPage() {
   const totalPortfolioSpend = allCampaigns.reduce((sum, c) => sum + c.spent, 0);
   const activeBudget = allCampaigns.filter((c) => c.status === "Active").reduce((sum, c) => sum + c.budget, 0);
 
-  const formatCurrency = (amount: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(amount);
+  const formatCurrency = (amount: number, currency: string = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
   const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
   return (
@@ -451,8 +457,8 @@ export default function CampaignsPage() {
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1.5 w-48">
                             <div className="flex justify-between text-xs font-medium">
-                              <span className="text-slate-700 dark:text-slate-300">{formatCurrency(campaign.spent)}</span>
-                              <span className="text-slate-400 dark:text-slate-500">{formatCurrency(campaign.budget)}</span>
+                              <span className="text-slate-700 dark:text-slate-300">{formatCurrency(campaign.spent, campaign.currency || 'USD')}</span>
+                              <span className="text-slate-400 dark:text-slate-500">{formatCurrency(campaign.budget, campaign.currency || 'USD')}</span>
                             </div>
                             <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                               <div 
@@ -535,16 +541,15 @@ export default function CampaignsPage() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Budget ($) *</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={formData.budget || ""}
-                    onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    placeholder="5000"
-                  />
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Currency</label>
+                  <select
+                    value={formData.currency || "USD"}
+                    onChange={(e) => setFormData({ ...formData, currency: e.target.value })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50"
+                  >
+                    <option value="USD">USD ($)</option>
+                    <option value="INR">INR (₹)</option>
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Status</label>
@@ -557,6 +562,32 @@ export default function CampaignsPage() {
                     <option value="Paused">Paused</option>
                     <option value="Draft">Draft</option>
                   </select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Budget *</label>
+                  <input
+                    type="number"
+                    required
+                    min="0"
+                    value={formData.budget || ""}
+                    onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    placeholder="5000"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Spent Amount</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.spent !== undefined ? formData.spent : ""}
+                    onChange={(e) => setFormData({ ...formData, spent: Number(e.target.value) })}
+                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                    placeholder="0"
+                  />
                 </div>
               </div>
               
