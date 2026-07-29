@@ -14,7 +14,15 @@ import {
   Layers,
   AlertCircle,
   Sparkles,
+  Calendar,
+  DollarSign
 } from "lucide-react";
+
+type SpendEntry = {
+  id: string;
+  date: string;
+  amount: number;
+};
 
 type Campaign = {
   id: string;
@@ -30,6 +38,7 @@ type Campaign = {
   startDate?: string;
   endDate?: string;
   currency?: string;
+  spendHistory?: SpendEntry[];
 };
 
 const MetaIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
@@ -61,6 +70,10 @@ const MOCK_INTERNAL_CAMPAIGNS: Campaign[] = [
     startDate: "2026-06-01",
     endDate: "2026-08-31",
     currency: "USD",
+    spendHistory: [
+      { id: "SPEND-1", date: "2026-06-15", amount: 1000 },
+      { id: "SPEND-2", date: "2026-07-01", amount: 1450 }
+    ]
   },
   {
     id: "INT-002",
@@ -75,6 +88,7 @@ const MOCK_INTERNAL_CAMPAIGNS: Campaign[] = [
     startDate: "2026-07-01",
     endDate: "2026-09-30",
     currency: "USD",
+    spendHistory: []
   },
 ];
 
@@ -124,6 +138,10 @@ export default function CampaignsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [formData, setFormData] = useState<Partial<Campaign>>({});
+  
+  // Spend Entry State
+  const [newSpendAmount, setNewSpendAmount] = useState("");
+  const [newSpendDate, setNewSpendDate] = useState(new Date().toISOString().split('T')[0]);
 
   const addToast = (message: string, type: "success" | "error" = "success") => {
     const id = Date.now();
@@ -188,6 +206,7 @@ export default function CampaignsPage() {
         startDate: formData.startDate,
         endDate: formData.endDate,
         currency: formData.currency || "USD",
+        spendHistory: formData.spendHistory || [],
         ...formData
       };
       setInternalCampaigns((prev) => [newCampaign, ...prev]);
@@ -208,13 +227,51 @@ export default function CampaignsPage() {
   const openEditModal = (campaign: Campaign) => {
     setEditingCampaign(campaign);
     setFormData(campaign);
+    setNewSpendAmount("");
+    setNewSpendDate(new Date().toISOString().split('T')[0]);
     setIsModalOpen(true);
   };
 
   const openCreateModal = () => {
     setEditingCampaign(null);
-    setFormData({ status: "Draft", currency: "USD", spent: 0 });
+    setFormData({ status: "Draft", currency: "USD", spent: 0, spendHistory: [] });
+    setNewSpendAmount("");
+    setNewSpendDate(new Date().toISOString().split('T')[0]);
     setIsModalOpen(true);
+  };
+  
+  const handleAddSpendEntry = () => {
+    if (!newSpendAmount || isNaN(Number(newSpendAmount)) || Number(newSpendAmount) <= 0) {
+      addToast("Please enter a valid amount", "error");
+      return;
+    }
+    const amount = Number(newSpendAmount);
+    const entry = {
+      id: `SPEND-${Date.now()}`,
+      date: newSpendDate,
+      amount: amount
+    };
+    const currentHistory = formData.spendHistory || [];
+    const currentSpent = formData.spent || 0;
+    
+    setFormData({
+      ...formData,
+      spendHistory: [entry, ...currentHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
+      spent: currentSpent + amount
+    });
+    setNewSpendAmount("");
+    addToast("Spend entry added successfully");
+  };
+
+  const handleRemoveSpendEntry = (id: string, amount: number) => {
+    const currentHistory = formData.spendHistory || [];
+    const currentSpent = formData.spent || 0;
+    setFormData({
+      ...formData,
+      spendHistory: currentHistory.filter(e => e.id !== id),
+      spent: Math.max(0, currentSpent - amount)
+    });
+    addToast("Spend entry removed");
   };
 
   const allCampaigns = useMemo(() => [...internalCampaigns, ...externalCampaigns], [internalCampaigns, externalCampaigns]);
@@ -512,8 +569,8 @@ export default function CampaignsPage() {
 
       {/* Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl shadow-xl w-full max-w-lg border border-slate-200 dark:border-slate-800 overflow-hidden animate-in zoom-in-95 duration-200 my-8">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800">
               <h2 className="text-lg font-bold text-slate-900 dark:text-slate-50">
                 {editingCampaign ? "Edit Campaign" : "Create New Campaign"}
@@ -526,7 +583,7 @@ export default function CampaignsPage() {
               </button>
             </div>
             
-            <div className="p-6 space-y-4">
+            <div className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Campaign Name *</label>
                 <input
@@ -567,32 +624,6 @@ export default function CampaignsPage() {
               
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Budget *</label>
-                  <input
-                    type="number"
-                    required
-                    min="0"
-                    value={formData.budget || ""}
-                    onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    placeholder="5000"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Spent Amount</label>
-                  <input
-                    type="number"
-                    min="0"
-                    value={formData.spent !== undefined ? formData.spent : ""}
-                    onChange={(e) => setFormData({ ...formData, spent: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
-                    placeholder="0"
-                  />
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4">
-                <div>
                   <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Start Date</label>
                   <input
                     type="date"
@@ -609,6 +640,104 @@ export default function CampaignsPage() {
                     onChange={(e) => setFormData({ ...formData, endDate: e.target.value })}
                     className="w-full px-3 py-2 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50"
                   />
+                </div>
+              </div>
+
+              {/* Budget and Spend Tracking Section */}
+              <div className="border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden bg-slate-50/30 dark:bg-slate-900/30">
+                <div className="p-4 border-b border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-between items-center">
+                  <div>
+                    <label className="block text-sm font-semibold text-slate-700 dark:text-slate-300 mb-1">Total Budget *</label>
+                    <input
+                      type="number"
+                      required
+                      min="0"
+                      value={formData.budget || ""}
+                      onChange={(e) => setFormData({ ...formData, budget: Number(e.target.value) })}
+                      className="w-40 px-3 py-1.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      placeholder="5000"
+                    />
+                  </div>
+                  <div className="text-right">
+                    <span className="block text-xs font-semibold text-slate-500 dark:text-slate-400 mb-1 uppercase tracking-wider">Total Spent</span>
+                    <span className="text-lg font-bold text-slate-900 dark:text-slate-50">
+                      {formatCurrency(formData.spent || 0, formData.currency || "USD")}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="p-4 space-y-4">
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <DollarSign className="w-4 h-4 text-emerald-500" /> Track Spending
+                  </h4>
+                  
+                  <div className="flex gap-2">
+                    <div className="flex-1">
+                      <input
+                        type="date"
+                        value={newSpendDate}
+                        onChange={(e) => setNewSpendDate(e.target.value)}
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <input
+                        type="number"
+                        min="0"
+                        value={newSpendAmount}
+                        onChange={(e) => setNewSpendAmount(e.target.value)}
+                        placeholder="Amount"
+                        className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 text-slate-900 dark:text-slate-50 placeholder:text-slate-400 dark:placeholder:text-slate-500"
+                      />
+                    </div>
+                    <button
+                      onClick={handleAddSpendEntry}
+                      disabled={!newSpendAmount || Number(newSpendAmount) <= 0}
+                      className="px-4 py-2 bg-slate-900 dark:bg-slate-50 hover:bg-slate-800 dark:hover:bg-slate-200 text-white dark:text-slate-900 rounded-lg text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-sm whitespace-nowrap"
+                    >
+                      Add Entry
+                    </button>
+                  </div>
+
+                  {formData.spendHistory && formData.spendHistory.length > 0 ? (
+                    <div className="mt-4 border border-slate-100 dark:border-slate-800 rounded-lg overflow-hidden">
+                      <div className="max-h-40 overflow-y-auto">
+                        <table className="w-full text-left text-sm">
+                          <thead className="bg-slate-50 dark:bg-slate-900 sticky top-0">
+                            <tr>
+                              <th className="px-3 py-2 font-medium text-slate-500 dark:text-slate-400">Date</th>
+                              <th className="px-3 py-2 font-medium text-slate-500 dark:text-slate-400 text-right">Amount</th>
+                              <th className="px-3 py-2 w-10"></th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-slate-100 dark:divide-slate-800 bg-white dark:bg-slate-950">
+                            {formData.spendHistory.map((entry) => (
+                              <tr key={entry.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-900/50">
+                                <td className="px-3 py-2 text-slate-700 dark:text-slate-300">
+                                  {new Date(entry.date).toLocaleDateString()}
+                                </td>
+                                <td className="px-3 py-2 text-slate-900 dark:text-slate-50 font-medium text-right">
+                                  {formatCurrency(entry.amount, formData.currency || "USD")}
+                                </td>
+                                <td className="px-3 py-2 text-right">
+                                  <button
+                                    onClick={() => handleRemoveSpendEntry(entry.id, entry.amount)}
+                                    className="p-1 text-slate-400 hover:text-red-500 rounded transition-colors"
+                                  >
+                                    <Trash2 className="w-3.5 h-3.5" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-6 border border-dashed border-slate-200 dark:border-slate-800 rounded-lg bg-white dark:bg-slate-950">
+                      <p className="text-sm text-slate-500 dark:text-slate-400">No spend entries yet.</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
