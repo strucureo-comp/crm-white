@@ -22,6 +22,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import {
+  DragDropContext,
+  Droppable,
+  Draggable,
+  DropResult,
+} from '@hello-pangea/dnd';
+
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -123,6 +130,7 @@ export default function PipelinePage() {
 
   const [waReply, setWaReply] = useState('');
   const [waMessages, setWaMessages] = useState(mockWhatsAppMessages);
+  const [isMounted, setIsMounted] = useState(false);
 
   const activePipeline = pipelines.find((p) => p.id === activePipelineId);
   const stages = activePipeline?.stages || DEFAULT_PIPELINE_STAGES;
@@ -143,6 +151,7 @@ export default function PipelinePage() {
   }
 
   useEffect(() => { load(); }, []);
+  useEffect(() => { setIsMounted(true); }, []);
 
   const grouped: Record<string, Lead[]> = {};
   for (const stage of stages) {
@@ -367,36 +376,34 @@ export default function PipelinePage() {
     setWaReply('');
   }
 
-  const handleDragStart = useCallback((e: React.DragEvent, leadId: string, fromStage: string) => {
-    e.dataTransfer.setData('text/plain', JSON.stringify({ leadId, fromStage }));
-  }, []);
-
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault();
-    e.currentTarget.classList.add('bg-muted/50');
-  }, []);
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.currentTarget.classList.remove('bg-muted/50');
-  }, []);
-
-  const handleDrop = useCallback(async (e: React.DragEvent, targetStage: string) => {
-    e.preventDefault();
-    e.currentTarget.classList.remove('bg-muted/50');
-    try {
-      const { leadId } = JSON.parse(e.dataTransfer.getData('text/plain'));
-      const lead = leads.find((l) => l.id === leadId);
-      if (lead && lead.status !== targetStage) {
-        await updateLead(leadId, { status: targetStage as LeadStatus });
-        toast.success(`Moved to ${stageLabels[targetStage] || targetStage}`);
+  const onDragEnd = useCallback(async (result: DropResult) => {
+    const { source, destination, draggableId } = result;
+    if (!destination) return;
+    if (source.droppableId === destination.droppableId && source.index === destination.index) return;
+    
+    const targetStageId = destination.droppableId;
+    
+    if (source.droppableId !== targetStageId) {
+      setLeads((prev) => {
+        const newLeads = [...prev];
+        const leadIndex = newLeads.findIndex((l) => l.id === draggableId);
+        if (leadIndex >= 0) {
+          newLeads[leadIndex] = { ...newLeads[leadIndex], status: targetStageId as LeadStatus };
+        }
+        return newLeads;
+      });
+      
+      try {
+        await updateLead(draggableId, { status: targetStageId as LeadStatus });
+        toast.success(`Moved to ${stageLabels[targetStageId] || targetStageId}`);
+      } catch {
+        toast.error('Failed to move deal');
         load();
       }
-    } catch {
-      // ignore
     }
-  }, [leads, load]);
+  }, [load]);
 
-  if (loading) {
+  if (loading || !isMounted) {
     return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading pipeline...</p></div>;
   }
 
@@ -491,129 +498,139 @@ export default function PipelinePage() {
       </div>
 
       {viewMode === 'kanban' ? (
-        <div className="flex gap-4 overflow-x-auto pb-4 min-h-[400px]">
-          {stages.map((stage) => {
-            const stageLeads = grouped[stage.id] || [];
-            return (
-              <div
-                key={stage.id}
-                className="flex-shrink-0 w-72"
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={(e) => handleDrop(e, stage.id)}
-              >
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
-                    <h3 className="text-sm font-semibold truncate">{stage.name}</h3>
-                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
-                      {stageLeads.length}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-0.5 shrink-0">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDealDialog(stage.id)}>
-                      <Plus size={12} />
-                    </Button>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-6 w-6">
-                          <MoreHorizontal size={12} />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem onClick={() => openStageDialog('rename', stage.id)}>
-                          <Pencil size={12} className="mr-2" /> Rename
-                        </DropdownMenuItem>
-                        <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteStage(stage.id)}>
-                          <Trash2 size={12} className="mr-2" /> Delete
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-                <div className="space-y-3">
-                  {stageLeads.map((lead) => (
-                    <Card
-                      key={lead.id}
-                      className="hover:shadow-sm transition-shadow cursor-grab active:cursor-grabbing"
-                      draggable
-                      onDragStart={(e) => handleDragStart(e, lead.id, lead.status)}
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4 min-h-[400px]">
+            {stages.map((stage) => {
+              const stageLeads = grouped[stage.id] || [];
+              return (
+                <Droppable key={stage.id} droppableId={stage.id}>
+                  {(provided, snapshot) => (
+                    <div
+                      className={`flex-shrink-0 w-72 rounded-lg transition-colors ${snapshot.isDraggingOver ? 'bg-muted/30' : ''}`}
+                      ref={provided.innerRef}
+                      {...provided.droppableProps}
                     >
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <GripVertical size={14} className="text-muted-foreground/40 shrink-0" />
-                            <p className="text-sm font-medium truncate">{lead.name}</p>
-                          </div>
+                      <div className="flex items-center justify-between mb-3 px-1">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: stage.color }} />
+                          <h3 className="text-sm font-semibold truncate">{stage.name}</h3>
+                          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full shrink-0">
+                            {stageLeads.length}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => openDealDialog(stage.id)}>
+                            <Plus size={12} />
+                          </Button>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label="Deal actions">
+                              <Button variant="ghost" size="icon" className="h-6 w-6">
                                 <MoreHorizontal size={12} />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => { setEditingDeal(lead); setDealDialogOpen(true); }}>
-                                <Pencil size={14} className="mr-2" /> Edit
+                              <DropdownMenuItem onClick={() => openStageDialog('rename', stage.id)}>
+                                <Pencil size={12} className="mr-2" /> Rename
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => { setViewDeal(lead); setViewDealOpen(true); }}>
-                                <Eye size={14} className="mr-2" /> View
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(lead)} disabled={deleting === lead.id}>
-                                <Trash2 size={14} className="mr-2" /> {deleting === lead.id ? 'Deleting...' : 'Delete'}
+                              <DropdownMenuItem className="text-red-600" onClick={() => handleDeleteStage(stage.id)}>
+                                <Trash2 size={12} className="mr-2" /> Delete
                               </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </div>
-                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Building2 size={12} />
-                            <span className="truncate">{lead.company || '—'}</span>
+                      </div>
+                      <div className="space-y-3 min-h-[150px]">
+                        {stageLeads.map((lead, index) => (
+                          <Draggable key={lead.id} draggableId={lead.id} index={index}>
+                            {(provided, snapshot) => (
+                              <Card
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                className={`hover:shadow-sm transition-shadow ${snapshot.isDragging ? 'shadow-md rotate-2 ring-1 ring-primary/20' : ''}`}
+                                style={provided.draggableProps.style}
+                              >
+                                <CardContent className="p-4">
+                                  <div className="flex items-start justify-between mb-2">
+                                    <div className="flex items-center gap-2 min-w-0">
+                                      <GripVertical size={14} className="text-muted-foreground/40 shrink-0" />
+                                      <p className="text-sm font-medium truncate">{lead.name}</p>
+                                    </div>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label="Deal actions">
+                                          <MoreHorizontal size={12} />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={() => { setEditingDeal(lead); setDealDialogOpen(true); }}>
+                                          <Pencil size={14} className="mr-2" /> Edit
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={() => { setViewDeal(lead); setViewDealOpen(true); }}>
+                                          <Eye size={14} className="mr-2" /> View
+                                        </DropdownMenuItem>
+                                        <DropdownMenuSeparator />
+                                        <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(lead)} disabled={deleting === lead.id}>
+                                          <Trash2 size={14} className="mr-2" /> {deleting === lead.id ? 'Deleting...' : 'Delete'}
+                                        </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                  <div className="space-y-1.5 text-xs text-muted-foreground">
+                                    <div className="flex items-center gap-1">
+                                      <Building2 size={12} />
+                                      <span className="truncate">{lead.company || '—'}</span>
+                                    </div>
+                                    <div className="flex items-center gap-1">
+                                      <DollarSign size={12} />
+                                      {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
+                                    </div>
+                                    <div className="flex items-center justify-between">
+                                      <span className="flex items-center gap-1">
+                                        <Clock size={12} />
+                                        {lead.notes?.slice(0, 20) || '—'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <div className="mt-2 flex items-center justify-between">
+                                    <Avatar className="h-6 w-6">
+                                      <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                                        {getInitials(lead.name)}
+                                      </AvatarFallback>
+                                    </Avatar>
+                                    <div className="flex gap-1 flex-wrap justify-end">
+                                      {lead.tags?.slice(0, 2).map((tag) => (
+                                        <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0">{tag}</Badge>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </CardContent>
+                              </Card>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        {stageLeads.length === 0 && (
+                          <div
+                            className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/30 transition-colors mt-2"
+                            onClick={() => openDealDialog(stage.id)}
+                          >
+                            <p className="text-xs text-muted-foreground">+ Add Deal</p>
                           </div>
-                          <div className="flex items-center gap-1">
-                            <DollarSign size={12} />
-                            {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-1">
-                              <Clock size={12} />
-                              {lead.notes?.slice(0, 20) || '—'}
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-2 flex items-center justify-between">
-                          <Avatar className="h-6 w-6">
-                            <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
-                              {getInitials(lead.name)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div className="flex gap-1 flex-wrap justify-end">
-                            {lead.tags?.slice(0, 2).map((tag) => (
-                              <Badge key={tag} variant="secondary" className="text-[9px] px-1 py-0">{tag}</Badge>
-                            ))}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {stageLeads.length === 0 && (
-                    <div
-                      className="border-2 border-dashed rounded-lg p-6 text-center cursor-pointer hover:bg-muted/30 transition-colors"
-                      onClick={() => openDealDialog(stage.id)}
-                    >
-                      <p className="text-xs text-muted-foreground">+ Add Deal</p>
+                        )}
+                      </div>
                     </div>
                   )}
-                </div>
-              </div>
-            );
-          })}
-          <div className="flex-shrink-0 w-16 flex items-start pt-8">
-            <Button variant="outline" size="sm" className="h-8 w-8" onClick={() => openStageDialog('create')}>
-              <Plus size={14} />
-            </Button>
+                </Droppable>
+              );
+            })}
+            <div className="flex-shrink-0 w-16 flex items-start pt-8">
+              <Button variant="outline" size="sm" className="h-8 w-8" onClick={() => openStageDialog('create')}>
+                <Plus size={14} />
+              </Button>
+            </div>
           </div>
-        </div>
+        </DragDropContext>
       ) : (
         <Card>
           <CardContent className="p-0">
