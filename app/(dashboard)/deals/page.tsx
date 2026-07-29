@@ -359,7 +359,6 @@ export default function DealsPage() {
                 <TableHead>Client</TableHead>
                 <TableHead>Value</TableHead>
                 <TableHead>Stage</TableHead>
-                <TableHead>Probability</TableHead>
                 <TableHead>Days in Stage</TableHead>
                 <TableHead>Follow-up</TableHead>
                 <TableHead>Owner</TableHead>
@@ -402,12 +401,7 @@ export default function DealsPage() {
                         {stageLabels[lead.status]}
                       </Badge>
                     </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Progress value={0 || 0} className="h-1.5 w-16" />
-                        <span className="text-xs text-muted-foreground">{0 || 0}%</span>
-                      </div>
-                    </TableCell>
+
                     <TableCell className="text-muted-foreground">{daysInStage}d</TableCell>
                     <TableCell>
                       {needsFollowUp ? (
@@ -530,10 +524,8 @@ export default function DealsPage() {
                               <Clock size={12} />
                               {daysBetween(lead.updated_at || lead.created_at)}d
                             </span>
-                            <span>{0 || 0}%</span>
                           </div>
                         </div>
-                        <Progress value={0 || 0} className="h-1 mt-2" />
                         <div className="mt-2" onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={lead.status}

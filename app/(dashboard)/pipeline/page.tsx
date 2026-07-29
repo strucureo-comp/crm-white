@@ -579,10 +579,8 @@ export default function PipelinePage() {
                               <Clock size={12} />
                               {lead.notes?.slice(0, 20) || '—'}
                             </span>
-                            <span className="font-medium">{0 || 0}%</span>
                           </div>
                         </div>
-                        <Progress value={0 || 0} className="h-1 mt-2" />
                         <div className="mt-2 flex items-center justify-between">
                           <Avatar className="h-6 w-6">
                             <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
