@@ -156,7 +156,7 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
           )}
           {!collapsed && (
             <span className="font-semibold text-lg tracking-tight whitespace-nowrap">
-              {companyName}
+              Tagverse.io
             </span>
           )}
         </div>
@@ -286,7 +286,7 @@ export function AppSidebar() {
   const { companyName, logoUrl } = useWorkspace();
 
   useEffect(() => {
-    getLeads().then((leads) => setLeadCount(leads.length)).catch(() => {});
+    getLeads().then((leads) => setLeadCount(leads.length)).catch(() => { });
   }, []);
 
   const { topItems, groups: navGroups } = getNavConfig(leadCount);
@@ -337,7 +337,9 @@ export function AppSidebar() {
                   <span className="text-primary-foreground font-bold text-sm">{companyName.charAt(0)}</span>
                 </div>
               )}
-              <SheetTitle className="font-semibold text-lg tracking-tight">{companyName}</SheetTitle>
+              <SheetTitle className="font-semibold text-lg tracking-tight">
+                Tagverse.io
+              </SheetTitle>
             </div>
             <SheetDescription className="sr-only">Navigation menu</SheetDescription>
             <SheetClose className="rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2">
