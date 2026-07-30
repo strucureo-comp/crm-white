@@ -179,13 +179,13 @@ export default function TeamPage() {
   const filteredActivity = MOCK_ACTIVITY.filter(a => filterAction === 'All' || a.action.includes(filterAction));
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] text-slate-900">
+    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] dark:bg-background text-slate-900 dark:text-slate-100">
       
       {/* 2. Global Layout & Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border-b border-slate-200 shrink-0 z-10 shadow-sm">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 shrink-0 z-10 shadow-sm">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-black tracking-tight">Team</h1>
-          <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold border-slate-200">
+          <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 font-bold border-slate-200 dark:border-slate-700">
             {members.length} Members
           </Badge>
         </div>
@@ -197,25 +197,25 @@ export default function TeamPage() {
       <div className="flex flex-1 min-h-0 overflow-hidden">
         
         {/* 3. Sidebar Navigation */}
-        <div className="w-64 border-r border-slate-200 bg-white flex flex-col p-4 shrink-0 z-10">
-          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-2">Management</div>
+        <div className="w-64 border-r border-slate-200 dark:border-slate-800 bg-white dark:bg-card flex flex-col p-4 shrink-0 z-10">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mb-4 px-2">Management</div>
           
           <nav className="flex flex-col gap-1">
             <button 
               onClick={() => setActiveTab('Members')}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Members' ? 'bg-purple-50 text-purple-700 font-bold border-l-4 border-l-purple-600' : 'text-slate-600 hover:bg-slate-50 font-semibold border-l-4 border-l-transparent'}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Members' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-bold border-l-4 border-l-purple-600 dark:border-l-purple-500' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 font-semibold border-l-4 border-l-transparent'}`}
             >
               <Users className="w-4 h-4" /> Members
             </button>
             <button 
               onClick={() => setActiveTab('Roles')}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Roles' ? 'bg-purple-50 text-purple-700 font-bold border-l-4 border-l-purple-600' : 'text-slate-600 hover:bg-slate-50 font-semibold border-l-4 border-l-transparent'}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Roles' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-bold border-l-4 border-l-purple-600 dark:border-l-purple-500' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 font-semibold border-l-4 border-l-transparent'}`}
             >
               <Shield className="w-4 h-4" /> Roles & Permissions
             </button>
             <button 
               onClick={() => setActiveTab('Activity')}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Activity' ? 'bg-purple-50 text-purple-700 font-bold border-l-4 border-l-purple-600' : 'text-slate-600 hover:bg-slate-50 font-semibold border-l-4 border-l-transparent'}`}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Activity' ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 font-bold border-l-4 border-l-purple-600 dark:border-l-purple-500' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 font-semibold border-l-4 border-l-transparent'}`}
             >
               <Activity className="w-4 h-4" /> Activity Log
             </button>
@@ -223,7 +223,7 @@ export default function TeamPage() {
         </div>
 
         {/* 4. Tab Views (Content Area) */}
-        <div className="flex-1 overflow-y-auto p-6 bg-[#f8fafc]">
+        <div className="flex-1 overflow-y-auto p-6 bg-[#f8fafc] dark:bg-muted/5">
           
           {/* A. Members Tab */}
           {activeTab === 'Members' && (
@@ -233,20 +233,20 @@ export default function TeamPage() {
                   <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                   <Input 
                     placeholder="Search members..." 
-                    className="pl-9 h-11 bg-white border-slate-200 shadow-sm rounded-xl font-medium focus-visible:ring-purple-500" 
+                    className="pl-9 h-11 bg-white dark:bg-card border-slate-200 dark:border-slate-800 shadow-sm rounded-xl font-medium focus-visible:ring-purple-500" 
                     value={searchMember}
                     onChange={(e) => setSearchMember(e.target.value)}
                   />
                 </div>
                 <Select value={filterRole} onValueChange={setFilterRole}>
-                  <SelectTrigger className="w-[160px] h-11 bg-white border-slate-200 shadow-sm rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] h-11 bg-white dark:bg-card border-slate-200 dark:border-slate-800 shadow-sm rounded-xl font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Roles</SelectItem>
                     {roles.map(r => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
                   </SelectContent>
                 </Select>
                 <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger className="w-[160px] h-11 bg-white border-slate-200 shadow-sm rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[160px] h-11 bg-white dark:bg-card border-slate-200 dark:border-slate-800 shadow-sm rounded-xl font-bold"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Statuses</SelectItem>
                     <SelectItem value="Active">Active</SelectItem>
@@ -256,11 +256,11 @@ export default function TeamPage() {
                 </Select>
               </div>
 
-              <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+              <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl overflow-hidden bg-white dark:bg-card">
                 <div className="overflow-x-auto">
                   <table className="w-full text-left border-collapse">
                     <thead>
-                      <tr className="border-b border-slate-100 bg-slate-50/50">
+                      <tr className="border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50">
                         <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[40%]">Member</th>
                         <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[20%]">Role</th>
                         <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[15%]">Status</th>
@@ -273,15 +273,15 @@ export default function TeamPage() {
                         <tr><td colSpan={5} className="p-8 text-center text-slate-500 font-medium italic">No members found matching your filters.</td></tr>
                       )}
                       {filteredMembers.map(m => (
-                        <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <tr key={m.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors group">
                           <td className="p-4">
                             <div className="flex items-center gap-3">
-                              <Avatar className="w-10 h-10 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                              <Avatar className="w-10 h-10 border-2 border-white dark:border-card shadow-sm ring-1 ring-slate-100 dark:ring-slate-800">
                                 <AvatarFallback className="text-white font-bold text-xs" style={{ backgroundColor: m.color }}>{m.initials}</AvatarFallback>
                               </Avatar>
                               <div className="flex flex-col min-w-0">
-                                <span className="font-bold text-slate-900 truncate leading-tight mb-0.5">{m.name}</span>
-                                <span className="text-xs text-slate-500 truncate">{m.email}</span>
+                                <span className="font-bold text-slate-900 dark:text-slate-100 truncate leading-tight mb-0.5">{m.name}</span>
+                                <span className="text-xs text-slate-500 dark:text-slate-400 truncate">{m.email}</span>
                               </div>
                             </div>
                           </td>
@@ -297,8 +297,8 @@ export default function TeamPage() {
                           </td>
                           <td className="p-4">
                             <Badge variant="outline" className={`text-[10px] uppercase font-black tracking-wider px-2 py-0.5 border-transparent ${
-                              m.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 
-                              m.status === 'Invited' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
+                              m.status === 'Active' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' : 
+                              m.status === 'Invited' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
                             }`}>
                               {m.status}
                             </Badge>
@@ -324,10 +324,10 @@ export default function TeamPage() {
             <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
               
               {/* Left - Roles List */}
-              <Card className="w-full lg:w-72 border-slate-200 shadow-sm rounded-2xl bg-white shrink-0 self-start">
-                <CardHeader className="p-4 border-b border-slate-100 flex flex-row items-center justify-between pb-3">
-                  <h3 className="font-black text-slate-900 tracking-tight">Roles</h3>
-                  <Button variant="ghost" size="sm" className="h-7 text-xs font-bold text-purple-600 hover:text-purple-700 hover:bg-purple-50"><Plus className="w-3 h-3 mr-1" /> Add</Button>
+              <Card className="w-full lg:w-72 border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card shrink-0 self-start">
+                <CardHeader className="p-4 border-b border-slate-100 dark:border-slate-800 flex flex-row items-center justify-between pb-3">
+                  <h3 className="font-black text-slate-900 dark:text-slate-100 tracking-tight">Roles</h3>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs font-bold text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"><Plus className="w-3 h-3 mr-1" /> Add</Button>
                 </CardHeader>
                 <CardContent className="p-2 space-y-1">
                   {roles.map(r => (
@@ -335,7 +335,7 @@ export default function TeamPage() {
                       key={r.id}
                       onClick={() => setSelectedRoleId(r.id)}
                       className={`w-full text-left px-3 py-2.5 rounded-xl transition-all font-bold text-sm flex items-center justify-between ${
-                        selectedRoleId === r.id ? 'bg-purple-50 text-purple-700 border border-purple-100 shadow-sm' : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                        selectedRoleId === r.id ? 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border border-purple-100 dark:border-purple-800 shadow-sm' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800/50 border border-transparent'
                       }`}
                     >
                       {r.name}
@@ -346,11 +346,11 @@ export default function TeamPage() {
               </Card>
 
               {/* Right - Permission Matrix */}
-              <Card className="flex-1 border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
-                <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-start sm:items-center justify-between gap-4 bg-slate-50/50 pb-4">
+              <Card className="flex-1 border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card overflow-hidden">
+                <CardHeader className="p-5 border-b border-slate-100 dark:border-slate-800 flex flex-row items-start sm:items-center justify-between gap-4 bg-slate-50/50 dark:bg-slate-900/50 pb-4">
                   <div>
-                    <h3 className="text-xl font-black text-slate-900 tracking-tight">{editedRole?.name} Permissions</h3>
-                    <p className="text-xs text-slate-500 font-medium mt-1">Configure what users with this role can access and modify.</p>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">{editedRole?.name} Permissions</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 font-medium mt-1">Configure what users with this role can access and modify.</p>
                   </div>
                   <Button 
                     className={`rounded-xl font-bold shadow-md transition-all ${
@@ -373,28 +373,28 @@ export default function TeamPage() {
                       if(!perms) return null;
                       
                       return (
-                        <div key={mod} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/30 transition-colors">
+                        <div key={mod} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/30 dark:hover:bg-slate-800/30 transition-colors">
                           <div className="flex flex-col">
-                            <span className="font-bold text-slate-900 capitalize">{mod}</span>
-                            <span className="text-[11px] text-slate-500 font-medium mt-0.5">Control access to {mod} data.</span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100 capitalize">{mod}</span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium mt-0.5">Control access to {mod} data.</span>
                           </div>
                           
-                          <div className="flex items-center bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                          <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-xl w-full sm:w-auto">
                             <button 
                               onClick={() => togglePermission(mod, 'v')}
-                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.v ? 'bg-white text-blue-700 shadow-sm border border-blue-100' : 'text-slate-500 hover:text-slate-700'}`}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.v ? 'bg-white dark:bg-card text-blue-700 dark:text-blue-400 shadow-sm border border-blue-100 dark:border-blue-900/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                               {perms.v ? <Check className="w-3 h-3" /> : <span>–</span>} View
                             </button>
                             <button 
                               onClick={() => togglePermission(mod, 'e')}
-                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.e ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100' : 'text-slate-500 hover:text-slate-700'}`}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.e ? 'bg-white dark:bg-card text-emerald-700 dark:text-emerald-400 shadow-sm border border-emerald-100 dark:border-emerald-900/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                               {perms.e ? <Check className="w-3 h-3" /> : <span>–</span>} Edit
                             </button>
                             <button 
                               onClick={() => togglePermission(mod, 'd')}
-                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.d ? 'bg-white text-rose-700 shadow-sm border border-rose-100' : 'text-slate-500 hover:text-slate-700'}`}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.d ? 'bg-white dark:bg-card text-rose-700 dark:text-rose-400 shadow-sm border border-rose-100 dark:border-rose-900/50' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'}`}
                             >
                               {perms.d ? <Check className="w-3 h-3" /> : <span>–</span>} None
                             </button>
@@ -412,13 +412,13 @@ export default function TeamPage() {
           {/* C. Activity Log Tab */}
           {activeTab === 'Activity' && (
             <div className="max-w-4xl mx-auto space-y-4">
-              <div className="flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+              <div className="flex items-center justify-between bg-white dark:bg-card p-3 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-2 px-2">
-                  <Filter className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm font-bold text-slate-700">Filter Feed:</span>
+                  <Filter className="w-4 h-4 text-slate-400 dark:text-slate-500" />
+                  <span className="text-sm font-bold text-slate-700 dark:text-slate-300">Filter Feed:</span>
                 </div>
                 <Select value={filterAction} onValueChange={setFilterAction}>
-                  <SelectTrigger className="w-[200px] h-9 bg-slate-50 border-transparent shadow-none font-bold text-sm"><SelectValue /></SelectTrigger>
+                  <SelectTrigger className="w-[200px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm"><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="All">All Activity</SelectItem>
                     <SelectItem value="updated permissions">Permissions Updated</SelectItem>
@@ -431,7 +431,7 @@ export default function TeamPage() {
 
               <div className="space-y-3">
                 {filteredActivity.length === 0 && (
-                  <div className="p-8 text-center text-slate-500 font-medium italic bg-white rounded-2xl border border-slate-200 border-dashed">No recent activity matches your filter.</div>
+                  <div className="p-8 text-center text-slate-500 font-medium italic bg-white dark:bg-card rounded-2xl border border-slate-200 dark:border-slate-800 border-dashed">No recent activity matches your filter.</div>
                 )}
                 
                 {filteredActivity.map(a => {
@@ -439,16 +439,16 @@ export default function TeamPage() {
                   if(!member) return null;
                   
                   return (
-                    <Card key={a.id} className="border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white hover:border-purple-200 transition-colors">
+                    <Card key={a.id} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-xl overflow-hidden bg-white dark:bg-card hover:border-purple-200 dark:hover:border-purple-800 transition-colors">
                       <CardContent className="p-4 flex items-start sm:items-center justify-between gap-4">
                         <div className="flex items-center gap-4">
-                          <Avatar className="w-10 h-10 border ring-1 ring-slate-100 shadow-sm">
+                          <Avatar className="w-10 h-10 border ring-1 ring-slate-100 dark:ring-slate-800 shadow-sm">
                             <AvatarFallback className="text-white font-bold text-xs" style={{ backgroundColor: member.color }}>{member.initials}</AvatarFallback>
                           </Avatar>
                           <div className="text-sm">
-                            <span className="font-bold text-slate-900">{member.name}</span>{' '}
-                            <span className="text-slate-500 font-medium">{a.action}</span>{' '}
-                            <span className="font-bold text-purple-700">{a.target}</span>
+                            <span className="font-bold text-slate-900 dark:text-slate-100">{member.name}</span>{' '}
+                            <span className="text-slate-500 dark:text-slate-400 font-medium">{a.action}</span>{' '}
+                            <span className="font-bold text-purple-700 dark:text-purple-400">{a.target}</span>
                           </div>
                         </div>
                         <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 shrink-0">
