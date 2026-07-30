@@ -56,8 +56,6 @@ const MOCK_ASSIGNEES: Assignee[] = [
   { id: 'a2', name: 'Sarah Jones', avatar: 'SJ', email: 'sarah@acme.com' },
 ];
 
-const COLUMNS = ['To Do', 'In Progress', 'Review', 'Done'];
-
 const MOCK_TASKS: Task[] = [];
 
 const PriorityStyle = (priority: TaskPriority) => {
@@ -75,6 +73,7 @@ export default function TaskManagerPage() {
   useEffect(() => setIsMounted(true), []);
 
   // State
+  const [columns, setColumns] = useState<string[]>(['To Do', 'In Progress', 'Review', 'Done']);
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
   const [view, setView] = useState<ViewType>('Kanban');
   const [search, setSearch] = useState('');
@@ -136,6 +135,15 @@ export default function TaskManagerPage() {
     setFormPriority('Medium');
     setFormDate('');
     setFormDescription('');
+  };
+
+  const handleAddColumn = () => {
+    const newColName = prompt('Enter new column name:');
+    if (newColName && newColName.trim() && !columns.includes(newColName.trim())) {
+      setColumns(prev => [...prev, newColName.trim()]);
+    } else if (newColName) {
+      toast.error('Invalid or duplicate column name');
+    }
   };
 
   const handleDragEnd = (result: DropResult) => {
@@ -275,7 +283,7 @@ export default function TaskManagerPage() {
             <Select onValueChange={handleBulkStatusChange}>
               <SelectTrigger className="h-8 text-xs w-[150px] bg-white border-purple-200"><SelectValue placeholder="Move status to..." /></SelectTrigger>
               <SelectContent>
-                {COLUMNS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
             </Select>
             <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-8 text-rose-600 hover:bg-rose-100 hover:text-rose-700 font-bold">
@@ -296,7 +304,7 @@ export default function TaskManagerPage() {
         {view === 'Kanban' && (
           <DragDropContext onDragEnd={handleDragEnd}>
             <div className="flex gap-4 h-full overflow-x-auto items-start pb-4">
-              {COLUMNS.map((col, idx) => {
+              {columns.map((col, idx) => {
                 const colTasks = filteredTasks.filter(t => t.status === col);
                 const borderColors = ['border-t-blue-500', 'border-t-purple-500', 'border-t-amber-500', 'border-t-emerald-500'];
                 const bColor = borderColors[idx % borderColors.length];
@@ -369,7 +377,7 @@ export default function TaskManagerPage() {
                   </div>
                 );
               })}
-              <div className="flex-shrink-0 w-[320px] flex items-center justify-center bg-muted/10 border-2 border-dashed rounded-xl border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/30 cursor-pointer transition-colors group">
+              <div onClick={handleAddColumn} className="flex-shrink-0 w-[320px] flex items-center justify-center bg-muted/10 border-2 border-dashed rounded-xl border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/30 cursor-pointer transition-colors group">
                 <span className="text-sm font-bold text-muted-foreground group-hover:text-primary flex items-center"><Plus className="w-4 h-4 mr-2" /> Add Column</span>
               </div>
             </div>
@@ -421,7 +429,7 @@ export default function TaskManagerPage() {
                 <div className="w-32">
                   <Select value={task.status} onValueChange={(v) => updateTaskField(task.id, 'status', v)}>
                     <SelectTrigger className="h-8 text-xs bg-muted/50 border-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>{COLUMNS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
                 <div className="w-32">
@@ -473,7 +481,7 @@ export default function TaskManagerPage() {
                       <td className="px-4 py-3">
                         <Select value={task.status} onValueChange={(v) => updateTaskField(task.id, 'status', v)}>
                           <SelectTrigger className="h-7 text-xs bg-transparent border-border/50 hover:bg-muted/50"><SelectValue /></SelectTrigger>
-                          <SelectContent>{COLUMNS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                          <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
                         </Select>
                       </td>
                       <td className="px-4 py-3">
