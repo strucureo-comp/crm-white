@@ -146,15 +146,15 @@ export default function ReportsPage() {
   const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc]">
+    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] dark:bg-background">
       
       {/* 2. Global Layout & Header */}
-      <div className="p-6 pb-4 bg-white border-b border-slate-200 shrink-0">
+      <div className="p-6 pb-4 bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 shrink-0">
         <div className="flex flex-col gap-6">
           
           <div>
-            <h1 className="text-3xl text-slate-900 tracking-tight mb-1" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 800 }}>Reports</h1>
-            <p className="text-sm text-slate-500 font-medium">Analyze performance, track trends, and schedule automated reports.</p>
+            <h1 className="text-3xl text-slate-900 dark:text-slate-100 tracking-tight mb-1" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 800 }}>Reports</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Analyze performance, track trends, and schedule automated reports.</p>
           </div>
 
           <div className="flex flex-wrap gap-2">
@@ -167,7 +167,7 @@ export default function ReportsPage() {
                   className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
                     isActive 
                       ? `${rt.color} text-white shadow-lg ring-2 ring-offset-2 ring-transparent` 
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                   style={isActive ? { boxShadow: `0 8px 20px -8px ${rt.color.replace('bg-', 'var(--tw-colors-').replace('-500', '-500)')}` } : {}}
                 >
@@ -177,43 +177,43 @@ export default function ReportsPage() {
             })}
           </div>
 
-          <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-slate-50/50">
+          <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50">
             <div className="p-3 px-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-4 flex-1">
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Date Range</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Date Range</label>
                   <Select defaultValue="ytd">
-                    <SelectTrigger className="w-[160px] h-9 bg-white border-slate-200 rounded-xl font-bold text-sm shadow-sm"><Calendar className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><Calendar className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="ytd">Year to Date</SelectItem><SelectItem value="q2">Q2 2026</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Agent</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Agent</label>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white border-slate-200 rounded-xl font-bold text-sm shadow-sm"><Users className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><Users className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="all">All Agents</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Region</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Region</label>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white border-slate-200 rounded-xl font-bold text-sm shadow-sm"><MapPin className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><MapPin className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="all">Global</SelectItem><SelectItem value="na">North America</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 tracking-widest px-1">Product</label>
+                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Product</label>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white border-slate-200 rounded-xl font-bold text-sm shadow-sm"><Package className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><Package className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="all">All Products</SelectItem></SelectContent>
                   </Select>
                 </div>
               </div>
               
               <div className="flex items-center gap-3 pt-4 xl:pt-0">
-                <Button variant="ghost" className="font-bold text-slate-600 rounded-xl">Schedule</Button>
-                <div className="flex items-center bg-white border border-slate-200 rounded-xl p-1 shadow-sm">
-                  <span className="text-xs font-black text-slate-400 uppercase tracking-widest px-3">Export:</span>
+                <Button variant="ghost" className="font-bold text-slate-600 dark:text-slate-300 rounded-xl">Schedule</Button>
+                <div className="flex items-center bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-sm">
+                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3">Export:</span>
                   <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-red-50 hover:text-red-600 text-slate-600" onClick={() => setExportPreview('pdf')}><FileIcon className="w-3 h-3 mr-1" /> PDF</Button>
                   <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-green-50 hover:text-green-600 text-slate-600" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> CSV</Button>
                   <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-emerald-50 hover:text-emerald-600 text-slate-600" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> Excel</Button>
@@ -246,16 +246,16 @@ export default function ReportsPage() {
                 { label: 'Avg Conversion', value: '54%', delta: '-2.4%', icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50', down: true },
                 { label: 'Active Pipeline', value: '$8.2M', delta: '+22.5%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
               ].map((kpi, i) => (
-                <Card key={i} className="border-slate-200 shadow-sm rounded-2xl">
+                <Card key={i} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
                   <CardContent className="p-5 flex flex-col gap-4">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-black uppercase text-slate-500 tracking-wider">{kpi.label}</span>
+                      <span className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">{kpi.label}</span>
                       <div className={`w-8 h-8 rounded-full ${kpi.bg} ${kpi.color} flex items-center justify-center`}>
                         <kpi.icon className="w-4 h-4" />
                       </div>
                     </div>
                     <div className="flex items-end justify-between">
-                      <span className="text-3xl font-black text-slate-900 tracking-tighter">{kpi.value}</span>
+                      <span className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tighter">{kpi.value}</span>
                       <Badge className={`${kpi.down ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'} hover:bg-transparent font-bold border-transparent px-2`}>
                         {kpi.down ? <ArrowDownRight className="w-3 h-3 mr-0.5" /> : <ArrowUpRight className="w-3 h-3 mr-0.5" />} {kpi.delta}
                       </Badge>
@@ -266,10 +266,10 @@ export default function ReportsPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-slate-200 shadow-sm rounded-2xl">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900">Revenue Trend vs Target</h3>
-                  <Badge variant="outline" className="text-slate-500 font-bold border-slate-200">Last 6 Months</Badge>
+              <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Revenue Trend vs Target</h3>
+                  <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold border-slate-200 dark:border-slate-700">Last 6 Months</Badge>
                 </div>
                 <div className="p-5 h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -285,10 +285,10 @@ export default function ReportsPage() {
                 </div>
               </Card>
 
-              <Card className="border-slate-200 shadow-sm rounded-2xl">
-                <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900">Pipeline Funnel</h3>
-                  <Badge variant="outline" className="text-slate-500 font-bold border-slate-200">All Agents</Badge>
+              <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
+                <div className="p-5 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
+                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Pipeline Funnel</h3>
+                  <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold border-slate-200 dark:border-slate-700">All Agents</Badge>
                 </div>
                 <div className="p-5 h-[300px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -317,11 +317,11 @@ export default function ReportsPage() {
               </div>
 
               {activeTab === 'table' && (
-                <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+                <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl overflow-hidden bg-white dark:bg-card">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left border-collapse">
                       <thead>
-                        <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <tr className="border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50">
                           <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('agent')}>Agent</th>
                           <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('region')}>Region</th>
                           <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('product')}>Product</th>
@@ -332,23 +332,23 @@ export default function ReportsPage() {
                           <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('status')}>Status</th>
                         </tr>
                       </thead>
-                      <tbody className="divide-y divide-slate-100">
+                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
                         {sortedData.map(row => (
-                          <tr key={row.id} className="hover:bg-slate-50/50 transition-colors">
-                            <td className="p-4 font-bold text-slate-900">{row.agent}</td>
-                            <td className="p-4 text-sm font-medium text-slate-600">{row.region}</td>
-                            <td className="p-4 text-sm font-medium text-slate-600">{row.product}</td>
-                            <td className="p-4 text-sm font-black text-slate-900 text-right">{row.deals}</td>
+                          <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
+                            <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{row.agent}</td>
+                            <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-400">{row.region}</td>
+                            <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-400">{row.product}</td>
+                            <td className="p-4 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{row.deals}</td>
                             <td className="p-4 text-sm font-black text-emerald-600 text-right">{formatCurrency(row.revenue)}</td>
                             <td className="p-4">
                               <div className="flex items-center gap-3">
-                                <span className="text-sm font-bold text-slate-700 w-8">{row.conversion}%</span>
-                                <div className="flex-1 h-2 bg-slate-100 rounded-full overflow-hidden">
+                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300 w-8">{row.conversion}%</span>
+                                <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
                                   <div className="h-full bg-blue-500 rounded-full" style={{ width: `${row.conversion}%` }} />
                                 </div>
                               </div>
                             </td>
-                            <td className="p-4 text-sm font-black text-slate-700 text-right">{formatCurrency(row.pipeline)}</td>
+                            <td className="p-4 text-sm font-black text-slate-700 dark:text-slate-300 text-right">{formatCurrency(row.pipeline)}</td>
                             <td className="p-4">
                               <Badge variant="outline" className={`text-[10px] uppercase font-black tracking-wider px-2 py-0.5 border-transparent ${
                                 row.status === 'Won' ? 'bg-emerald-50 text-emerald-700' : 
@@ -368,14 +368,14 @@ export default function ReportsPage() {
               {activeTab === 'saved' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {MOCK_SAVED_REPORTS.map(r => (
-                    <Card key={r.id} className="border-slate-200 shadow-sm rounded-2xl hover:border-slate-300 transition-colors">
+                    <Card key={r.id} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                       <CardContent className="p-5 flex flex-col gap-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 flex items-center justify-center text-slate-500"><FileText className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><FileText className="w-5 h-5" /></div>
                             <div>
-                              <h4 className="font-bold text-slate-900 leading-tight">{r.name}</h4>
-                              <p className="text-xs font-medium text-slate-500 capitalize">{r.type} Report</p>
+                              <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{r.name}</h4>
+                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 capitalize">{r.type} Report</p>
                             </div>
                           </div>
                         </div>
@@ -403,14 +403,14 @@ export default function ReportsPage() {
               {activeTab === 'scheduled' && (
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {scheduled.map(s => (
-                    <Card key={s.id} className="border-slate-200 shadow-sm rounded-2xl hover:border-slate-300 transition-colors">
+                    <Card key={s.id} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
                       <CardContent className="p-5 flex flex-col gap-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600"><Clock className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600"><Clock className="w-5 h-5" /></div>
                             <div>
-                              <h4 className="font-bold text-slate-900 leading-tight">{s.name}</h4>
-                              <p className="text-xs font-medium text-slate-500">{s.recipients} Recipients</p>
+                              <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{s.name}</h4>
+                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{s.recipients} Recipients</p>
                             </div>
                           </div>
                         </div>
