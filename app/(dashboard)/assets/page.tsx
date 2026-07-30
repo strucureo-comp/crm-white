@@ -113,7 +113,7 @@ export default function AssetsPage() {
     // Reset Form
     setFormName('');
     setFormType('Image');
-    setFormFolder(FOLDERS[0]);
+    setFormFolder(folders[0]);
     
     toast.success('Asset uploaded successfully!', {
       icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
