@@ -229,7 +229,7 @@ export default function CalendarAgendaPage() {
                       <div 
                         key={idx} 
                         className={`border-b border-r p-1.5 flex flex-col transition-colors cursor-pointer min-h-[100px]
-                          ${isSelected ? 'bg-purple-50/50 ring-1 ring-inset ring-purple-400' : 'hover:bg-muted/30 bg-background'}
+                          ${isSelected ? 'bg-purple-50/50 dark:bg-purple-900/20 ring-1 ring-inset ring-purple-400 dark:ring-purple-500' : 'hover:bg-muted/30 bg-background'}
                         `}
                         onClick={() => setSelectedDate(cell.dateStr)}
                       >
