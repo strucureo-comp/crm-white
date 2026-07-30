@@ -46,6 +46,7 @@ import {
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { getLeads, updateLead, deleteLead, getPipelines, createPipeline, updatePipeline, deletePipeline, createLead } from '@/lib/firebase/database';
 import type { Lead, LeadStatus, Pipeline, PipelineStage } from '@/lib/db/types';
+import { getCurrentUserId } from '@/lib/firebase/auth';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
@@ -202,7 +203,8 @@ export default function PipelinePage() {
           company: dealFormCompany,
           estimated_value: dealFormValue === '' ? 0 : Number(dealFormValue),
           status: dealFormStage,
-          email: 'placeholder@example.com'
+          email: 'placeholder@example.com',
+          owner_id: getCurrentUserId() || '',
         });
         toast.success('Deal created');
       }
