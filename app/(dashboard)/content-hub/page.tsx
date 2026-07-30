@@ -36,26 +36,26 @@ type StageInfo = { id: string; label: string; dotColor: string; order: number; }
 
 // --- Constants & Data Setup ---
 const CONTENT_TYPES = [
-  { label: 'Blog', color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/40 dark:text-blue-400' },
-  { label: 'Email', color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/40 dark:text-violet-400' },
-  { label: 'Newsletter', color: 'bg-indigo-100 text-indigo-700 border-indigo-200 dark:bg-indigo-900/40 dark:text-indigo-400' },
-  { label: 'Landing Page', color: 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-400' },
-  { label: 'Case Study', color: 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/40 dark:text-amber-400' },
-  { label: 'Social Post', color: 'bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/40 dark:text-pink-400' },
-  { label: 'Ad Copy', color: 'bg-rose-100 text-rose-700 border-rose-200 dark:bg-rose-900/40 dark:text-rose-400' },
-  { label: 'Video Script', color: 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/40 dark:text-red-400' },
-  { label: 'WhatsApp Template', color: 'bg-green-100 text-green-700 border-green-200 dark:bg-green-900/40 dark:text-green-400' },
-  { label: 'Knowledge Base', color: 'bg-slate-100 text-slate-700 border-slate-200 dark:bg-slate-800 dark:text-slate-300' },
+  { label: 'Blog', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Email', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Newsletter', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Landing Page', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Case Study', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Social Post', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Ad Copy', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Video Script', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'WhatsApp Template', color: 'bg-muted text-muted-foreground border-border' },
+  { label: 'Knowledge Base', color: 'bg-muted text-muted-foreground border-border' },
 ];
 
 const DEFAULT_STAGES: StageInfo[] = [
-  { id: 'Ideas', label: 'Ideas', dotColor: 'bg-slate-400', order: 0 },
-  { id: 'Draft', label: 'Draft', dotColor: 'bg-amber-400', order: 1 },
-  { id: 'In Review', label: 'In Review', dotColor: 'bg-blue-400', order: 2 },
-  { id: 'Approved', label: 'Approved', dotColor: 'bg-emerald-400', order: 3 },
-  { id: 'Scheduled', label: 'Scheduled', dotColor: 'bg-purple-400', order: 4 },
-  { id: 'Published', label: 'Published', dotColor: 'bg-rose-400', order: 5 },
-  { id: 'Archived', label: 'Archived', dotColor: 'bg-gray-400', order: 6 },
+  { id: 'Ideas', label: 'Ideas', dotColor: 'bg-muted-foreground', order: 0 },
+  { id: 'Draft', label: 'Draft', dotColor: 'bg-muted-foreground', order: 1 },
+  { id: 'In Review', label: 'In Review', dotColor: 'bg-muted-foreground', order: 2 },
+  { id: 'Approved', label: 'Approved', dotColor: 'bg-muted-foreground', order: 3 },
+  { id: 'Scheduled', label: 'Scheduled', dotColor: 'bg-muted-foreground', order: 4 },
+  { id: 'Published', label: 'Published', dotColor: 'bg-muted-foreground', order: 5 },
+  { id: 'Archived', label: 'Archived', dotColor: 'bg-muted-foreground', order: 6 },
 ];
 
 const FUNNELS = ['Awareness', 'Consideration', 'Decision', 'Retention'];
@@ -716,14 +716,14 @@ export default function ContentHubPage() {
             <div>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-xl font-bold tracking-tight">Pending Approvals</h3>
-                <Badge variant="outline" className="bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400">
+                <Badge variant="outline" className="bg-muted text-muted-foreground border-border">
                   {approvalItems.length} items require review
                 </Badge>
               </div>
 
               {approvalItems.length === 0 ? (
                 <div className="text-center py-20 bg-card rounded-xl border border-dashed text-muted-foreground">
-                  <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-emerald-500 opacity-50" />
+                  <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
                   <p className="text-lg font-medium text-foreground">You're all caught up!</p>
                   <p className="text-sm">There are no assets currently waiting for review.</p>
                 </div>
@@ -758,7 +758,7 @@ export default function ContentHubPage() {
                       <div className="border-t p-3 bg-muted/10 flex items-center justify-between gap-3">
                         <Button 
                           variant="ghost" 
-                          className="flex-1 text-rose-600 hover:text-rose-700 hover:bg-rose-50 dark:hover:bg-rose-950 font-medium text-xs"
+                          className="flex-1 text-muted-foreground hover:text-foreground hover:bg-muted font-medium text-xs"
                           onClick={() => {
                             setSelectedItem(item);
                             setIsRejecting(true);
@@ -767,7 +767,7 @@ export default function ContentHubPage() {
                           <ArrowRight className="w-4 h-4 mr-1.5 rotate-180" /> Send back to Draft
                         </Button>
                         <Button 
-                          className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-medium text-xs shadow-sm"
+                          className="flex-1 bg-primary hover:bg-primary/90 text-primary-foreground font-medium text-xs shadow-sm"
                           onClick={() => approveAsset(item)}
                         >
                           Approve Asset <Check className="w-4 h-4 ml-1.5" />
