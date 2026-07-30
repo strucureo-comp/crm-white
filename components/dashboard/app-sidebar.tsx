@@ -37,11 +37,17 @@ import {
   Receipt,
   X,
   Activity,
-  TrendingUp,
+  TrendUp,
   Target,
   Camera,
   Mail,
   Wallet,
+  Hexagon,
+  LineChart,
+  Bell,
+  GitBranch,
+  Handshake,
+  Filter,
 } from 'lucide-react';
 
 interface NavItem {
@@ -56,64 +62,73 @@ interface NavGroup {
   items: NavItem[];
 }
 
-function getNavGroups(leadCount: number): NavGroup[] {
-  return [
-    {
-      title: 'CRM',
-      items: [
-        { title: 'Overview', href: '/overview', icon: LayoutDashboard },
-        { title: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-        { title: 'Leads', href: '/leads', icon: Users, badge: leadCount || undefined },
-        { title: 'Contacts', href: '/contacts', icon: Contact2 },
-        { title: 'Pipeline', href: '/deals', icon: DollarSign },
-        { title: 'Funnel', href: '/funnel', icon: TrendingUp },
-        { title: 'Deals', href: '/pipeline', icon: BarChart3 },
-        { title: 'Activity', href: '/activity', icon: Activity },
-      ],
-    },
-    {
-      title: 'Revenue',
-      items: [
-        { title: 'Quotes', href: '/quotes', icon: FileText },
-        { title: 'Invoices', href: '/invoices', icon: Receipt },
-        { title: 'Proposals', href: '/proposals', icon: FileSpreadsheet },
-        { title: 'Payments', href: '/payments', icon: Wallet },
-      ],
-    },
-    {
-      title: 'Marketing',
-      items: [
-        { title: 'Campaigns', href: '/campaigns', icon: Target },
-        { title: 'Content Hub', href: '/content-hub', icon: Megaphone },
-        { title: 'Social Media', href: '/social', icon: Camera },
-        { title: 'Email Marketing', href: '/email', icon: Mail },
-        { title: 'Media Library', href: '/media-library', icon: Image },
-        { title: 'Marketing Calendar', href: '/marketing-calendar', icon: Calendar },
-      ],
-    },
-    {
-      title: 'Workspace',
-      items: [
-        { title: 'Projects', href: '/projects', icon: Briefcase },
-        { title: 'Tasks', href: '/tasks', icon: CheckSquare },
-        { title: 'Calendar', href: '/calendar', icon: Calendar },
-        { title: 'Team', href: '/team', icon: Users2 },
-      ],
-    },
-    {
-      title: 'Analytics',
-      items: [
-        { title: 'Analytics', href: '/analytics', icon: BarChart3 },
-        { title: 'Assets', href: '/assets', icon: Image },
-      ],
-    },
-    {
-      title: 'Integrations',
-      items: [
-        { title: 'Automation Hub', href: '/integrations', icon: Puzzle },
-      ],
-    },
-  ];
+interface NavConfig {
+  topItems: NavItem[];
+  groups: NavGroup[];
+}
+
+function getNavConfig(leadCount: number): NavConfig {
+  return {
+    topItems: [
+      { title: 'Dashboard', href: '/dashboard', icon: Hexagon },
+      { title: 'Overview', href: '/overview', icon: LineChart },
+      { title: 'Activity Feed', href: '/activity', icon: Bell },
+    ],
+    groups: [
+      {
+        title: 'CRM',
+        items: [
+          { title: 'Leads', href: '/leads', icon: Target, badge: leadCount || undefined },
+          { title: 'Contacts', href: '/contacts', icon: Contact2 },
+          { title: 'Pipelines', href: '/pipeline', icon: GitBranch },
+          { title: 'Deals', href: '/deals', icon: Handshake },
+          { title: 'Funnel', href: '/funnel', icon: Filter },
+        ],
+      },
+      {
+        title: 'Revenue Hub',
+        items: [
+          { title: 'Quotes', href: '/quotes', icon: FileText },
+          { title: 'Invoices', href: '/invoices', icon: Receipt },
+          { title: 'Proposals', href: '/proposals', icon: FileSpreadsheet },
+          { title: 'Payments', href: '/payments', icon: Wallet },
+        ],
+      },
+      {
+        title: 'Marketing',
+        items: [
+          { title: 'Campaigns', href: '/campaigns', icon: Target },
+          { title: 'Content Hub', href: '/content-hub', icon: Megaphone },
+          { title: 'Social Media', href: '/social', icon: Camera },
+          { title: 'Email Marketing', href: '/email', icon: Mail },
+          { title: 'Media Library', href: '/media-library', icon: Image },
+          { title: 'Marketing Calendar', href: '/marketing-calendar', icon: Calendar },
+        ],
+      },
+      {
+        title: 'Workspace',
+        items: [
+          { title: 'Projects', href: '/projects', icon: Briefcase },
+          { title: 'Tasks', href: '/tasks', icon: CheckSquare },
+          { title: 'Calendar', href: '/calendar', icon: Calendar },
+          { title: 'Team', href: '/team', icon: Users2 },
+        ],
+      },
+      {
+        title: 'Analytics',
+        items: [
+          { title: 'Analytics', href: '/analytics', icon: BarChart3 },
+          { title: 'Assets', href: '/assets', icon: Image },
+        ],
+      },
+      {
+        title: 'Integration Hub',
+        items: [
+          { title: 'Automation Hub', href: '/integrations', icon: Puzzle },
+        ],
+      },
+    ]
+  };
 }
 
 function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathname, companyLogo, companyName }: {
@@ -125,7 +140,7 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
   companyLogo: string;
   companyName: string;
 }) {
-  const navGroups = getNavGroups(leadCount);
+  const { topItems, groups: navGroups } = getNavConfig(leadCount);
 
   return (
     <>
@@ -155,6 +170,28 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
       </div>
 
       <div className="flex-1 overflow-y-auto overflow-x-hidden py-2 px-2 space-y-1">
+        <div className={cn('space-y-0.5 mb-4', collapsed && 'space-y-1')}>
+          {topItems.map((item) => {
+            const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className={cn(
+                  'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-all duration-200 group relative',
+                  isActive
+                    ? 'bg-primary/10 text-primary font-medium'
+                    : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-foreground'
+                )}
+              >
+                <item.icon size={18} className={cn('shrink-0', isActive && 'text-primary')} />
+                {!collapsed && (
+                  <span className="truncate">{item.title}</span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
         {navGroups.map((group) => (
           <div key={group.title}>
             {!collapsed && (
@@ -252,7 +289,7 @@ export function AppSidebar() {
     getLeads().then((leads) => setLeadCount(leads.length)).catch(() => {});
   }, []);
 
-  const navGroups = getNavGroups(leadCount);
+  const { topItems, groups: navGroups } = getNavConfig(leadCount);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     Object.fromEntries(navGroups.map((g) => [g.title, true]))
   );
@@ -309,6 +346,27 @@ export function AppSidebar() {
             </SheetClose>
           </div>
           <div className="flex-1 overflow-y-auto py-2 px-2 space-y-1 h-[calc(100vh-4rem)]">
+            <div className="space-y-0.5 mb-4">
+              {topItems.map((item) => {
+                const isActive = pathname === item.href || pathname?.startsWith(item.href + '/');
+                return (
+                  <SheetClose asChild key={item.href}>
+                    <Link
+                      href={item.href}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all duration-200',
+                        isActive
+                          ? 'bg-primary/10 text-primary font-medium'
+                          : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-foreground'
+                      )}
+                    >
+                      <item.icon size={18} className={cn('shrink-0', isActive && 'text-primary')} />
+                      <span className="truncate">{item.title}</span>
+                    </Link>
+                  </SheetClose>
+                );
+              })}
+            </div>
             {navGroups.map((group) => (
               <div key={group.title}>
                 <div className="flex items-center gap-1 px-2 py-1.5 text-xs font-medium text-muted-foreground uppercase tracking-wider">
