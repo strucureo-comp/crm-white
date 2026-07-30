@@ -160,7 +160,7 @@ export default function CalendarAgendaPage() {
       {/* 2. Global Top Bar */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-background border-b shrink-0 z-10">
         <div>
-          <h1 className="text-2xl font-black text-[#1e1a4f] tracking-tight">Calendar Agenda</h1>
+          <h1 className="text-2xl font-black text-[#1e1a4f] dark:text-foreground tracking-tight">Calendar Agenda</h1>
           <p className="text-sm text-muted-foreground font-medium mt-1">Track schedules, meetings, and milestone due dates</p>
         </div>
         
@@ -171,7 +171,7 @@ export default function CalendarAgendaPage() {
                 key={v}
                 onClick={() => setView(v)}
                 className={`px-4 py-1.5 rounded-lg text-sm font-bold transition-all ${
-                  view === v ? 'bg-white text-purple-700 shadow-sm border border-purple-100' : 'text-muted-foreground hover:text-foreground'
+                  view === v ? 'bg-white dark:bg-muted text-purple-700 dark:text-purple-300 shadow-sm border border-purple-100 dark:border-purple-800' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {v}
@@ -193,8 +193,8 @@ export default function CalendarAgendaPage() {
           
           <div className="flex items-center justify-between p-4 border-b shrink-0 bg-background">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-purple-50 flex items-center justify-center text-purple-600 border border-purple-100"><CalendarIcon className="w-5 h-5" /></div>
-              <h2 className="text-xl font-bold text-[#1e1a4f]">{getMonthName(currentMonth)}</h2>
+              <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center text-purple-600 dark:text-purple-400 border border-purple-100 dark:border-purple-900/50"><CalendarIcon className="w-5 h-5" /></div>
+              <h2 className="text-xl font-bold text-[#1e1a4f] dark:text-foreground">{getMonthName(currentMonth)}</h2>
             </div>
             <div className="flex items-center gap-2">
               <Button variant="outline" size="icon" className="w-9 h-9 rounded-lg border-border/60 hover:bg-muted" onClick={handlePrevMonth}><ChevronLeft className="w-4 h-4" /></Button>
@@ -235,7 +235,7 @@ export default function CalendarAgendaPage() {
                       >
                         <div className="text-right mb-1">
                           <span className={`text-[11px] font-bold w-6 h-6 inline-flex items-center justify-center rounded-full ${
-                            cell.dateStr === '2026-07-15' && !isSelected ? 'bg-[#1e1a4f] text-white' : 
+                            cell.dateStr === '2026-07-15' && !isSelected ? 'bg-[#1e1a4f] dark:bg-slate-700 text-white' : 
                             isSelected ? 'bg-purple-600 text-white' : 
                             cell.isWeekend ? 'text-rose-400' : 'text-muted-foreground'
                           }`}>
@@ -246,14 +246,14 @@ export default function CalendarAgendaPage() {
                         <div className="flex-1 flex flex-col gap-1 overflow-hidden">
                           {displayItems.map((item, i) => (
                             item.isTask ? (
-                              <div key={`t-${item.id}`} className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-blue-50/50 border border-blue-100 text-[9px] font-bold text-blue-800 truncate">
+                              <div key={`t-${item.id}`} className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 text-[9px] font-bold text-blue-800 dark:text-blue-300 truncate">
                                 <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
                                 <span className="truncate">{item.title}</span>
                               </div>
                             ) : (
                               <div 
                                 key={`e-${item.id}`} 
-                                className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:opacity-80 text-[9px] font-bold text-gray-800 truncate border"
+                                className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:opacity-80 text-[9px] font-bold text-gray-800 dark:text-gray-200 truncate border"
                                 style={{ backgroundColor: `${(item as CalendarEvent).color}15`, borderColor: `${(item as CalendarEvent).color}30` }}
                                 onClick={(e) => { e.stopPropagation(); setViewingEvent(item as CalendarEvent); }}
                               >
@@ -282,15 +282,15 @@ export default function CalendarAgendaPage() {
         </div>
 
         {/* B. Right Side: Agenda Panel */}
-        <div className="w-80 shrink-0 flex flex-col overflow-y-auto p-4 gap-4 bg-[#f8fafc]">
+        <div className="w-80 shrink-0 flex flex-col overflow-y-auto p-4 gap-4 bg-[#f8fafc] dark:bg-muted/5 border-l">
           
-          <Card className="border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
-            <CardHeader className="bg-purple-50/50 p-4 border-b border-purple-100 pb-3">
+          <Card className="border-0 shadow-sm bg-white dark:bg-card rounded-2xl overflow-hidden">
+            <CardHeader className="bg-purple-50/50 dark:bg-purple-900/20 p-4 border-b border-purple-100 dark:border-purple-900/30 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-lg">🗓️</span>
-                <CardTitle className="text-[13px] font-black uppercase tracking-wider text-purple-900">Selected Day</CardTitle>
+                <CardTitle className="text-[13px] font-black uppercase tracking-wider text-purple-900 dark:text-purple-100">Selected Day</CardTitle>
               </div>
-              <p className="text-xs font-bold text-purple-600 mt-1">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</p>
+              <p className="text-xs font-bold text-purple-600 dark:text-purple-400 mt-1">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</p>
             </CardHeader>
             <CardContent className="p-0 divide-y divide-border/50">
               {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && (
@@ -305,7 +305,7 @@ export default function CalendarAgendaPage() {
                       <span className="text-sm font-bold text-foreground leading-tight">{t.title}</span>
                     </div>
                   </div>
-                  <Badge variant="outline" className="w-fit mt-2 bg-blue-50 text-blue-700 border-blue-200 text-[9px] uppercase font-bold">Task Due</Badge>
+                  <Badge variant="outline" className="w-fit mt-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 text-[9px] uppercase font-bold">Task Due</Badge>
                 </div>
               ))}
 
@@ -337,11 +337,11 @@ export default function CalendarAgendaPage() {
             </CardContent>
           </Card>
 
-          <Card className="border-0 shadow-sm bg-white rounded-2xl overflow-hidden">
-            <CardHeader className="bg-slate-50 p-4 border-b pb-3">
+          <Card className="border-0 shadow-sm bg-white dark:bg-card rounded-2xl overflow-hidden">
+            <CardHeader className="bg-slate-50 dark:bg-slate-900/50 p-4 border-b dark:border-slate-800 pb-3">
               <div className="flex items-center gap-2">
                 <span className="text-lg">📅</span>
-                <CardTitle className="text-[13px] font-black uppercase tracking-wider text-slate-700">Upcoming 7 Days</CardTitle>
+                <CardTitle className="text-[13px] font-black uppercase tracking-wider text-slate-700 dark:text-slate-300">Upcoming 7 Days</CardTitle>
               </div>
             </CardHeader>
             <CardContent className="p-0 divide-y divide-border/50">
