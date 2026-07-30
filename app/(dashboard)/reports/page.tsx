@@ -183,28 +183,28 @@ export default function ReportsPage() {
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Date Range</label>
                   <Select defaultValue="ytd">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><Calendar className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><Calendar className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="ytd">Year to Date</SelectItem><SelectItem value="q2">Q2 2026</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Agent</label>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><Users className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><Users className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="all">All Agents</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Region</label>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><MapPin className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><MapPin className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="all">Global</SelectItem><SelectItem value="na">North America</SelectItem></SelectContent>
                   </Select>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Product</label>
                   <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 rounded-xl font-bold text-sm shadow-sm"><Package className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
+                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><Package className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
                     <SelectContent><SelectItem value="all">All Products</SelectItem></SelectContent>
                   </Select>
                 </div>
@@ -214,9 +214,9 @@ export default function ReportsPage() {
                 <Button variant="ghost" className="font-bold text-slate-600 dark:text-slate-300 rounded-xl">Schedule</Button>
                 <div className="flex items-center bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-sm">
                   <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3">Export:</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-red-50 hover:text-red-600 text-slate-600" onClick={() => setExportPreview('pdf')}><FileIcon className="w-3 h-3 mr-1" /> PDF</Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-green-50 hover:text-green-600 text-slate-600" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> CSV</Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-emerald-50 hover:text-emerald-600 text-slate-600" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> Excel</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 text-slate-600 dark:text-slate-300" onClick={() => setExportPreview('pdf')}><FileIcon className="w-3 h-3 mr-1" /> PDF</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 text-slate-600 dark:text-slate-300" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> CSV</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400 text-slate-600 dark:text-slate-300" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> Excel</Button>
                 </div>
                 <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white rounded-xl shadow-md font-bold px-6" onClick={handleGenerate} disabled={isGenerating}>
                   <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} /> {isGenerating ? 'Generating...' : 'Generate'}
@@ -241,10 +241,10 @@ export default function ReportsPage() {
             {/* 3. Generated Content Dashboard */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               {[
-                { label: 'Total Revenue', value: '$3.5M', delta: '+15.2%', icon: CircleDollarSign, color: 'text-emerald-600', bg: 'bg-emerald-50' },
-                { label: 'Deals Closed', value: '359', delta: '+4.1%', icon: Target, color: 'text-blue-600', bg: 'bg-blue-50' },
-                { label: 'Avg Conversion', value: '54%', delta: '-2.4%', icon: Activity, color: 'text-rose-600', bg: 'bg-rose-50', down: true },
-                { label: 'Active Pipeline', value: '$8.2M', delta: '+22.5%', icon: TrendingUp, color: 'text-purple-600', bg: 'bg-purple-50' },
+                { label: 'Total Revenue', value: '$3.5M', delta: '+15.2%', icon: CircleDollarSign, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
+                { label: 'Deals Closed', value: '359', delta: '+4.1%', icon: Target, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
+                { label: 'Avg Conversion', value: '54%', delta: '-2.4%', icon: Activity, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20', down: true },
+                { label: 'Active Pipeline', value: '$8.2M', delta: '+22.5%', icon: TrendingUp, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
               ].map((kpi, i) => (
                 <Card key={i} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
                   <CardContent className="p-5 flex flex-col gap-4">
@@ -256,7 +256,7 @@ export default function ReportsPage() {
                     </div>
                     <div className="flex items-end justify-between">
                       <span className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tighter">{kpi.value}</span>
-                      <Badge className={`${kpi.down ? 'bg-rose-50 text-rose-700' : 'bg-emerald-50 text-emerald-700'} hover:bg-transparent font-bold border-transparent px-2`}>
+                      <Badge className={`${kpi.down ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'} hover:bg-transparent font-bold border-transparent px-2`}>
                         {kpi.down ? <ArrowDownRight className="w-3 h-3 mr-0.5" /> : <ArrowUpRight className="w-3 h-3 mr-0.5" />} {kpi.delta}
                       </Badge>
                     </div>
@@ -309,11 +309,11 @@ export default function ReportsPage() {
             </div>
 
             {/* 4. Tabbed Content Area */}
-            <div className="space-y-4 pt-4 border-t border-slate-200">
-              <div className="flex border-b border-slate-200">
-                <button onClick={() => setActiveTab('table')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'table' ? 'border-[#1e1a4f] text-[#1e1a4f]' : 'border-transparent text-slate-500 hover:text-slate-900'}`}>Report table</button>
-                <button onClick={() => setActiveTab('saved')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'saved' ? 'border-[#1e1a4f] text-[#1e1a4f]' : 'border-transparent text-slate-500 hover:text-slate-900'}`}>Saved reports</button>
-                <button onClick={() => setActiveTab('scheduled')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'scheduled' ? 'border-[#1e1a4f] text-[#1e1a4f]' : 'border-transparent text-slate-500 hover:text-slate-900'}`}>Scheduled</button>
+            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
+              <div className="flex border-b border-slate-200 dark:border-slate-800">
+                <button onClick={() => setActiveTab('table')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'table' ? 'border-[#1e1a4f] dark:border-indigo-400 text-[#1e1a4f] dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}>Report table</button>
+                <button onClick={() => setActiveTab('saved')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'saved' ? 'border-[#1e1a4f] dark:border-indigo-400 text-[#1e1a4f] dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}>Saved reports</button>
+                <button onClick={() => setActiveTab('scheduled')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'scheduled' ? 'border-[#1e1a4f] dark:border-indigo-400 text-[#1e1a4f] dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}>Scheduled</button>
               </div>
 
               {activeTab === 'table' && (
@@ -383,15 +383,15 @@ export default function ReportsPage() {
                           <p>Created: {r.createdAt}</p>
                           <p>Last run: {r.lastRun}</p>
                         </div>
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                           {r.status === 'success' ? (
-                            <Badge className="bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200"><CheckCircle2 className="w-3 h-3 mr-1" /> Success</Badge>
+                            <Badge className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1" /> Success</Badge>
                           ) : (
-                            <Badge className="bg-rose-50 text-rose-700 hover:bg-rose-50 border-rose-200"><ShieldAlert className="w-3 h-3 mr-1" /> Failed</Badge>
+                            <Badge className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 border-rose-200 dark:border-rose-800"><ShieldAlert className="w-3 h-3 mr-1" /> Failed</Badge>
                           )}
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" className="h-8 font-bold text-blue-600 hover:text-blue-700 hover:bg-blue-50 px-3"><Play className="w-3 h-3 mr-1" /> Run</Button>
-                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></Button>
+                            <Button variant="ghost" size="sm" className="h-8 font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3"><Play className="w-3 h-3 mr-1" /> Run</Button>
+                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"><Trash2 className="w-4 h-4" /></Button>
                           </div>
                         </div>
                       </CardContent>
@@ -407,7 +407,7 @@ export default function ReportsPage() {
                       <CardContent className="p-5 flex flex-col gap-4">
                         <div className="flex items-start justify-between">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600"><Clock className="w-5 h-5" /></div>
+                            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400"><Clock className="w-5 h-5" /></div>
                             <div>
                               <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{s.name}</h4>
                               <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{s.recipients} Recipients</p>
@@ -418,14 +418,14 @@ export default function ReportsPage() {
                           <Badge variant="outline" className="uppercase text-[10px] font-black tracking-widest text-slate-500">{s.frequency}</Badge>
                           <span className="text-xs font-medium text-slate-500">Next: {s.nextRun}</span>
                         </div>
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100">
+                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
                           <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleScheduled(s.id)}>
-                            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${s.active ? 'bg-emerald-500' : 'bg-slate-200'}`}>
+                            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${s.active ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`}>
                               <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${s.active ? 'translate-x-5' : 'translate-x-0'}`} />
                             </div>
-                            <span className="text-xs font-bold text-slate-600">{s.active ? 'Active' : 'Paused'}</span>
+                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{s.active ? 'Active' : 'Paused'}</span>
                           </div>
-                          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50"><Trash2 className="w-4 h-4" /></Button>
+                          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"><Trash2 className="w-4 h-4" /></Button>
                         </div>
                       </CardContent>
                     </Card>
