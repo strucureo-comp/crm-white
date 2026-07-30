@@ -90,7 +90,7 @@ function getNavConfig(leadCount: number): NavConfig {
         items: [
           { title: 'Quotes', href: '/quotes', icon: FileText },
           { title: 'Invoices', href: '/invoices', icon: Receipt },
-          { title: 'Proposals', href: '/proposals', icon: FileSpreadsheet },
+          { title: 'Contracts', href: '/proposals', icon: FileSpreadsheet },
           { title: 'Payments', href: '/payments', icon: Wallet },
         ],
       },
@@ -102,6 +102,7 @@ function getNavConfig(leadCount: number): NavConfig {
           { title: 'Social Media', href: '/social', icon: Camera },
           { title: 'Email Marketing', href: '/email', icon: Mail },
           { title: 'Marketing Calendar', href: '/marketing-calendar', icon: Calendar },
+          { title: 'Assets', href: '/assets', icon: Image },
         ],
       },
       {
@@ -117,7 +118,6 @@ function getNavConfig(leadCount: number): NavConfig {
         title: 'Analytics',
         items: [
           { title: 'Analytics', href: '/analytics', icon: BarChart3 },
-          { title: 'Assets', href: '/assets', icon: Image },
         ],
       },
       {

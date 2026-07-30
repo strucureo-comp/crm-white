@@ -65,35 +65,35 @@ export default function ProposalsPage() {
     if (!confirmState.id) return;
     try {
       await deleteQuotation(confirmState.id);
-      toast.success('Proposal deleted');
+      toast.success('Contract deleted');
       load();
       setConfirmState({ open: false });
     } catch {
-      toast.error('Failed to delete proposal');
+      toast.error('Failed to delete contract');
       setConfirmState({ open: false });
     }
   }
 
   if (loading) {
-    return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading proposals...</p></div>;
+    return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading contracts...</p></div>;
   }
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Proposals</h2>
-          <p className="text-sm text-muted-foreground">Build and send professional proposals</p>
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Contracts</h2>
+          <p className="text-sm text-muted-foreground">Build and send professional contracts</p>
         </div>
         <Button onClick={() => { setEditingQuote(null); setDialogOpen(true); }} className="w-full sm:w-auto">
           <Plus size={16} className="mr-2" />
-          New Proposal
+          New Contract
         </Button>
       </div>
 
       <div className="relative max-w-md">
         <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Search proposals..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
+        <Input placeholder="Search contracts..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
       </div>
 
       {filtered.length > 0 ? (
@@ -131,7 +131,7 @@ export default function ProposalsPage() {
                 <div className="flex items-center gap-1 mt-3 pt-3 border-t">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" aria-label="Proposal actions">
+                      <Button variant="ghost" size="icon" className="h-8 w-8 ml-auto" aria-label="Contract actions">
                         <MoreHorizontal size={14} />
                       </Button>
                     </DropdownMenuTrigger>
@@ -139,10 +139,10 @@ export default function ProposalsPage() {
                       <DropdownMenuItem onClick={async () => {
                         try {
                           await updateQuotation(q.id, { status: 'sent' });
-                          toast.success(`Proposal ${q.quotation_number} sent`);
+                          toast.success(`Contract ${q.quotation_number} sent`);
                           load();
                         } catch {
-                          toast.error('Failed to send proposal');
+                          toast.error('Failed to send contract');
                         }
                       }}>
                         <FileSpreadsheet size={14} className="mr-2" /> Send
@@ -160,7 +160,7 @@ export default function ProposalsPage() {
                         try {
                           const pdf = await generateQuotationPdf(q, null);
                           await downloadPdf(pdf, `${q.quotation_number}.pdf`);
-                          toast.success('Proposal downloaded');
+                          toast.success('Contract downloaded');
                         } catch { toast.error('Failed to generate PDF'); }
                       }}>
                         <Download size={14} className="mr-2" /> Download
@@ -173,10 +173,10 @@ export default function ProposalsPage() {
                             quotation_number: `Q-${Date.now().toString().slice(-6)}`,
                             status: 'draft',
                           });
-                          toast.success('Proposal duplicated');
+                          toast.success('Contract duplicated');
                           load();
                         } catch {
-                          toast.error('Failed to duplicate proposal');
+                          toast.error('Failed to duplicate contract');
                         }
                       }}>
                         <FileSpreadsheet size={14} className="mr-2" /> Duplicate
@@ -196,7 +196,7 @@ export default function ProposalsPage() {
           ))}
         </div>
       ) : (
-        <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">No proposals yet</p></CardContent></Card>
+        <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">No contracts yet</p></CardContent></Card>
       )}
 
       <QuoteDialog
@@ -208,8 +208,8 @@ export default function ProposalsPage() {
       <ConfirmDialog
         open={confirmState.open}
         onOpenChange={(open) => setConfirmState({ open })}
-        title="Delete Proposal"
-        description="Are you sure you want to delete this proposal? This action cannot be undone."
+        title="Delete Contract"
+        description="Are you sure you want to delete this contract? This action cannot be undone."
         onConfirm={onDeleteConfirm}
       />
     </div>
