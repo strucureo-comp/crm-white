@@ -209,11 +209,23 @@ export default function FunnelPage() {
             </CardHeader>
             <CardContent>
               {filteredLeads.length > 0 ? (
-                <div className="py-4 space-y-1">
+                <div className="py-4 flex flex-col gap-[2px]">
                   {stageData.map((stage, index) => {
                     const N = stageData.length;
-                    const topWidth = 100 - (60 * (index / N));
-                    const bottomWidth = 100 - (60 * ((index + 1) / N));
+                    
+                    // A proper funnel has a tapering top and a straight neck at the bottom
+                    const neckStages = Math.max(1, Math.floor(N / 3));
+                    const taperStages = N - neckStages;
+                    
+                    let topWidth, bottomWidth;
+                    if (index < taperStages) {
+                      topWidth = 100 - (60 * (index / taperStages));
+                      bottomWidth = 100 - (60 * ((index + 1) / taperStages));
+                    } else {
+                      topWidth = 40;
+                      bottomWidth = 40;
+                    }
+                    
                     const topLeft = (100 - topWidth) / 2;
                     const topRight = 100 - topLeft;
                     const bottomLeft = (100 - bottomWidth) / 2;
@@ -226,7 +238,7 @@ export default function FunnelPage() {
                         </span>
                         <div className="flex-1 flex items-center justify-center">
                           <div
-                            className="h-10 w-full flex items-center justify-center transition-all duration-300"
+                            className="h-12 w-full flex items-center justify-center transition-all duration-300"
                             style={{
                               backgroundColor: stage.fill,
                               clipPath: `polygon(${topLeft}% 0%, ${topRight}% 0%, ${bottomRight}% 100%, ${bottomLeft}% 100%)`,
