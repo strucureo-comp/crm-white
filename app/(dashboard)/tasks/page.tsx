@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { getTaskColumns, saveTaskColumns } from '@/lib/firebase/database';
 
 // --- Data Schemas ---
 export interface Assignee { id: string; name: string; avatar: string; email: string; }
@@ -74,7 +75,17 @@ export default function TaskManagerPage() {
 
   // State
   const [columns, setColumns] = useState<string[]>(['To Do', 'In Progress', 'Review', 'Done']);
+  const [isAddingColumn, setIsAddingColumn] = useState(false);
+  const [newColumnName, setNewColumnName] = useState('');
   const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+
+  useEffect(() => {
+    async function loadColumns() {
+      const cols = await getTaskColumns();
+      if (cols && cols.length > 0) setColumns(cols);
+    }
+    loadColumns();
+  }, []);
   const [view, setView] = useState<ViewType>('Kanban');
   const [search, setSearch] = useState('');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -137,13 +148,33 @@ export default function TaskManagerPage() {
     setFormDescription('');
   };
 
-  const handleAddColumn = () => {
-    const newColName = prompt('Enter new column name:');
-    if (newColName && newColName.trim() && !columns.includes(newColName.trim())) {
-      setColumns(prev => [...prev, newColName.trim()]);
-    } else if (newColName) {
+  const handleSaveNewColumn = async () => {
+    const trimmed = newColumnName.trim();
+    if (trimmed && !columns.includes(trimmed)) {
+      const nextCols = [...columns, trimmed];
+      setColumns(nextCols);
+      setNewColumnName('');
+      setIsAddingColumn(false);
+      
+      const success = await saveTaskColumns(nextCols);
+      if (!success) toast.error('Failed to save column to backend');
+      else toast.success('Column added successfully');
+    } else if (trimmed) {
       toast.error('Invalid or duplicate column name');
     }
+  };
+
+  const handleDeleteColumn = async (colToDelete: string) => {
+    const colTasks = tasks.filter(t => t.status === colToDelete);
+    if (colTasks.length > 0) {
+      if (!window.confirm(`There are ${colTasks.length} tasks in "${colToDelete}". Are you sure you want to delete this column?`)) return;
+    }
+    
+    const nextCols = columns.filter(c => c !== colToDelete);
+    setColumns(nextCols);
+    const success = await saveTaskColumns(nextCols);
+    if (!success) toast.error('Failed to delete column from backend');
+    else toast.success(`Column "${colToDelete}" deleted`);
   };
 
   const handleDragEnd = (result: DropResult) => {
@@ -316,7 +347,7 @@ export default function TaskManagerPage() {
                         <h3 className="font-bold text-sm">{col}</h3>
                         <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-muted">{colTasks.length}</Badge>
                       </div>
-                      <Button variant="ghost" size="icon" className="w-6 h-6 text-muted-foreground hover:text-rose-600"><X className="w-3 h-3" /></Button>
+                      <Button variant="ghost" size="icon" className="w-6 h-6 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteColumn(col)}><X className="w-3 h-3" /></Button>
                     </div>
                     
                     <Droppable droppableId={col}>
@@ -377,9 +408,31 @@ export default function TaskManagerPage() {
                   </div>
                 );
               })}
-              <div onClick={handleAddColumn} className="flex-shrink-0 w-[320px] flex items-center justify-center bg-muted/10 border-2 border-dashed rounded-xl border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/30 cursor-pointer transition-colors group">
-                <span className="text-sm font-bold text-muted-foreground group-hover:text-primary flex items-center"><Plus className="w-4 h-4 mr-2" /> Add Column</span>
-              </div>
+              {isAddingColumn ? (
+                <div className="flex-shrink-0 w-[320px] bg-muted/10 border-2 rounded-xl border-primary/50 p-3 flex flex-col gap-2">
+                  <Input
+                    autoFocus
+                    placeholder="Column title..."
+                    value={newColumnName}
+                    onChange={(e) => setNewColumnName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveNewColumn();
+                      if (e.key === 'Escape') setIsAddingColumn(false);
+                    }}
+                    className="bg-background h-8 text-sm"
+                  />
+                  <div className="flex items-center gap-2">
+                    <Button size="sm" className="h-7 text-xs px-3" onClick={handleSaveNewColumn}>Add</Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => setIsAddingColumn(false)}>
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div onClick={() => setIsAddingColumn(true)} className="flex-shrink-0 w-[320px] flex items-center justify-center bg-muted/10 border-2 border-dashed rounded-xl border-muted-foreground/20 hover:border-primary/50 hover:bg-muted/30 cursor-pointer transition-colors group">
+                  <span className="text-sm font-bold text-muted-foreground group-hover:text-primary flex items-center"><Plus className="w-4 h-4 mr-2" /> Add Column</span>
+                </div>
+              )}
             </div>
           </DragDropContext>
         )}

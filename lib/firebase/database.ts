@@ -1081,6 +1081,29 @@ export async function deleteTask(id: string): Promise<boolean> {
   }
 }
 
+export async function getTaskColumns(): Promise<string[]> {
+  try {
+    const refPath = ref(database, 'settings/task_columns');
+    const snapshot = await get(refPath);
+    if (!snapshot.exists()) return ['To Do', 'In Progress', 'Review', 'Done'];
+    return snapshot.val() as string[];
+  } catch (error) {
+    console.error('Error getting task columns:', error);
+    return ['To Do', 'In Progress', 'Review', 'Done'];
+  }
+}
+
+export async function saveTaskColumns(columns: string[]): Promise<boolean> {
+  try {
+    const refPath = ref(database, 'settings/task_columns');
+    await set(refPath, columns);
+    return true;
+  } catch (error) {
+    console.error('Error saving task columns:', error);
+    return false;
+  }
+}
+
 // ----------------------------------------------------
 // LEAD FUNCTIONS
 // ----------------------------------------------------
