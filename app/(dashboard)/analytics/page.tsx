@@ -229,14 +229,14 @@ export default function AnalyticsDashboard() {
   if (!isClient) return null; // Avoid hydration mismatch with DndKit/Recharts
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc]">
+    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] dark:bg-background">
       
       {/* 2. Global Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border-b border-slate-200 shrink-0 z-20 shadow-sm relative">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 shrink-0 z-20 shadow-sm relative">
         <div className="flex items-center gap-4">
           <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#1e1a4f] font-sans" style={{ fontFamily: "'Outfit', sans-serif" }}>Analytics Dashboard</h1>
-            <p className="text-sm text-slate-500 font-medium mt-1">Real-time performance metrics across all client accounts.</p>
+            <h1 className="text-2xl font-black tracking-tight text-[#1e1a4f] dark:text-foreground font-sans" style={{ fontFamily: "'Outfit', sans-serif" }}>Analytics Dashboard</h1>
+            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Real-time performance metrics across all client accounts.</p>
           </div>
           {isEditMode && <Badge className="bg-blue-50 text-blue-700 border-blue-200 uppercase font-black tracking-widest text-[10px] h-6 px-3">Edit Mode</Badge>}
         </div>
@@ -268,22 +268,22 @@ export default function AnalyticsDashboard() {
       </div>
 
       {/* Global Filters Row */}
-      <div className="bg-white border-b border-slate-200 p-3 px-5 flex flex-wrap items-center gap-4 shrink-0 z-10">
-        <span className="text-xs font-black uppercase text-slate-400 tracking-widest">Filters:</span>
+      <div className="bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 p-3 px-5 flex flex-wrap items-center gap-4 shrink-0 z-10">
+        <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Filters:</span>
         <Select value={globalFilters.dateRange} onValueChange={v => setGlobalFilters(p => ({...p, dateRange: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 transition-colors rounded-lg"><Calendar className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Calendar className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="7days">Last 7 Days</SelectItem><SelectItem value="30days">Last 30 Days</SelectItem><SelectItem value="thisYear">This Year</SelectItem></SelectContent>
         </Select>
         <Select value={globalFilters.pipeline} onValueChange={v => setGlobalFilters(p => ({...p, pipeline: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 transition-colors rounded-lg"><Building2 className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Building2 className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">All Pipelines</SelectItem><SelectItem value="sales">Sales Pipeline</SelectItem><SelectItem value="partners">Partner Pipeline</SelectItem></SelectContent>
         </Select>
         <Select value={globalFilters.owner} onValueChange={v => setGlobalFilters(p => ({...p, owner: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 transition-colors rounded-lg"><Users className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Users className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">All Owners</SelectItem><SelectItem value="me">Assigned to Me</SelectItem></SelectContent>
         </Select>
         <Select value={globalFilters.tag} onValueChange={v => setGlobalFilters(p => ({...p, tag: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 transition-colors rounded-lg"><Tag className="w-4 h-4 mr-2 text-slate-400" /><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Tag className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">All Tags</SelectItem><SelectItem value="enterprise">Enterprise</SelectItem><SelectItem value="smb">SMB</SelectItem></SelectContent>
         </Select>
       </div>
@@ -294,11 +294,11 @@ export default function AnalyticsDashboard() {
         <div className="flex-1 overflow-y-auto p-6 flex flex-col">
           {widgets.length === 0 ? (
             <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 flex items-center justify-center mb-6">
-                <LayoutDashboard className="w-8 h-8 text-slate-400" />
+              <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center mb-6">
+                <LayoutDashboard className="w-8 h-8 text-slate-400 dark:text-slate-500" />
               </div>
-              <h3 className="text-xl font-black text-slate-900 tracking-tight">Your Dashboard is Empty</h3>
-              <p className="text-slate-500 font-medium mt-2 mb-6 max-w-sm">Start building your custom view by adding components to the grid.</p>
+              <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Your Dashboard is Empty</h3>
+              <p className="text-slate-500 dark:text-slate-400 font-medium mt-2 mb-6 max-w-sm">Start building your custom view by adding components to the grid.</p>
               {!isEditMode && <Button onClick={() => setIsEditMode(true)} className="rounded-xl font-bold bg-[#1e1a4f] text-white">Edit Layout</Button>}
             </div>
           ) : (
@@ -327,18 +327,18 @@ export default function AnalyticsDashboard() {
                                 opacity: snapshot.isDragging ? 0.8 : 1,
                                 zIndex: snapshot.isDragging ? 50 : 1,
                               }}
-                              className={`relative group bg-white rounded-[16px] border shadow-sm flex flex-col transition-all duration-200
-                                ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:border-slate-300' : ''}
-                                ${isSelected && isEditMode ? 'ring-2 ring-blue-500 border-blue-500 shadow-md' : 'border-slate-200'}
+                              className={`relative group bg-white dark:bg-card rounded-[16px] border shadow-sm flex flex-col transition-all duration-200
+                                ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 dark:hover:border-slate-600' : ''}
+                                ${isSelected && isEditMode ? 'ring-2 ring-blue-500 border-blue-500 shadow-md' : 'border-slate-200 dark:border-slate-800'}
                               `}
                               onClick={() => { if(isEditMode) setSelectedWidgetId(w.id); }}
                             >
-                              <div className="p-5 border-b border-slate-100 shrink-0 flex items-center justify-between">
-                                <h3 className="font-bold text-slate-800">{w.title}</h3>
+                              <div className="p-5 border-b border-slate-100 dark:border-slate-800/50 shrink-0 flex items-center justify-between">
+                                <h3 className="font-bold text-slate-800 dark:text-slate-200">{w.title}</h3>
                                 {isEditMode && (
-                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 absolute top-3 right-3">
-                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100"><Settings className="w-4 h-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" onClick={(e) => removeWidget(w.id, e)}><Trash2 className="w-4 h-4" /></Button>
+                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 dark:border-slate-800 absolute top-3 right-3">
+                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"><Settings className="w-4 h-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={(e) => removeWidget(w.id, e)}><Trash2 className="w-4 h-4" /></Button>
                                   </div>
                                 )}
                               </div>
@@ -361,19 +361,19 @@ export default function AnalyticsDashboard() {
 
         {/* 6. Configurator Panel */}
         {isEditMode && selectedWidgetId && (
-          <div className="w-80 border-l border-slate-200 bg-white shadow-[-8px_0_24px_-12px_rgba(0,0,0,0.1)] z-20 flex flex-col shrink-0 animate-in slide-in-from-right-4 duration-300">
-            <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-              <h3 className="font-black text-slate-900 tracking-tight">Widget Settings</h3>
-              <button className="text-slate-400 hover:text-slate-600" onClick={() => setSelectedWidgetId(null)}><X className="w-4 h-4" /></button>
+          <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-[-8px_0_24px_-12px_rgba(0,0,0,0.1)] z-20 flex flex-col shrink-0 animate-in slide-in-from-right-4 duration-300">
+            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
+              <h3 className="font-black text-slate-900 dark:text-slate-100 tracking-tight">Widget Settings</h3>
+              <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => setSelectedWidgetId(null)}><X className="w-4 h-4" /></button>
             </div>
             
             <div className="p-5 overflow-y-auto flex-1 space-y-6">
               <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Widget Title</label>
+                <label className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Widget Title</label>
                 <Input 
                   value={widgets.find(w => w.id === selectedWidgetId)?.title || ''} 
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? {...w, title: e.target.value} : w))}
-                  className="h-10 bg-slate-50 border-slate-200 font-bold rounded-xl focus-visible:ring-blue-500"
+                  className="h-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold rounded-xl focus-visible:ring-blue-500"
                 />
               </div>
 
@@ -405,17 +405,17 @@ export default function AnalyticsDashboard() {
 
       {/* Add Component Modal */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-[600px] p-8 bg-white border-0 shadow-2xl rounded-[1.5rem] gap-6">
+        <DialogContent className="sm:max-w-[600px] p-8 bg-white dark:bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6">
           <DialogHeader>
-            <DialogTitle className="text-2xl font-black text-[#1e1a4f] tracking-tight">Add Component</DialogTitle>
+            <DialogTitle className="text-2xl font-black text-[#1e1a4f] dark:text-foreground tracking-tight">Add Component</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
             {['KPI', 'Bar Chart', 'Line Chart', 'Donut Chart', 'Funnel', 'Area Chart'].map(type => (
-              <div key={type} className="border border-slate-200 rounded-xl p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-blue-500 hover:bg-blue-50/50 transition-colors group">
-                <div className="w-12 h-12 rounded-full bg-slate-50 flex items-center justify-center group-hover:bg-blue-100 transition-colors">
-                  <LayoutDashboard className="w-5 h-5 text-slate-400 group-hover:text-blue-600" />
+              <div key={type} className="border border-slate-200 dark:border-slate-800 rounded-xl p-4 flex flex-col items-center justify-center gap-3 cursor-pointer hover:border-blue-500 dark:hover:border-blue-500 hover:bg-blue-50/50 dark:hover:bg-blue-900/20 transition-colors group">
+                <div className="w-12 h-12 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center group-hover:bg-blue-100 dark:group-hover:bg-blue-900/40 transition-colors">
+                  <LayoutDashboard className="w-5 h-5 text-slate-400 dark:text-slate-500 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
                 </div>
-                <span className="font-bold text-sm text-slate-700">{type}</span>
+                <span className="font-bold text-sm text-slate-700 dark:text-slate-300">{type}</span>
               </div>
             ))}
           </div>
