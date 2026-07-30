@@ -118,6 +118,7 @@ function getNavConfig(leadCount: number): NavConfig {
         title: 'Analytics',
         items: [
           { title: 'Analytics', href: '/analytics', icon: BarChart3 },
+          { title: 'Reports', href: '/reports', icon: FileText },
         ],
       },
       {
