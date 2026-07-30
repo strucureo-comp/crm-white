@@ -173,51 +173,7 @@ export default function OverviewPage() {
         />
       </div>
 
-      <div className="overflow-x-auto pb-2">
-        <div className="flex gap-4 min-w-max">
-          {companyList.map((company) => (
-            <Card key={company.name} className="w-64 shrink-0 hover:shadow-md transition-shadow">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-3 mb-3">
-                  <Avatar className="h-10 w-10">
-                    <AvatarFallback className="bg-primary/10 text-primary font-semibold">
-                      {company.name.slice(0, 2).toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="min-w-0">
-                    <p className="font-medium truncate">{company.name}</p>
-                    <p className="text-xs text-muted-foreground">{company.leads.length} leads</p>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Stage</span>
-                    <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${stageColors[company.stage] || ''}`}>
-                      {company.stage.replace('_', ' ').replace(/\b\w/g, (l) => l.toUpperCase())}
-                    </Badge>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs text-muted-foreground">Pipeline Value</span>
-                    <span className="text-xs font-medium">{formatCurrency(company.totalValue)}</span>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">Health Score</span>
-                      <span className="text-muted-foreground">{Math.min(100, Math.round((company.totalValue / (pipelineValue || 1)) * 100 * company.leads.length))}%</span>
-                    </div>
-                    <div className="h-1.5 bg-muted rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-primary rounded-full"
-                        style={{ width: `${Math.min(100, Math.round((company.totalValue / (pipelineValue || 1)) * 100 * company.leads.length))}%` }}
-                      />
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <Card>
