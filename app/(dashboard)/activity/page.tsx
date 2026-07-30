@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { getActivityLogs, getTasks } from '@/lib/firebase/database';
+import { getActivityLogs, getTasks, createActivityLog } from '@/lib/firebase/database';
 import type { ActivityLog, TaskItem, ActivityAction } from '@/lib/db/types';
 import { toast } from 'sonner';
 import {
@@ -124,6 +124,40 @@ export default function ActivityPage() {
   const [activeTab, setActiveTab] = useState<TabFilter>('All');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(true);
+  const [formState, setFormState] = useState({
+    title: '',
+    type: 'meeting',
+    priority: 'medium',
+    date: format(new Date(), 'yyyy-MM-dd'),
+    time: '09:00'
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  async function handleSaveActivity() {
+    if (!formState.title.trim()) return toast.error('Title is required');
+    setIsSubmitting(true);
+    try {
+      await createActivityLog({
+        action: 'task_created',
+        description: formState.title,
+        entity_type: formState.type,
+        user_id: 'demo-user',
+        user_name: 'Demo User',
+        title: formState.title,
+        date: formState.date,
+        time: formState.time,
+        metadata: { priority: formState.priority }
+      });
+      toast.success('Activity added');
+      setDialogOpen(false);
+      load();
+      setFormState({ ...formState, title: '' });
+    } catch (error) {
+      toast.error('Failed to save activity');
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
 
   async function load() {
     try {
@@ -163,13 +197,13 @@ export default function ActivityPage() {
       type: (l.entity_type === 'meeting' ? 'meeting' :
             l.entity_type === 'task' ? 'task' :
             l.entity_type === 'project' ? 'deadline' : 'followup') as ActivityType,
-      title: l.description,
+      title: l.title || l.description,
       description: l.action.replace(/_/g, ' '),
       company: l.entity_type,
-      date: l.created_at,
-      time: formatTime(l.created_at),
+      date: l.date || l.created_at,
+      time: l.time || formatTime(l.created_at),
       duration: 0,
-      priority: 'medium' as const,
+      priority: (l.metadata?.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
       status: 'pending' as 'pending',
       owner: l.user_name,
     }));
@@ -506,12 +540,19 @@ export default function ActivityPage() {
           <div className="space-y-4 py-2">
             <div>
               <label className="text-sm font-medium mb-1 block">Title</label>
-              <Input placeholder="Activity title" />
+              <Input 
+                placeholder="Activity title" 
+                value={formState.title}
+                onChange={(e) => setFormState(prev => ({ ...prev, title: e.target.value }))}
+              />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1 block">Type</label>
-                <Select defaultValue="meeting">
+                <Select 
+                  value={formState.type} 
+                  onValueChange={(v) => setFormState(prev => ({ ...prev, type: v }))}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="meeting">Meeting</SelectItem>
@@ -523,7 +564,10 @@ export default function ActivityPage() {
               </div>
               <div>
                 <label className="text-sm font-medium mb-1 block">Priority</label>
-                <Select defaultValue="medium">
+                <Select 
+                  value={formState.priority} 
+                  onValueChange={(v) => setFormState(prev => ({ ...prev, priority: v }))}
+                >
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="low">Low</SelectItem>
@@ -534,10 +578,30 @@ export default function ActivityPage() {
                 </Select>
               </div>
             </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="text-sm font-medium mb-1 block">Date</label>
+                <Input 
+                  type="date"
+                  value={formState.date}
+                  onChange={(e) => setFormState(prev => ({ ...prev, date: e.target.value }))}
+                />
+              </div>
+              <div>
+                <label className="text-sm font-medium mb-1 block">Time</label>
+                <Input 
+                  type="time"
+                  value={formState.time}
+                  onChange={(e) => setFormState(prev => ({ ...prev, time: e.target.value }))}
+                />
+              </div>
+            </div>
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>Cancel</Button>
-            <Button onClick={() => { setDialogOpen(false); toast.success('Activity added'); }}>Save</Button>
+            <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSubmitting}>Cancel</Button>
+            <Button onClick={handleSaveActivity} disabled={isSubmitting}>
+              {isSubmitting ? 'Saving...' : 'Save'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

@@ -602,6 +602,8 @@ export interface ActivityLog {
   user_id: string;
   user_name: string;
   title?: string;
+  date?: string;
+  time?: string;
   metadata?: Record<string, any>;
   created_at: string;
 }
