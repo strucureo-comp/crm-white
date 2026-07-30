@@ -369,7 +369,7 @@ export default function CalendarAgendaPage() {
       
       {/* Event Detail Popup */}
       <Dialog open={!!viewingEvent} onOpenChange={(open) => { if (!open) setViewingEvent(null); }}>
-        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden rounded-[1.5rem] border-0 shadow-2xl bg-white">
+        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden rounded-[1.5rem] border-0 shadow-2xl bg-white" hideCloseIcon>
           {viewingEvent && (
             <>
               <div className="h-2 w-full" style={{ backgroundColor: viewingEvent.color }} />
@@ -428,7 +428,7 @@ export default function CalendarAgendaPage() {
 
       {/* Schedule Event Modal */}
       <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
-        <DialogContent className="sm:max-w-[500px] p-8 bg-[#fdfcff] dark:bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6">
+        <DialogContent className="sm:max-w-[500px] p-8 bg-[#fdfcff] dark:bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6" hideCloseIcon>
           <div className="flex items-center justify-between">
             <DialogTitle className="text-2xl font-black text-[#1e1a4f] dark:text-slate-100 tracking-tight">Schedule Event</DialogTitle>
             <button className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors" onClick={() => setIsScheduleOpen(false)}>
