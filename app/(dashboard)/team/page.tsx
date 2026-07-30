@@ -1,214 +1,470 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { Users, Shield, Activity, Search, Plus, MoreHorizontal, Edit2, X, Check, SearchIcon, Clock, Filter, AlertCircle, Save } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Search, Trophy, MessageSquare, Phone, Mail, MoreHorizontal, Pencil, Trash2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { getUsers, deleteUser } from '@/lib/firebase/database';
-import type { User } from '@/lib/db/types';
-import { toast } from 'sonner';
-import { TeamDialog } from '@/components/dialogs/team-dialog';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
-const roleColors: Record<string, string> = {
-  admin: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400',
-  dev: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
-  client: 'bg-muted text-muted-foreground',
-};
+// --- Data Schemas ---
+type PermissionType = 'v' | 'e' | 'd';
 
-export default function TeamPage() {
-  const [users, setUsers] = useState<User[]>([]);
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [dialogOpen, setDialogOpen] = useState(false);
-  const [dialogMode, setDialogMode] = useState<'edit' | 'invite'>('invite');
-  const [editingUser, setEditingUser] = useState<User | null>(null);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+interface ModulePermissions {
+  v: boolean;
+  e: boolean;
+  d: boolean;
+}
 
-  async function load() {
-    setLoading(true);
-    const data = await getUsers();
-    setUsers(data);
-    setLoading(false);
-  }
+interface Role {
+  id: string;
+  name: string;
+  modules: {
+    contracts: ModulePermissions;
+    payments: ModulePermissions;
+    marketing: ModulePermissions;
+    workspace: ModulePermissions;
+    analytics: ModulePermissions;
+  };
+}
 
-  useEffect(() => { load(); }, []);
+interface Member {
+  id: string;
+  name: string;
+  email: string;
+  role: string;
+  status: 'Active' | 'Invited' | 'Inactive';
+  lastActive: string;
+  initials: string;
+  color: string;
+}
 
-  const filtered = users.filter((u) =>
-    !search || u.full_name.toLowerCase().includes(search.toLowerCase()) || u.email.toLowerCase().includes(search.toLowerCase())
-  );
+interface ActivityItem {
+  id: string;
+  repId: string;
+  action: string;
+  target: string;
+  time: string;
+}
 
-  function openInvite() {
-    setEditingUser(null);
-    setDialogMode('invite');
-    setDialogOpen(true);
-  }
-
-  function openEdit(user: User) {
-    setEditingUser(user);
-    setDialogMode('edit');
-    setDialogOpen(true);
-  }
-
-  async function handleDelete(id: string) {
-    setConfirmState({ open: true, id });
-  }
-
-  async function onDeleteConfirm() {
-    const id = confirmState.id;
-    if (!id) return;
-    setConfirmState((prev) => ({ ...prev, loading: true }));
-    try {
-      await deleteUser(id);
-      toast.success('Member removed');
-      load();
-    } catch {
-      toast.error('Failed to remove member');
-    } finally {
-      setConfirmState({ open: false });
+// --- Mock Data ---
+const MOCK_ROLES: Role[] = [
+  {
+    id: 'r1', name: 'Admin',
+    modules: {
+      contracts: { v: false, e: true, d: false },
+      payments: { v: false, e: true, d: false },
+      marketing: { v: false, e: true, d: false },
+      workspace: { v: false, e: true, d: false },
+      analytics: { v: false, e: true, d: false },
+    }
+  },
+  {
+    id: 'r2', name: 'Manager',
+    modules: {
+      contracts: { v: false, e: true, d: false },
+      payments: { v: true, e: false, d: false },
+      marketing: { v: false, e: true, d: false },
+      workspace: { v: true, e: false, d: false },
+      analytics: { v: false, e: true, d: false },
+    }
+  },
+  {
+    id: 'r3', name: 'Sales Rep',
+    modules: {
+      contracts: { v: false, e: true, d: false },
+      payments: { v: false, e: false, d: true },
+      marketing: { v: false, e: false, d: true },
+      workspace: { v: true, e: false, d: false },
+      analytics: { v: true, e: false, d: false },
+    }
+  },
+  {
+    id: 'r4', name: 'Viewer',
+    modules: {
+      contracts: { v: true, e: false, d: false },
+      payments: { v: true, e: false, d: false },
+      marketing: { v: true, e: false, d: false },
+      workspace: { v: true, e: false, d: false },
+      analytics: { v: true, e: false, d: false },
     }
   }
+];
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><p className="text-muted-foreground">Loading team...</p></div>;
-  }
+const MOCK_MEMBERS: Member[] = [
+  { id: 'm1', name: 'Alex Rivera', email: 'alex@tagverse.com', role: 'Admin', status: 'Active', lastActive: 'Just now', initials: 'AR', color: '#8b5cf6' },
+  { id: 'm2', name: 'Sarah Jones', email: 'sarah@tagverse.com', role: 'Manager', status: 'Active', lastActive: '2h ago', initials: 'SJ', color: '#ec4899' },
+  { id: 'm3', name: 'Mike Chen', email: 'mike@tagverse.com', role: 'Sales Rep', status: 'Invited', lastActive: 'Never', initials: 'MC', color: '#3b82f6' },
+  { id: 'm4', name: 'Emma Wilson', email: 'emma@tagverse.com', role: 'Sales Rep', status: 'Active', lastActive: '5h ago', initials: 'EW', color: '#10b981' },
+  { id: 'm5', name: 'David Kim', email: 'david@tagverse.com', role: 'Viewer', status: 'Inactive', lastActive: '3 days ago', initials: 'DK', color: '#64748b' },
+];
+
+const MOCK_ACTIVITY: ActivityItem[] = [
+  { id: 'a1', repId: 'm1', action: 'updated permissions for', target: 'Sales Rep role', time: '10 mins ago' },
+  { id: 'a2', repId: 'm2', action: 'invited', target: 'Mike Chen to workspace', time: '1 hour ago' },
+  { id: 'a3', repId: 'm4', action: 'logged in from', target: 'new device (Mac OS)', time: '5 hours ago' },
+  { id: 'a4', repId: 'm1', action: 'changed role of', target: 'David Kim to Viewer', time: '3 days ago' },
+  { id: 'a5', repId: 'm5', action: 'deactivated', target: 'their own account', time: '3 days ago' },
+];
+
+const MODULE_NAMES = ['contracts', 'payments', 'marketing', 'workspace', 'analytics'] as const;
+type ModuleKey = typeof MODULE_NAMES[number];
+
+export default function TeamPage() {
+  const [activeTab, setActiveTab] = useState<'Members' | 'Roles' | 'Activity'>('Members');
+  
+  // Members Tab State
+  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
+  const [searchMember, setSearchMember] = useState('');
+  const [filterRole, setFilterRole] = useState('All');
+  const [filterStatus, setFilterStatus] = useState('All');
+
+  // Roles Tab State
+  const [roles, setRoles] = useState<Role[]>(MOCK_ROLES);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('r3'); // Sales Rep default
+  const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [editedRole, setEditedRole] = useState<Role | null>(null);
+
+  // Activity Tab State
+  const [filterAction, setFilterAction] = useState('All');
+
+  // Sync editedRole when selected role changes
+  useEffect(() => {
+    const role = roles.find(r => r.id === selectedRoleId);
+    if (role) setEditedRole(JSON.parse(JSON.stringify(role)));
+    setSaveState('idle');
+  }, [selectedRoleId, roles]);
+
+  const handleRoleChange = (memberId: string, newRole: string) => {
+    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
+  };
+
+  const handleRemoveMember = (memberId: string) => {
+    setMembers(prev => prev.filter(m => m.id !== memberId));
+  };
+
+  const togglePermission = (mod: ModuleKey, perm: PermissionType) => {
+    if (!editedRole) return;
+    const newRole = { ...editedRole };
+    
+    // Reset all to false for this module
+    newRole.modules[mod] = { v: false, e: false, d: false };
+    // Set the selected one to true
+    newRole.modules[mod][perm] = true;
+    
+    setEditedRole(newRole);
+    setSaveState('idle'); // Need to save changes
+  };
+
+  const handleSaveRole = () => {
+    if (!editedRole) return;
+    setSaveState('saving');
+    setTimeout(() => {
+      setRoles(prev => prev.map(r => r.id === editedRole.id ? editedRole : r));
+      setSaveState('saved');
+      setTimeout(() => setSaveState('idle'), 2000);
+    }, 800);
+  };
+
+  // Filtered Data
+  const filteredMembers = members.filter(m => {
+    const matchesSearch = m.name.toLowerCase().includes(searchMember.toLowerCase()) || m.email.toLowerCase().includes(searchMember.toLowerCase());
+    const matchesRole = filterRole === 'All' || m.role === filterRole;
+    const matchesStatus = filterStatus === 'All' || m.status === filterStatus;
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
+  const filteredActivity = MOCK_ACTIVITY.filter(a => filterAction === 'All' || a.action.includes(filterAction));
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-        <div>
-          <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Team</h2>
-          <p className="text-sm text-muted-foreground">Manage your team and track performance</p>
+    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] text-slate-900">
+      
+      {/* 2. Global Layout & Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white border-b border-slate-200 shrink-0 z-10 shadow-sm">
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-black tracking-tight">Team</h1>
+          <Badge variant="secondary" className="bg-slate-100 text-slate-600 font-bold border-slate-200">
+            {members.length} Members
+          </Badge>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={() => toast.message('Team chat coming soon')} className="text-xs sm:text-sm">
-            <MessageSquare size={14} className="mr-1.5" />
-            Team Chat
-          </Button>
-          <Button onClick={openInvite} size="sm" className="text-xs sm:text-sm">
-            <Plus size={14} className="mr-1.5" />
-            Invite Member
-          </Button>
-        </div>
+        <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white rounded-xl shadow-md font-bold px-5">
+          <Plus className="w-4 h-4 mr-2" /> Invite Member
+        </Button>
       </div>
 
-      <div className="relative max-w-md">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-        <Input placeholder="Search team members..." value={search} onChange={(e) => setSearch(e.target.value)} className="pl-9" />
-      </div>
+      <div className="flex flex-1 min-h-0 overflow-hidden">
+        
+        {/* 3. Sidebar Navigation */}
+        <div className="w-64 border-r border-slate-200 bg-white flex flex-col p-4 shrink-0 z-10">
+          <div className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-4 px-2">Management</div>
+          
+          <nav className="flex flex-col gap-1">
+            <button 
+              onClick={() => setActiveTab('Members')}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Members' ? 'bg-purple-50 text-purple-700 font-bold border-l-4 border-l-purple-600' : 'text-slate-600 hover:bg-slate-50 font-semibold border-l-4 border-l-transparent'}`}
+            >
+              <Users className="w-4 h-4" /> Members
+            </button>
+            <button 
+              onClick={() => setActiveTab('Roles')}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Roles' ? 'bg-purple-50 text-purple-700 font-bold border-l-4 border-l-purple-600' : 'text-slate-600 hover:bg-slate-50 font-semibold border-l-4 border-l-transparent'}`}
+            >
+              <Shield className="w-4 h-4" /> Roles & Permissions
+            </button>
+            <button 
+              onClick={() => setActiveTab('Activity')}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all ${activeTab === 'Activity' ? 'bg-purple-50 text-purple-700 font-bold border-l-4 border-l-purple-600' : 'text-slate-600 hover:bg-slate-50 font-semibold border-l-4 border-l-transparent'}`}
+            >
+              <Activity className="w-4 h-4" /> Activity Log
+            </button>
+          </nav>
+        </div>
 
-      {filtered.length > 0 ? (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-4">
-            {filtered.map((user) => (
-              <Card key={user.id} className="hover:shadow-sm transition-all">
-                <CardContent className="p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-10 w-10">
-                        <AvatarFallback className="bg-primary/10 text-primary text-sm">
-                          {user.full_name.split(' ').map(n => n[0]).join('')}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="text-sm font-medium">{user.full_name}</p>
-                        <p className="text-xs text-muted-foreground">{user.email}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-4">
-                      <Badge variant="secondary" className={roleColors[user.role] || ''}>
-                        {user.role.charAt(0).toUpperCase() + user.role.slice(1)}
-                      </Badge>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Member actions">
-                            <MoreHorizontal size={14} />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="w-36">
-                          <DropdownMenuItem onClick={() => openEdit(user)}>
-                            <Pencil size={14} className="mr-2" /> Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(user.id)}>
-                            <Trash2 size={14} className="mr-2" /> Remove
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
+        {/* 4. Tab Views (Content Area) */}
+        <div className="flex-1 overflow-y-auto p-6 bg-[#f8fafc]">
+          
+          {/* A. Members Tab */}
+          {activeTab === 'Members' && (
+            <div className="max-w-6xl mx-auto space-y-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <div className="relative flex-1">
+                  <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                  <Input 
+                    placeholder="Search members..." 
+                    className="pl-9 h-11 bg-white border-slate-200 shadow-sm rounded-xl font-medium focus-visible:ring-purple-500" 
+                    value={searchMember}
+                    onChange={(e) => setSearchMember(e.target.value)}
+                  />
+                </div>
+                <Select value={filterRole} onValueChange={setFilterRole}>
+                  <SelectTrigger className="w-[160px] h-11 bg-white border-slate-200 shadow-sm rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Roles</SelectItem>
+                    {roles.map(r => <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-[160px] h-11 bg-white border-slate-200 shadow-sm rounded-xl font-bold"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Statuses</SelectItem>
+                    <SelectItem value="Active">Active</SelectItem>
+                    <SelectItem value="Invited">Invited</SelectItem>
+                    <SelectItem value="Inactive">Inactive</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <Card className="border-slate-200 shadow-sm rounded-2xl overflow-hidden bg-white">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left border-collapse">
+                    <thead>
+                      <tr className="border-b border-slate-100 bg-slate-50/50">
+                        <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[40%]">Member</th>
+                        <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[20%]">Role</th>
+                        <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[15%]">Status</th>
+                        <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[15%]">Last Active</th>
+                        <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 w-[10%] text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredMembers.length === 0 && (
+                        <tr><td colSpan={5} className="p-8 text-center text-slate-500 font-medium italic">No members found matching your filters.</td></tr>
+                      )}
+                      {filteredMembers.map(m => (
+                        <tr key={m.id} className="hover:bg-slate-50/50 transition-colors group">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10 border-2 border-white shadow-sm ring-1 ring-slate-100">
+                                <AvatarFallback className="text-white font-bold text-xs" style={{ backgroundColor: m.color }}>{m.initials}</AvatarFallback>
+                              </Avatar>
+                              <div className="flex flex-col min-w-0">
+                                <span className="font-bold text-slate-900 truncate leading-tight mb-0.5">{m.name}</span>
+                                <span className="text-xs text-slate-500 truncate">{m.email}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4">
+                            <Select value={m.role} onValueChange={(val) => handleRoleChange(m.id, val)}>
+                              <SelectTrigger className="h-8 text-xs font-bold border-slate-200 shadow-none bg-transparent hover:bg-slate-100 w-[130px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {roles.map(r => <SelectItem key={r.id} value={r.name} className="text-xs font-bold">{r.name}</SelectItem>)}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline" className={`text-[10px] uppercase font-black tracking-wider px-2 py-0.5 border-transparent ${
+                              m.status === 'Active' ? 'bg-emerald-50 text-emerald-700' : 
+                              m.status === 'Invited' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
+                            }`}>
+                              {m.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-xs font-medium text-slate-500">{m.lastActive}</td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Edit2 className="w-4 h-4" /></Button>
+                              <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleRemoveMember(m.id)}><X className="w-4 h-4" /></Button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* B. Roles & Permissions Tab */}
+          {activeTab === 'Roles' && (
+            <div className="max-w-6xl mx-auto flex flex-col lg:flex-row gap-6">
+              
+              {/* Left - Roles List */}
+              <Card className="w-full lg:w-72 border-slate-200 shadow-sm rounded-2xl bg-white shrink-0 self-start">
+                <CardHeader className="p-4 border-b border-slate-100 flex flex-row items-center justify-between pb-3">
+                  <h3 className="font-black text-slate-900 tracking-tight">Roles</h3>
+                  <Button variant="ghost" size="sm" className="h-7 text-xs font-bold text-purple-600 hover:text-purple-700 hover:bg-purple-50"><Plus className="w-3 h-3 mr-1" /> Add</Button>
+                </CardHeader>
+                <CardContent className="p-2 space-y-1">
+                  {roles.map(r => (
+                    <button 
+                      key={r.id}
+                      onClick={() => setSelectedRoleId(r.id)}
+                      className={`w-full text-left px-3 py-2.5 rounded-xl transition-all font-bold text-sm flex items-center justify-between ${
+                        selectedRoleId === r.id ? 'bg-purple-50 text-purple-700 border border-purple-100 shadow-sm' : 'text-slate-600 hover:bg-slate-50 border border-transparent'
+                      }`}
+                    >
+                      {r.name}
+                      {selectedRoleId === r.id && <Check className="w-4 h-4" />}
+                    </button>
+                  ))}
+                </CardContent>
+              </Card>
+
+              {/* Right - Permission Matrix */}
+              <Card className="flex-1 border-slate-200 shadow-sm rounded-2xl bg-white overflow-hidden">
+                <CardHeader className="p-5 border-b border-slate-100 flex flex-row items-start sm:items-center justify-between gap-4 bg-slate-50/50 pb-4">
+                  <div>
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight">{editedRole?.name} Permissions</h3>
+                    <p className="text-xs text-slate-500 font-medium mt-1">Configure what users with this role can access and modify.</p>
+                  </div>
+                  <Button 
+                    className={`rounded-xl font-bold shadow-md transition-all ${
+                      saveState === 'saved' ? 'bg-emerald-500 hover:bg-emerald-600 text-white' : 
+                      saveState === 'saving' ? 'bg-slate-200 text-slate-500 cursor-not-allowed' :
+                      'bg-[#1e1a4f] hover:bg-[#2d2770] text-white'
+                    }`}
+                    onClick={handleSaveRole}
+                    disabled={saveState !== 'idle'}
+                  >
+                    {saveState === 'saving' ? <><Activity className="w-4 h-4 mr-2 animate-spin" /> Saving...</> :
+                     saveState === 'saved' ? <><Check className="w-4 h-4 mr-2" /> Saved</> :
+                     <><Save className="w-4 h-4 mr-2" /> Save changes</>}
+                  </Button>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <div className="divide-y divide-slate-100">
+                    {MODULE_NAMES.map(mod => {
+                      const perms = editedRole?.modules[mod];
+                      if(!perms) return null;
+                      
+                      return (
+                        <div key={mod} className="p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 hover:bg-slate-50/30 transition-colors">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-900 capitalize">{mod}</span>
+                            <span className="text-[11px] text-slate-500 font-medium mt-0.5">Control access to {mod} data.</span>
+                          </div>
+                          
+                          <div className="flex items-center bg-slate-100 p-1 rounded-xl w-full sm:w-auto">
+                            <button 
+                              onClick={() => togglePermission(mod, 'v')}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.v ? 'bg-white text-blue-700 shadow-sm border border-blue-100' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                              {perms.v ? <Check className="w-3 h-3" /> : <span>–</span>} View
+                            </button>
+                            <button 
+                              onClick={() => togglePermission(mod, 'e')}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.e ? 'bg-white text-emerald-700 shadow-sm border border-emerald-100' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                              {perms.e ? <Check className="w-3 h-3" /> : <span>–</span>} Edit
+                            </button>
+                            <button 
+                              onClick={() => togglePermission(mod, 'd')}
+                              className={`flex-1 sm:flex-none flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all ${perms.d ? 'bg-white text-rose-700 shadow-sm border border-rose-100' : 'text-slate-500 hover:text-slate-700'}`}
+                            >
+                              {perms.d ? <Check className="w-3 h-3" /> : <span>–</span>} None
+                            </button>
+                          </div>
+                        </div>
+                      )
+                    })}
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
 
-          <div className="space-y-4">
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Trophy size={18} className="text-amber-500" />
-                  Team Stats
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Total Members</span>
-                      <span className="font-medium">{users.length}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Admins</span>
-                      <span className="font-medium">{users.filter((u) => u.role === 'admin').length}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Developers</span>
-                      <span className="font-medium">{users.filter((u) => u.role === 'dev').length}</span>
-                    </div>
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-sm mb-1">
-                      <span className="text-muted-foreground">Clients</span>
-                      <span className="font-medium">{users.filter((u) => u.role === 'client').length}</span>
-                    </div>
-                  </div>
+            </div>
+          )}
+
+          {/* C. Activity Log Tab */}
+          {activeTab === 'Activity' && (
+            <div className="max-w-4xl mx-auto space-y-4">
+              <div className="flex items-center justify-between bg-white p-3 rounded-2xl shadow-sm border border-slate-200">
+                <div className="flex items-center gap-2 px-2">
+                  <Filter className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-bold text-slate-700">Filter Feed:</span>
                 </div>
-              </CardContent>
-            </Card>
-          </div>
+                <Select value={filterAction} onValueChange={setFilterAction}>
+                  <SelectTrigger className="w-[200px] h-9 bg-slate-50 border-transparent shadow-none font-bold text-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="All">All Activity</SelectItem>
+                    <SelectItem value="updated permissions">Permissions Updated</SelectItem>
+                    <SelectItem value="invited">Invitations</SelectItem>
+                    <SelectItem value="logged in">Logins</SelectItem>
+                    <SelectItem value="changed role">Role Changes</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-3">
+                {filteredActivity.length === 0 && (
+                  <div className="p-8 text-center text-slate-500 font-medium italic bg-white rounded-2xl border border-slate-200 border-dashed">No recent activity matches your filter.</div>
+                )}
+                
+                {filteredActivity.map(a => {
+                  const member = members.find(m => m.id === a.repId) || MOCK_MEMBERS.find(m => m.id === a.repId);
+                  if(!member) return null;
+                  
+                  return (
+                    <Card key={a.id} className="border-slate-200 shadow-sm rounded-xl overflow-hidden bg-white hover:border-purple-200 transition-colors">
+                      <CardContent className="p-4 flex items-start sm:items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                          <Avatar className="w-10 h-10 border ring-1 ring-slate-100 shadow-sm">
+                            <AvatarFallback className="text-white font-bold text-xs" style={{ backgroundColor: member.color }}>{member.initials}</AvatarFallback>
+                          </Avatar>
+                          <div className="text-sm">
+                            <span className="font-bold text-slate-900">{member.name}</span>{' '}
+                            <span className="text-slate-500 font-medium">{a.action}</span>{' '}
+                            <span className="font-bold text-purple-700">{a.target}</span>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-400 shrink-0">
+                          <Clock className="w-3 h-3" />
+                          {a.time}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+
         </div>
-      ) : (
-        <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">{search ? 'No members match your search' : 'No team members yet'}</p></CardContent></Card>
-      )}
-
-      <TeamDialog
-        open={dialogOpen}
-        onOpenChange={setDialogOpen}
-        onSaved={load}
-        user={editingUser}
-        mode={dialogMode}
-      />
-
-      <ConfirmDialog
-        open={confirmState.open}
-        onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
-        title="Remove member"
-        description="Are you sure you want to remove this team member? This action cannot be undone."
-        onConfirm={onDeleteConfirm}
-        loading={confirmState.loading}
-      />
+      </div>
     </div>
   );
 }
