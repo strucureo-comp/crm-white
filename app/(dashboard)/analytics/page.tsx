@@ -64,16 +64,7 @@ const MOCK_FUNNEL_DATA = [
   { name: 'Closed Won', value: 150 },
 ];
 
-const INITIAL_WIDGETS: Widget[] = [
-  { id: 'w1', type: 'kpi', title: 'Total Revenue', config: { module: 'sales', metric: 'revenue', colorTheme: '#10b981' } },
-  { id: 'w2', type: 'kpi', title: 'Active Deals', config: { module: 'sales', metric: 'deals', colorTheme: '#3b82f6' } },
-  { id: 'w3', type: 'kpi', title: 'Win Rate', config: { module: 'sales', metric: 'win_rate', colorTheme: '#8b5cf6' } },
-  { id: 'w4', type: 'kpi', title: 'Avg Deal Size', config: { module: 'sales', metric: 'avg_size', colorTheme: '#f59e0b' } },
-  { id: 'w5', type: 'area', title: 'Revenue Growth', config: { module: 'sales', metric: 'revenue', colorTheme: '#8b5cf6' } },
-  { id: 'w6', type: 'donut', title: 'Deals by Segment', config: { module: 'sales', metric: 'segment', colorTheme: '#ec4899' } },
-  { id: 'w7', type: 'bar', title: 'Monthly Targets', config: { module: 'sales', metric: 'targets', colorTheme: '#3b82f6' } },
-  { id: 'w8', type: 'funnel', title: 'Sales Funnel', config: { module: 'sales', metric: 'funnel', colorTheme: '#f59e0b' } },
-];
+const INITIAL_WIDGETS: Widget[] = [];
 
 const THEME_COLORS: Record<string, string[]> = {
   '#8b5cf6': ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe'],
