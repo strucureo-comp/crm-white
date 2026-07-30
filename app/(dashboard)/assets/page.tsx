@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { 
   Upload, Search, Folder, CloudUpload, Eye, Download, Trash2, 
   MoreHorizontal, FileImage, FileVideo, FileText, File as FileIcon, 
-  CheckCircle2, FolderOpen
+  CheckCircle2, FolderOpen, Plus
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,7 @@ export type Asset = {
   date: string;
 };
 
-const FOLDERS = [
+const INITIAL_FOLDERS = [
   'Brand guidelines',
   'Campaign creatives',
   'Product screenshots',
@@ -51,6 +51,11 @@ export default function AssetsPage() {
 
   // State
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [folders, setFolders] = useState<string[]>(INITIAL_FOLDERS);
+  
+  // Folder Creation State
+  const [isNewFolderOpen, setIsNewFolderOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState('');
   
   // Filters
   const [search, setSearch] = useState('');
@@ -64,7 +69,7 @@ export default function AssetsPage() {
   // Upload Form State
   const [formName, setFormName] = useState('');
   const [formType, setFormType] = useState('Image');
-  const [formFolder, setFormFolder] = useState(FOLDERS[0]);
+  const [formFolder, setFormFolder] = useState(INITIAL_FOLDERS[0]);
 
   // Derived Data
   const recentUploads = useMemo(() => {
@@ -111,6 +116,21 @@ export default function AssetsPage() {
     setFormFolder(FOLDERS[0]);
     
     toast.success('Asset uploaded successfully!', {
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-lg'
+    });
+  };
+
+  const handleCreateFolder = () => {
+    const trimmed = newFolderName.trim();
+    if (!trimmed) return toast.error('Folder name is required');
+    if (folders.includes(trimmed)) return toast.error('Folder already exists');
+    
+    setFolders(prev => [...prev, trimmed]);
+    setIsNewFolderOpen(false);
+    setNewFolderName('');
+    
+    toast.success('Folder created successfully!', {
       icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
       className: 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-lg'
     });
@@ -179,10 +199,13 @@ export default function AssetsPage() {
         
         {/* Left Column - Folders */}
         <Card className="border shadow-sm flex flex-col h-[320px]">
-          <CardHeader className="pb-3 border-b bg-muted/20">
+          <CardHeader className="pb-3 border-b bg-muted/20 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="text-lg font-bold flex items-center gap-2">
               <FolderOpen className="w-5 h-5 text-primary" /> Folders
             </CardTitle>
+            <Button variant="ghost" size="icon" className="h-8 w-8 -mr-2" onClick={() => setIsNewFolderOpen(true)}>
+              <Plus className="w-4 h-4" />
+            </Button>
           </CardHeader>
           <div className="p-2 flex-1 overflow-y-auto">
             <div 
@@ -196,7 +219,7 @@ export default function AssetsPage() {
               <Badge variant="secondary" className="bg-background border shadow-sm text-xs">{totalAssets}</Badge>
             </div>
             
-            {FOLDERS.map(folder => {
+            {folders.map(folder => {
               const count = assets.filter(a => a.folder === folder).length;
               const isActive = activeFolder === folder;
               
@@ -391,7 +414,7 @@ export default function AssetsPage() {
                   <Select value={formFolder} onValueChange={setFormFolder}>
                     <SelectTrigger className="bg-background focus:ring-1"><SelectValue /></SelectTrigger>
                     <SelectContent>
-                      {FOLDERS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                      {folders.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -403,6 +426,33 @@ export default function AssetsPage() {
           <DialogFooter className="p-6 pt-4 border-t bg-muted/10">
             <Button variant="ghost" onClick={() => setIsUploadOpen(false)}>Cancel</Button>
             <Button onClick={handleUpload} className="shadow-sm font-semibold">Upload Asset</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Create Folder Modal */}
+      <Dialog open={isNewFolderOpen} onOpenChange={setIsNewFolderOpen}>
+        <DialogContent className="sm:max-w-[400px] p-0 overflow-hidden bg-background/95 backdrop-blur-xl shadow-2xl border-border/60 rounded-2xl">
+          <DialogHeader className="p-6 pb-4 border-b bg-muted/20">
+            <DialogTitle className="text-xl font-bold">Create New Folder</DialogTitle>
+          </DialogHeader>
+          
+          <div className="p-6 space-y-4">
+            <div className="space-y-2">
+              <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Folder Name</Label>
+              <Input 
+                placeholder="E.g. Q3 Assets" 
+                value={newFolderName} 
+                onChange={(e) => setNewFolderName(e.target.value)} 
+                className="bg-background focus-visible:ring-1" 
+                autoFocus
+              />
+            </div>
+          </div>
+          
+          <DialogFooter className="p-6 pt-4 border-t bg-muted/10">
+            <Button variant="ghost" onClick={() => setIsNewFolderOpen(false)}>Cancel</Button>
+            <Button onClick={handleCreateFolder} className="shadow-sm font-semibold bg-primary text-primary-foreground">Create Folder</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
