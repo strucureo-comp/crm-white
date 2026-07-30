@@ -88,7 +88,7 @@ function getNavConfig(leadCount: number): NavConfig {
       {
         title: 'Revenue Hub',
         items: [
-          { title: 'Quotes', href: '/quotes', icon: FileText },
+          { title: 'Quotations', href: '/quotes', icon: FileText },
           { title: 'Invoices', href: '/invoices', icon: Receipt },
           { title: 'Contracts', href: '/proposals', icon: FileSpreadsheet },
           { title: 'Payments', href: '/payments', icon: Wallet },
