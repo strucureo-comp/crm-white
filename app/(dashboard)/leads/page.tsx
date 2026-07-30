@@ -57,15 +57,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn, formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const statusColors: Record<string, string> = {
-  new: 'bg-blue-50 text-blue-600 dark:bg-blue-950 dark:text-blue-400',
-  contacted: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
-  qualified: 'bg-violet-50 text-violet-600 dark:bg-violet-950 dark:text-violet-400',
-  proposal: 'bg-purple-50 text-purple-600 dark:bg-purple-950 dark:text-purple-400',
-  negotiation: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
-  won: 'bg-green-50 text-green-600 dark:bg-green-950 dark:text-green-400',
-  lost: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
-};
+const statusColors: Record<string, string> = {};
 
 const stageTabs = [
   { value: 'all', label: 'All' },
@@ -457,14 +449,8 @@ export default function LeadsPage() {
                   header: 'Priority',
                   render: (lead) => {
                     if (!lead.priority) return <span className="text-sm text-muted-foreground">—</span>;
-                    const colors: Record<string, string> = {
-                      Low: 'text-slate-500 bg-slate-50 dark:text-slate-400 dark:bg-slate-900/50',
-                      Medium: 'text-blue-600 bg-blue-50 dark:text-blue-400 dark:bg-blue-900/50',
-                      High: 'text-orange-600 bg-orange-50 dark:text-orange-400 dark:bg-orange-900/50',
-                      Urgent: 'text-red-600 bg-red-50 dark:text-red-400 dark:bg-red-900/50',
-                    };
                     return (
-                      <Badge variant="secondary" className={cn('text-xs font-medium', colors[lead.priority] || '')}>
+                      <Badge variant="secondary" className="text-xs font-medium">
                         {lead.priority}
                       </Badge>
                     );
@@ -490,7 +476,7 @@ export default function LeadsPage() {
                   header: 'WA',
                   render: (lead) => (
                     <div className="flex items-center justify-center">
-                      <span className={cn('flex h-2 w-2 rounded-full', lead.phone ? 'bg-emerald-500' : 'bg-muted-foreground/30')} />
+                      <span className={cn('flex h-2 w-2 rounded-full', lead.phone ? 'bg-primary' : 'bg-muted-foreground/30')} />
                     </div>
                   ),
                 },
