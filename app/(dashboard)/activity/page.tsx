@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import { format, isToday, isTomorrow, isPast, isBefore, startOfDay, parseISO, addDays } from 'date-fns';
+import { format, isToday, isTomorrow, isPast, isBefore, startOfDay, parseISO } from 'date-fns';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -88,104 +88,6 @@ const typeConfig: Record<ActivityType, { icon: React.ElementType; label: string;
 const tabFilters = ['All', 'Meetings', 'Tasks', 'Deadlines', 'Followups'] as const;
 type TabFilter = (typeof tabFilters)[number];
 
-function generateMockActivities(date: Date): EnrichedActivity[] {
-  const baseDate = date.toISOString().split('T')[0];
-  const nextDay = addDays(date, 1).toISOString().split('T')[0];
-  const dayAfter = addDays(date, 2).toISOString().split('T')[0];
-
-  return [
-    {
-      id: 'mock-m1', type: 'meeting', title: 'Q3 Sprint Review',
-      description: 'Review sprint progress and plan next iteration',
-      company: 'Acme Corp', date: baseDate, time: '09:00 AM', duration: 45,
-      priority: 'high', status: 'pending', owner: 'Sarah Chen',
-    },
-    {
-      id: 'mock-m2', type: 'meeting', title: 'Client Onboarding Call',
-      description: 'New client orientation and requirements gathering',
-      company: 'Globex Inc', date: baseDate, time: '11:30 AM', duration: 30,
-      priority: 'medium', status: 'pending', owner: 'Mike Ross',
-    },
-    {
-      id: 'mock-t1', type: 'task', title: 'Update landing page copy',
-      description: 'Refresh hero section and feature descriptions',
-      company: 'Internal', date: baseDate, time: '10:00 AM', duration: 60,
-      priority: 'medium', status: 'pending', owner: 'Alex Kim',
-    },
-    {
-      id: 'mock-t2', type: 'task', title: 'Fix payment gateway bug',
-      description: 'Stripe integration returning 402 errors',
-      company: 'Internal', date: baseDate, time: '02:00 PM', duration: 120,
-      priority: 'critical', status: 'pending', owner: 'Jordan Lee',
-    },
-    {
-      id: 'mock-d1', type: 'deadline', title: 'Q3 Tax Filing Due',
-      description: 'Submit quarterly tax returns to IRS',
-      company: 'Acme Corp', date: baseDate, time: '05:00 PM', duration: 0,
-      priority: 'high', status: 'pending', owner: 'Priya Patel',
-    },
-    {
-      id: 'mock-f1', type: 'followup', title: 'Follow up on proposal',
-      description: 'Check status of submitted proposal #1024',
-      company: 'Stark Industries', date: baseDate, time: '03:30 PM', duration: 15,
-      priority: 'low', status: 'pending', owner: 'Taylor Wong',
-    },
-    {
-      id: 'mock-m3', type: 'meeting', title: 'Team Standup',
-      description: 'Daily sync with development team',
-      company: 'Internal', date: baseDate, time: '08:30 AM', duration: 15,
-      priority: 'low', status: 'pending', owner: 'Sarah Chen',
-    },
-    {
-      id: 'mock-m4', type: 'meeting', title: 'Design Review',
-      description: 'Review new mockups for dashboard v2',
-      company: 'Internal', date: baseDate, time: '04:00 PM', duration: 60,
-      priority: 'medium', status: 'pending', owner: 'Mike Ross',
-    },
-    {
-      id: 'mock-t3', type: 'task', title: 'Write API documentation',
-      description: 'Document all REST endpoints for the public API',
-      company: 'Internal', date: baseDate, time: '01:00 PM', duration: 90,
-      priority: 'medium', status: 'completed', owner: 'Alex Kim',
-    },
-    {
-      id: 'mock-t4', type: 'task', title: 'Database migration script',
-      description: 'Migrate user data to new schema',
-      company: 'Internal', date: baseDate, time: '11:00 AM', duration: 180,
-      priority: 'high', status: 'completed', owner: 'Jordan Lee',
-    },
-    {
-      id: 'mock-m5', type: 'meeting', title: 'Product Roadmap Planning',
-      description: 'Quarterly planning session for product team',
-      company: 'Internal', date: nextDay, time: '10:00 AM', duration: 90,
-      priority: 'high', status: 'pending', owner: 'Sarah Chen',
-    },
-    {
-      id: 'mock-t5', type: 'task', title: 'Security audit prep',
-      description: 'Prepare documentation for external audit',
-      company: 'Internal', date: nextDay, time: '09:00 AM', duration: 120,
-      priority: 'high', status: 'pending', owner: 'Priya Patel',
-    },
-    {
-      id: 'mock-d2', type: 'deadline', title: 'Contract renewal',
-      description: 'Renew annual maintenance contract',
-      company: 'Globex Inc', date: nextDay, time: '12:00 PM', duration: 0,
-      priority: 'medium', status: 'pending', owner: 'Taylor Wong',
-    },
-    {
-      id: 'mock-m6', type: 'meeting', title: 'Vendor negotiation',
-      description: 'Negotiate terms with new cloud provider',
-      company: 'Acme Corp', date: dayAfter, time: '02:00 PM', duration: 60,
-      priority: 'critical', status: 'pending', owner: 'Mike Ross',
-    },
-    {
-      id: 'mock-t6', type: 'task', title: 'Update employee handbook',
-      description: 'Revise remote work policy section',
-      company: 'Internal', date: dayAfter, time: '10:00 AM', duration: 60,
-      priority: 'low', status: 'pending', owner: 'Alex Kim',
-    },
-  ];
-}
 
 function getDayLabel(dateStr: string): string {
   const d = parseISO(dateStr);
@@ -240,12 +142,7 @@ export default function ActivityPage() {
 
   useEffect(() => { load(); }, []);
 
-  const mockActivities = useMemo(() => generateMockActivities(date), [date]);
-
   const allActivities = useMemo(() => {
-    const fromMock = mockActivities.map((a) => ({
-      ...a,
-    }));
     const fromTasks = rawTasks
       .filter((t) => t.status !== 'done' && t.due_date)
       .map((t) => ({
@@ -276,8 +173,8 @@ export default function ActivityPage() {
       status: 'pending' as 'pending',
       owner: l.user_name,
     }));
-    return [...fromMock, ...fromTasks, ...fromLogs];
-  }, [mockActivities, rawTasks, logs]);
+    return [...fromTasks, ...fromLogs];
+  }, [rawTasks, logs]);
 
   const selectedDateStr = format(date, 'yyyy-MM-dd');
 
