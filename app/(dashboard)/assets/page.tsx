@@ -1,303 +1,458 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import Image from 'next/image';
+import React, { useState, useMemo, useEffect } from 'react';
+import { 
+  Upload, Search, Folder, CloudUpload, Eye, Download, Trash2, 
+  MoreHorizontal, FileImage, FileVideo, FileText, File as FileIcon, 
+  CheckCircle2, FolderOpen
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Upload, Search, Folder, ImageIcon, FileText, Video, Music, Loader2, HardDrive, Clock, X, Eye, Trash2, ClipboardCopy, Download, MoreHorizontal, File
-} from 'lucide-react';
-import { MediaItemDialog } from '@/components/dialogs/media-item-dialog';
-import { getMediaItems, deleteMediaItem } from '@/lib/firebase/database';
-import type { MediaItem } from '@/lib/db/types';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
-import { ConfirmDialog } from '@/components/ui/confirm-dialog';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
 
-const folders = [
-  { id: 'all', label: 'All Assets', icon: Folder },
-  { id: 'image', label: 'Images', icon: ImageIcon },
-  { id: 'video', label: 'Videos', icon: Video },
-  { id: 'document', label: 'Documents', icon: FileText },
-  { id: 'audio', label: 'Audio', icon: Music },
-  { id: 'other', label: 'Other', icon: File },
+// --- Data Schema ---
+export type Asset = { 
+  id: string;
+  name: string; 
+  type: string; 
+  size: string; 
+  folder: string; 
+  badge: string; 
+  icon: string;  
+  date: string;
+};
+
+const FOLDERS = [
+  'Brand guidelines',
+  'Campaign creatives',
+  'Product screenshots',
+  'Social media templates',
+  'Videos & reels'
 ];
 
+const ASSET_TYPES = ['Image', 'Video', 'PDF', 'Document'];
+
+const TYPE_CONFIG: Record<string, { badge: string; icon: string }> = {
+  'Image': { badge: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-400', icon: '🖼️' },
+  'Video': { badge: 'bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400', icon: '🎥' },
+  'PDF': { badge: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-400', icon: '📄' },
+  'Document': { badge: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400', icon: '📝' }
+};
+
 export default function AssetsPage() {
-  const [loading, setLoading] = useState(true);
-  const [items, setItems] = useState<MediaItem[]>([]);
+  const [isMounted, setIsMounted] = useState(false);
+  useEffect(() => setIsMounted(true), []);
+
+  // State
+  const [assets, setAssets] = useState<Asset[]>([]);
+  
+  // Filters
   const [search, setSearch] = useState('');
-  const [activeFolder, setActiveFolder] = useState('all');
-  const [uploadOpen, setUploadOpen] = useState(false);
-  const [menuOpen, setMenuOpen] = useState<string | null>(null);
-  const [preview, setPreview] = useState<MediaItem | null>(null);
-  const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [typeFilter, setTypeFilter] = useState('All types');
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const data = await getMediaItems();
-      setItems(data);
-    } catch {
-      toast.error('Failed to load assets');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  // Modals
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [viewingAsset, setViewingAsset] = useState<Asset | null>(null);
 
-  useEffect(() => { load(); }, [load]);
+  // Upload Form State
+  const [formName, setFormName] = useState('');
+  const [formType, setFormType] = useState('Image');
+  const [formFolder, setFormFolder] = useState(FOLDERS[0]);
 
-  async function handleDelete(id: string) {
-    setConfirmState({ open: true, id });
-  }
+  // Derived Data
+  const recentUploads = useMemo(() => {
+    return [...assets].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 3);
+  }, [assets]);
 
-  async function onDeleteConfirm() {
-    const id = confirmState.id;
-    if (!id) return;
-    setConfirmState((prev) => ({ ...prev, loading: true }));
-    try {
-      await deleteMediaItem(id);
-      toast.success('Asset deleted');
-      load();
-    } catch {
-      toast.error('Failed to delete asset');
-    } finally {
-      setConfirmState({ open: false });
-    }
-  }
-
-  const stats = useMemo(() => {
-    const total = items.length;
-    const totalSize = items.reduce((acc, item) => {
-      const size = typeof item.size === 'string' ? parseFloat(item.size) : item.size;
-      return acc + (size || 0) / (1024 * 1024);
-    }, 0);
-    const recent = items.filter((i) => {
-      const diff = Date.now() - new Date(i.created_at).getTime();
-      return diff < 7 * 24 * 60 * 60 * 1000;
-    }).length;
-    return { total, totalSizeFormatted: totalSize.toFixed(1) + ' MB', recent };
-  }, [items]);
-
-  const filtered = useMemo(() => {
-    return items.filter((item) => {
-      const matchesSearch = item.name.toLowerCase().includes(search.toLowerCase());
-      const matchesFolder = activeFolder === 'all' || activeFolder === 'other'
-        ? !['image', 'video', 'document', 'audio'].includes(item.type)
-        : item.type === activeFolder;
-      return matchesSearch && matchesFolder;
+  const filteredAssets = useMemo(() => {
+    return assets.filter(asset => {
+      const matchesSearch = asset.name.toLowerCase().includes(search.toLowerCase());
+      const matchesType = typeFilter === 'All types' || asset.type === typeFilter;
+      const matchesFolder = activeFolder ? asset.folder === activeFolder : true;
+      return matchesSearch && matchesType && matchesFolder;
     });
-  }, [items, search, activeFolder]);
+  }, [assets, search, typeFilter, activeFolder]);
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 size={32} className="animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  // KPIs
+  const totalAssets = assets.length;
+  const imageCount = assets.filter(a => a.type === 'Image').length;
+  const videoCount = assets.filter(a => a.type === 'Video').length;
+  const documentCount = assets.filter(a => a.type === 'PDF' || a.type === 'Document').length;
+
+  // Handlers
+  const handleUpload = () => {
+    if (!formName.trim()) return toast.error('File name is required');
+    
+    const config = TYPE_CONFIG[formType] || TYPE_CONFIG['Document'];
+    const newAsset: Asset = {
+      id: Date.now().toString(),
+      name: formName,
+      type: formType,
+      folder: formFolder,
+      size: `${(Math.random() * 10 + 0.1).toFixed(1)} MB`, // Mock size
+      date: new Date().toISOString(),
+      badge: config.badge,
+      icon: config.icon
+    };
+
+    setAssets([newAsset, ...assets]);
+    setIsUploadOpen(false);
+    
+    // Reset Form
+    setFormName('');
+    setFormType('Image');
+    setFormFolder(FOLDERS[0]);
+    
+    toast.success('Asset uploaded successfully!', {
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-lg'
+    });
+  };
+
+  const handleDelete = (id: string) => {
+    setAssets(prev => prev.filter(a => a.id !== id));
+    toast.success('Asset deleted.', {
+      icon: <CheckCircle2 className="w-5 h-5 text-emerald-500" />,
+      className: 'bg-emerald-50 text-emerald-700 border-emerald-200 shadow-lg'
+    });
+    if (viewingAsset?.id === id) setViewingAsset(null);
+  };
+
+  if (!isMounted) return null;
 
   return (
-    <div className="flex gap-6">
-      <aside className="hidden md:flex flex-col w-56 shrink-0">
-        <nav className="space-y-1">
-          {folders.map((f) => {
-            const Icon = f.icon;
-            const count = f.id === 'all'
-              ? items.length
-              : f.id === 'other'
-                ? items.filter((i) => !['image', 'video', 'document', 'audio'].includes(i.type)).length
-                : items.filter((i) => i.type === f.id).length;
-            return (
-              <button
-                key={f.id}
-                onClick={() => setActiveFolder(f.id)}
-                className={`w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors ${
-                  activeFolder === f.id ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted'
-                }`}
-              >
-                <Icon size={16} />
-                <span className="flex-1 text-left">{f.label}</span>
-                <span className="text-xs">{count}</span>
-              </button>
-            );
-          })}
-        </nav>
-      </aside>
-
-      <div className="flex-1 min-w-0 space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
-          <div>
-            <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Assets</h2>
-            <p className="text-sm text-muted-foreground">Manage your file assets</p>
-          </div>
-          <Button onClick={() => setUploadOpen(true)} className="w-full sm:w-auto">
-            <Upload size={16} className="mr-2" />
-            Upload
-          </Button>
+    <div className="space-y-6 flex flex-col min-h-0">
+      
+      {/* 2. Global Header Section */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight text-foreground">Assets</h2>
+          <p className="text-sm text-muted-foreground mt-1">Images, videos, brand files</p>
         </div>
+        <Button onClick={() => setIsUploadOpen(true)} className="shadow-sm bg-primary text-primary-foreground font-semibold">
+          <Upload className="w-4 h-4 mr-2" />
+          Upload
+        </Button>
+      </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-primary/10">
-                <HardDrive size={20} className="text-primary" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Files</p>
-                <p className="text-lg font-bold">{stats.total}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-blue-500/10">
-                <HardDrive size={20} className="text-blue-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total Size</p>
-                <p className="text-lg font-bold">{stats.totalSizeFormatted}</p>
-              </div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="flex items-center gap-3 p-4">
-              <div className="p-2 rounded-lg bg-green-500/10">
-                <Clock size={20} className="text-green-500" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Recent Uploads (7d)</p>
-                <p className="text-lg font-bold">{stats.recent}</p>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+      {/* 3. KPIs Section */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shrink-0">
+        <Card className="border shadow-sm">
+          <CardContent className="p-6 flex flex-col justify-center">
+            <p className="text-sm font-medium text-muted-foreground">Total Assets</p>
+            <p className="text-4xl font-bold mt-2">{totalAssets}</p>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">+{(totalAssets * 0.1).toFixed(0)} this month</p>
+          </CardContent>
+        </Card>
+        <Card className="border shadow-sm">
+          <CardContent className="p-6 flex flex-col justify-center">
+            <p className="text-sm font-medium text-muted-foreground">Images</p>
+            <p className="text-4xl font-bold mt-2">{imageCount}</p>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">PNG, JPG, SVG</p>
+          </CardContent>
+        </Card>
+        <Card className="border shadow-sm">
+          <CardContent className="p-6 flex flex-col justify-center">
+            <p className="text-sm font-medium text-muted-foreground">Videos</p>
+            <p className="text-4xl font-bold mt-2">{videoCount}</p>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">MP4, MOV</p>
+          </CardContent>
+        </Card>
+        <Card className="border shadow-sm">
+          <CardContent className="p-6 flex flex-col justify-center">
+            <p className="text-sm font-medium text-muted-foreground">Documents</p>
+            <p className="text-4xl font-bold mt-2">{documentCount}</p>
+            <p className="text-xs text-muted-foreground mt-2 font-medium">PDF, DOCX</p>
+          </CardContent>
+        </Card>
+      </div>
 
-        <div className="flex flex-col sm:flex-row gap-4">
-          <div className="relative flex-1 max-w-md">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-            <Input placeholder="Search assets..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </div>
-        </div>
-
-        {filtered.length === 0 ? (
-          <div className="text-center py-12 border-2 border-dashed rounded-lg">
-            <ImageIcon size={48} className="mx-auto text-muted-foreground/50 mb-3" />
-            <p className="text-sm text-muted-foreground">No assets found</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-            {filtered.map((item) => (
-              <Card key={item.id} className="group cursor-pointer hover:shadow-sm transition-all" onClick={() => setPreview(item)}>
-                <CardContent className="p-0">
-                  <div className="aspect-square bg-muted rounded-t-lg flex items-center justify-center relative overflow-hidden">
-                    {item.url && item.type === 'image' ? (
-                      <Image src={item.url} alt={item.name} fill className="object-cover" sizes="(max-width: 640px) 50vw, (max-width: 768px) 33vw, (max-width: 1024px) 25vw, 20vw" />
-                    ) : (
-                      <>
-                        {item.type === 'image' && <ImageIcon size={32} className="text-muted-foreground/50" />}
-                        {item.type === 'video' && <Video size={32} className="text-muted-foreground/50" />}
-                        {item.type === 'document' && <FileText size={32} className="text-muted-foreground/50" />}
-                        {item.type === 'audio' && <Music size={32} className="text-muted-foreground/50" />}
-                        {!['image', 'video', 'document', 'audio'].includes(item.type) && <File size={32} className="text-muted-foreground/50" />}
-                      </>
-                    )}
-                    <div className="absolute top-2 right-2" onClick={(e) => e.stopPropagation()}>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 bg-background/80" aria-label="File actions" onClick={() => setMenuOpen(menuOpen === item.id ? null : item.id)}>
-                        <MoreHorizontal size={12} />
-                      </Button>
-                      {menuOpen === item.id && (
-                        <div className="absolute right-0 top-8 z-10 w-28 rounded-md border bg-background shadow-lg">
-                          <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted" onClick={() => { item.url && window.open(item.url, '_blank'); setMenuOpen(null); }}>
-                            <Eye size={12} /> Preview
-                          </button>
-                          <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted" onClick={() => { item.url && navigator.clipboard.writeText(item.url); toast.success('URL copied'); setMenuOpen(null); }}>
-                            <ClipboardCopy size={12} /> Copy URL
-                          </button>
-                          <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted" onClick={() => { item.url && window.open(item.url, '_blank'); setMenuOpen(null); }}>
-                            <Download size={12} /> Download
-                          </button>
-                          <button className="flex items-center gap-2 w-full px-3 py-2 text-sm hover:bg-muted text-red-600" onClick={() => { handleDelete(item.id); setMenuOpen(null); }}>
-                            <Trash2 size={12} /> Delete
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                    <Badge className="absolute bottom-2 left-2 text-[9px] px-1 py-0" variant="secondary">{item.type}</Badge>
+      {/* 4. Folders & Recent Uploads (2-Column Grid) */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 shrink-0">
+        
+        {/* Left Column - Folders */}
+        <Card className="border shadow-sm flex flex-col h-[320px]">
+          <CardHeader className="pb-3 border-b bg-muted/20">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <FolderOpen className="w-5 h-5 text-primary" /> Folders
+            </CardTitle>
+          </CardHeader>
+          <div className="p-2 flex-1 overflow-y-auto">
+            <div 
+              onClick={() => setActiveFolder(null)}
+              className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${activeFolder === null ? 'bg-primary/10 border-primary/20 border' : 'hover:bg-muted border border-transparent'}`}
+            >
+              <div className="flex items-center gap-3">
+                <Folder className={`w-5 h-5 ${activeFolder === null ? 'text-primary' : 'text-muted-foreground'}`} />
+                <span className={`text-sm font-medium ${activeFolder === null ? 'text-primary' : 'text-foreground'}`}>All Assets</span>
+              </div>
+              <Badge variant="secondary" className="bg-background border shadow-sm text-xs">{totalAssets}</Badge>
+            </div>
+            
+            {FOLDERS.map(folder => {
+              const count = assets.filter(a => a.folder === folder).length;
+              const isActive = activeFolder === folder;
+              
+              return (
+                <div 
+                  key={folder}
+                  onClick={() => setActiveFolder(folder)}
+                  className={`flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors ${isActive ? 'bg-primary/10 border-primary/20 border' : 'hover:bg-muted border border-transparent'}`}
+                >
+                  <div className="flex items-center gap-3">
+                    <Folder className={`w-5 h-5 ${isActive ? 'text-primary' : 'text-muted-foreground'}`} />
+                    <span className={`text-sm font-medium ${isActive ? 'text-primary' : 'text-foreground'}`}>{folder}</span>
                   </div>
-                  <div className="p-2.5">
-                    <p className="text-xs font-medium truncate">{item.name}</p>
-                    <p className="text-[10px] text-muted-foreground">{item.size}</p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  <Badge variant="secondary" className="bg-background border shadow-sm text-xs">{count}</Badge>
+                </div>
+              );
+            })}
           </div>
-        )}
+        </Card>
 
-        <MediaItemDialog open={uploadOpen} onOpenChange={setUploadOpen} onSaved={load} />
-
-        <Dialog open={!!preview} onOpenChange={(o) => { if (!o) setPreview(null); }}>
-          <DialogContent className="sm:max-w-[600px]">
-            <DialogHeader>
-              <DialogTitle>{preview?.name}</DialogTitle>
-            </DialogHeader>
-            {preview && (
-              <div className="space-y-4">
-                <div className="bg-muted rounded-lg flex items-center justify-center overflow-hidden max-h-[400px]">
-                  {preview.type === 'image' && preview.url ? (
-                    <Image src={preview.url} alt={preview.name} width={600} height={400} className="object-contain max-h-[400px] w-auto" />
-                  ) : preview.type === 'video' && preview.url ? (
-                    <video src={preview.url} controls className="max-h-[400px] w-full" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-2 py-12">
-                      {preview.type === 'audio' ? <Music size={48} className="text-muted-foreground/50" /> : <FileText size={48} className="text-muted-foreground/50" />}
-                      <p className="text-sm text-muted-foreground">Preview not available</p>
+        {/* Right Column - Recent Uploads */}
+        <Card className="border shadow-sm flex flex-col h-[320px]">
+          <CardHeader className="pb-3 border-b bg-muted/20">
+            <CardTitle className="text-lg font-bold flex items-center gap-2">
+              <CloudUpload className="w-5 h-5 text-emerald-500" /> Recent uploads
+            </CardTitle>
+          </CardHeader>
+          <div className="p-4 flex-1 overflow-y-auto space-y-3">
+            {recentUploads.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <CloudUpload className="w-10 h-10 mb-2 opacity-20" />
+                <p className="text-sm font-medium">No recent uploads</p>
+              </div>
+            ) : (
+              recentUploads.map(asset => (
+                <div key={`recent-${asset.id}`} className="flex items-center justify-between p-3 rounded-xl border bg-card shadow-sm hover:shadow-md transition-shadow group">
+                  <div className="flex items-center gap-4">
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-xl shadow-inner ${asset.badge}`}>
+                      {asset.icon}
                     </div>
-                  )}
-                </div>
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div><span className="text-muted-foreground">Type:</span> {preview.type}</div>
-                  <div><span className="text-muted-foreground">Size:</span> {preview.size}</div>
-                  <div><span className="text-muted-foreground">Dimensions:</span> {preview.dimensions}</div>
-                  <div><span className="text-muted-foreground">Created:</span> {new Date(preview.created_at).toLocaleDateString()}</div>
-                </div>
-                <div className="flex gap-2">
-                  {preview.url && (
-                    <>
-                      <Button size="sm" variant="outline" onClick={() => { navigator.clipboard.writeText(preview.url!); toast.success('URL copied'); }}>
-                        <ClipboardCopy size={14} className="mr-1" /> Copy URL
-                      </Button>
-                      <Button size="sm" variant="outline" onClick={() => window.open(preview.url, '_blank')}>
-                        <Download size={14} className="mr-1" /> Download
-                      </Button>
-                    </>
-                  )}
-                  <Button size="sm" variant="destructive" onClick={() => { setPreview(null); handleDelete(preview.id); }}>
-                    <Trash2 size={14} className="mr-1" /> Delete
+                    <div>
+                      <p className="font-bold text-sm text-foreground group-hover:text-primary transition-colors line-clamp-1">{asset.name}</p>
+                      <p className="text-[11px] font-medium text-muted-foreground mt-0.5">
+                        {asset.size} &bull; {new Date(asset.date).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground shrink-0">
+                    <Download className="w-4 h-4" />
                   </Button>
                 </div>
-              </div>
+              ))
             )}
-          </DialogContent>
-        </Dialog>
-
-        <ConfirmDialog
-          open={confirmState.open}
-          onOpenChange={(open) => setConfirmState((prev) => ({ ...prev, open }))}
-          title="Delete asset"
-          description="Are you sure you want to delete this asset? This action cannot be undone."
-          onConfirm={onDeleteConfirm}
-          loading={confirmState.loading}
-        />
+          </div>
+        </Card>
       </div>
+
+      {/* 5. Filters Section */}
+      <div className="flex flex-col sm:flex-row items-center gap-4 shrink-0 bg-card p-4 rounded-xl border shadow-sm">
+        <div className="relative flex-1 w-full">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+          <Input 
+            placeholder="Search assets..." 
+            value={search} 
+            onChange={(e) => setSearch(e.target.value)} 
+            className="pl-9 bg-background focus-visible:ring-1" 
+          />
+        </div>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-[200px] bg-background">
+            <SelectValue placeholder="All types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="All types">All types</SelectItem>
+            {ASSET_TYPES.map(type => <SelectItem key={type} value={type}>{type}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* 6. Assets Data Table */}
+      <Card className="border shadow-sm flex-1 flex flex-col min-h-[300px] overflow-hidden">
+        <div className="overflow-x-auto flex-1">
+          <table className="w-full text-sm text-left">
+            <thead className="bg-muted/50 text-muted-foreground border-b text-xs uppercase tracking-wider sticky top-0 z-10">
+              <tr>
+                <th className="px-6 py-4 font-medium whitespace-nowrap">File name</th>
+                <th className="px-6 py-4 font-medium whitespace-nowrap">Type</th>
+                <th className="px-6 py-4 font-medium whitespace-nowrap">Size</th>
+                <th className="px-6 py-4 font-medium whitespace-nowrap">Folder</th>
+                <th className="px-6 py-4 font-medium text-center whitespace-nowrap w-16">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-background">
+              {filteredAssets.map(asset => (
+                <tr key={asset.id} className="hover:bg-muted/30 transition-colors group">
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-3">
+                      <span className="text-xl">{asset.icon}</span>
+                      <span className="font-bold text-foreground group-hover:text-primary transition-colors cursor-pointer" onClick={() => setViewingAsset(asset)}>{asset.name}</span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <Badge variant="outline" className={`text-[10px] px-2 py-0.5 border-transparent ${asset.badge}`}>
+                      {asset.type}
+                    </Badge>
+                  </td>
+                  <td className="px-6 py-4 text-muted-foreground font-medium text-xs">
+                    {asset.size}
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-1.5 text-muted-foreground font-medium text-xs">
+                      <Folder className="w-3.5 h-3.5" />
+                      {asset.folder}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground hover:bg-muted">
+                          <MoreHorizontal className="w-4 h-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="w-40 border-border/60 shadow-xl backdrop-blur-xl bg-background/95">
+                        <DropdownMenuItem onClick={() => setViewingAsset(asset)} className="cursor-pointer">
+                          <Eye className="w-4 h-4 mr-2 text-muted-foreground" /> View
+                        </DropdownMenuItem>
+                        <DropdownMenuItem className="cursor-pointer">
+                          <Download className="w-4 h-4 mr-2 text-muted-foreground" /> Download
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(asset.id)} className="cursor-pointer text-red-600 focus:bg-red-50 focus:text-red-700 font-medium">
+                          <Trash2 className="w-4 h-4 mr-2" /> Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))}
+              {filteredAssets.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-6 py-16 text-center text-muted-foreground">
+                    <div className="flex flex-col items-center justify-center">
+                      <Search className="w-10 h-10 mb-3 opacity-20" />
+                      <p className="font-medium text-foreground">No assets found.</p>
+                      <p className="text-xs mt-1">Try adjusting your filters or search query.</p>
+                    </div>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+
+      {/* 7. Modals & Notifications */}
+
+      {/* Upload Asset Modal */}
+      <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+        <DialogContent className="sm:max-w-[500px] p-0 overflow-hidden bg-background/95 backdrop-blur-xl shadow-2xl border-border/60 rounded-2xl">
+          <DialogHeader className="p-6 pb-4 border-b bg-muted/20">
+            <DialogTitle className="text-xl font-bold">Upload Asset</DialogTitle>
+          </DialogHeader>
+          
+          <div className="p-6 space-y-6">
+            
+            {/* Drag & Drop Zone */}
+            <div className="border-2 border-dashed border-primary/30 rounded-xl bg-primary/5 hover:bg-primary/10 transition-colors p-8 flex flex-col items-center justify-center text-center cursor-pointer group">
+              <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center mb-3 group-hover:scale-110 transition-transform">
+                <CloudUpload className="w-6 h-6 text-primary" />
+              </div>
+              <p className="font-bold text-sm text-foreground">Drag & drop or click to upload</p>
+              <p className="text-xs text-muted-foreground mt-1">PNG, JPG, MP4, PDF supported</p>
+            </div>
+
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">File Name</Label>
+                <Input placeholder="E.g. Logo-Vector-2026.png" value={formName} onChange={(e) => setFormName(e.target.value)} className="bg-background focus-visible:ring-1" />
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Type</Label>
+                  <Select value={formType} onValueChange={setFormType}>
+                    <SelectTrigger className="bg-background focus:ring-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ASSET_TYPES.map(t => <SelectItem key={t} value={t}>{t}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Folder</Label>
+                  <Select value={formFolder} onValueChange={setFormFolder}>
+                    <SelectTrigger className="bg-background focus:ring-1"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {FOLDERS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </div>
+
+          </div>
+          
+          <DialogFooter className="p-6 pt-4 border-t bg-muted/10">
+            <Button variant="ghost" onClick={() => setIsUploadOpen(false)}>Cancel</Button>
+            <Button onClick={handleUpload} className="shadow-sm font-semibold">Upload Asset</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* View Modal */}
+      <Dialog open={!!viewingAsset} onOpenChange={(open) => { if(!open) setViewingAsset(null); }}>
+        <DialogContent className="sm:max-w-[450px] p-0 overflow-hidden bg-background/95 backdrop-blur-xl shadow-2xl border-border/60 rounded-2xl">
+          {viewingAsset && (
+            <>
+              <DialogHeader className="p-5 border-b bg-muted/20">
+                <DialogTitle className="text-lg font-bold truncate pr-6">{viewingAsset.name}</DialogTitle>
+              </DialogHeader>
+              
+              <div className="p-6">
+                <div className={`w-full aspect-video rounded-xl flex items-center justify-center text-7xl shadow-inner mb-6 ${viewingAsset.badge}`}>
+                  {viewingAsset.icon}
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-transparent">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Type</span>
+                    <Badge variant="outline" className={`text-[10px] px-2 py-0.5 border-transparent ${viewingAsset.badge}`}>
+                      {viewingAsset.type}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-transparent">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Size</span>
+                    <span className="text-sm font-bold">{viewingAsset.size}</span>
+                  </div>
+                  <div className="flex items-center justify-between p-3 rounded-lg bg-muted/40 border border-transparent">
+                    <span className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Folder</span>
+                    <div className="flex items-center gap-1.5 text-sm font-bold">
+                      <Folder className="w-4 h-4 text-muted-foreground" />
+                      {viewingAsset.folder}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter className="p-5 pt-4 border-t bg-muted/10">
+                <Button variant="ghost" onClick={() => setViewingAsset(null)}>Close</Button>
+                <Button className="shadow-sm font-semibold bg-primary text-primary-foreground">
+                  <Download className="w-4 h-4 mr-2" /> Download
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
