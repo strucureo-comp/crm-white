@@ -11,6 +11,7 @@ import {
   Plus, X, Save, Settings, Trash2, LayoutDashboard, ArrowUpRight, ArrowDownRight, ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Card } from '@/components/ui/card';
@@ -371,7 +372,7 @@ export default function AnalyticsDashboard() {
                 <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Widget Title</label>
                 <Input 
                   value={widgets.find(w => w.id === selectedWidgetId)?.title || ''} 
-                  onChange={(e) => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? {...w, title: e.target.value} : w))}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? {...w, title: e.target.value} : w))}
                   className="h-10 bg-slate-50 border-slate-200 font-bold rounded-xl focus-visible:ring-blue-500"
                 />
               </div>
