@@ -101,7 +101,6 @@ function getNavConfig(leadCount: number): NavConfig {
           { title: 'Content Hub', href: '/content-hub', icon: Megaphone },
           { title: 'Social Media', href: '/social', icon: Camera },
           { title: 'Email Marketing', href: '/email', icon: Mail },
-          { title: 'Media Library', href: '/media-library', icon: Image },
           { title: 'Marketing Calendar', href: '/marketing-calendar', icon: Calendar },
         ],
       },
