@@ -1,0 +1,46 @@
+erDiagram
+    Lead {
+        string id PK
+        string name
+        string email
+        string phone
+        string company
+        string status "LeadStatus: new, contacted, qualified, etc."
+        string source "LeadSource"
+        number estimated_value
+        string owner_id FK
+        string next_follow_up
+        string notes
+        string[] tags
+        string priority
+        string created_at
+        string updated_at
+    }
+    
+    NormalizedLead {
+        string lead_id PK
+        string workspace_id FK
+        string company_id FK
+        string contact_id FK
+        string name
+        string email
+        string phone
+        string source
+        string status
+        string intent
+        number lead_score
+        number probability
+        number potential_value
+        string[] tags
+        string last_contacted
+        string next_follow_up
+        string follow_up_notes
+        string converted_to_contact
+        string converted_to_deal
+        string converted_at
+        string created_at
+        string updated_at
+        string created_by
+    }
+
+    Lead ||--o| NormalizedLead : "is normalized to"

@@ -1,0 +1,31 @@
+erDiagram
+    Pipeline {
+        string pipeline_id PK
+        string workspace_id FK
+        string name
+        string description
+        boolean is_default
+        boolean is_active
+        string entity_type "deal"
+        string created_by
+        string created_at
+        string updated_at
+    }
+
+    PipelineStage {
+        string stage_id PK
+        string pipeline_id FK
+        string name
+        string description
+        number order
+        string color
+        number probability
+        string stage_type "open, won, lost"
+        boolean is_folded
+        number deal_count
+        number total_value
+        string created_at
+        string updated_at
+    }
+
+    Pipeline ||--o{ PipelineStage : "has stages"

@@ -1,0 +1,18 @@
+erDiagram
+    Project {
+        string id PK
+        string client_id FK
+        string title
+        string description
+        string status "pending, under_review, accepted, in_progress, testing, completed, cancelled"
+        string github_link
+        string document_url
+        number estimated_cost
+        number actual_cost
+        string deadline
+        number progress_percentage
+        string test_asset_url
+        string deployment_url
+        string created_at
+        string updated_at
+    }

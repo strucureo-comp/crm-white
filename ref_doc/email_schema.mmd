@@ -1,0 +1,17 @@
+erDiagram
+    EmailCampaign {
+        string id PK
+        string workspace_id FK
+        string name
+        string subject
+        string content
+        string status "draft, scheduled, sent"
+        string scheduled_at
+        string sent_at
+        string recipients
+        number open_rate
+        number click_rate
+        string created_by
+        string created_at
+        string updated_at
+    }

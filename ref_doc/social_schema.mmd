@@ -1,0 +1,16 @@
+erDiagram
+    SocialPost {
+        string id PK
+        string workspace_id FK
+        string platform "facebook, instagram, linkedin, twitter, youtube"
+        string content
+        string media_urls
+        string scheduled_at
+        string published_at
+        string status "scheduled, publishing, published, failed, draft"
+        string hashtags
+        string campaign_id FK
+        string created_by
+        string created_at
+        string updated_at
+    }

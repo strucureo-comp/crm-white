@@ -1,0 +1,18 @@
+erDiagram
+    Campaign {
+        string id PK
+        string workspace_id FK
+        string name
+        string description
+        string channel "email, social, paid, sms"
+        string status "draft, active, running, paused, completed, archived"
+        number budget
+        number spent
+        string currency
+        string target_audience
+        string start_date
+        string end_date
+        string created_by
+        string created_at
+        string updated_at
+    }

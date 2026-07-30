@@ -1,0 +1,21 @@
+erDiagram
+    %% Funnel is a visualization of Leads in Pipelines
+    Funnel {
+        string view_id
+        string name "Sales Funnel"
+        string date_range
+    }
+
+    Lead {
+        string id PK
+        string status
+        number estimated_value
+    }
+
+    Pipeline {
+        string id PK
+        string name
+    }
+
+    Funnel ||--o{ Lead : "visualizes"
+    Funnel ||--o{ Pipeline : "filters by"

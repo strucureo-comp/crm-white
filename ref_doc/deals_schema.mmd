@@ -1,0 +1,31 @@
+erDiagram
+    Deal {
+        string deal_id PK
+        string workspace_id FK
+        string company_id FK
+        string contact_id FK
+        string lead_id FK "optional"
+        string pipeline_id FK
+        string stage_id FK
+        string owner_id FK
+        string title
+        string description
+        number value
+        string currency
+        string status "open, won, lost"
+        string priority
+        number probability
+        string source
+        string expected_close_date
+        string actual_close_date
+        string notes
+        number quote_count
+        number invoice_count
+        number total_quoted
+        number total_invoiced
+        number total_paid
+        number days_in_pipeline
+        string created_at
+        string updated_at
+        string created_by
+    }
