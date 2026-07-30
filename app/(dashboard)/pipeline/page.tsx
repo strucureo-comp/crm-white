@@ -6,6 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
+import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import {
   Select,
   SelectContent,
@@ -220,6 +221,30 @@ export default function DealsPage() {
       toast.error('Failed to move deal');
     }
   }
+
+  const onDragEnd = async (result: DropResult) => {
+    if (!result.destination) return;
+    
+    const sourceStage = result.source.droppableId as LeadStatus;
+    const destStage = result.destination.droppableId as LeadStatus;
+    
+    if (sourceStage === destStage) return;
+
+    const draggedLeadId = result.draggableId;
+    const lead = leads.find(l => l.id === draggedLeadId);
+    if (!lead) return;
+
+    // Optimistically update local state
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, status: destStage } : l));
+
+    try {
+      await updateLead(lead.id, { status: destStage });
+      toast.success(`Moved to ${stageLabels[destStage]}`);
+    } catch {
+      toast.error('Failed to move deal');
+      load(); // Revert on failure
+    }
+  };
 
   function openDetailDrawer(lead: Lead) {
     setSelectedLead(lead);
@@ -455,105 +480,130 @@ export default function DealsPage() {
       )}
 
       {viewMode === 'kanban' && (
-        <div className="flex gap-4 overflow-x-auto pb-4">
-          {pipelineStages.map((stage) => {
-            const stageLeads = grouped[stage] || [];
-            return (
-              <div key={stage} className="flex-shrink-0 w-72">
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-sm font-semibold">{stageLabels[stage]}</h3>
-                    <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                      {stageLeads.length}
-                    </span>
-                  </div>
-                  <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingLead(null); setDialogOpen(true); }}>
-                    <Plus size={12} />
-                  </Button>
-                </div>
-                <div className="space-y-3">
-                  {stageLeads.map((lead) => (
-                    <Card key={lead.id} className="hover:shadow-sm transition-shadow cursor-pointer" onClick={() => openDetailDrawer(lead)}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between mb-2">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <div className={`w-2 h-2 rounded-full shrink-0 ${
-                              (0 || 0) <= 30 ? 'bg-blue-500' :
-                              (0 || 0) <= 60 ? 'bg-amber-500' :
-                              'bg-emerald-500'
-                            }`} />
-                            <p className="text-sm font-medium truncate">{lead.name}</p>
-                          </div>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label="Deal actions">
-                                <MoreHorizontal size={12} />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDetailDrawer(lead); }}>
-                                <Eye size={14} className="mr-2" /> View
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingLead(lead); setDialogOpen(true); }}>
-                                <Pencil size={14} className="mr-2" /> Edit
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleDelete(lead); }} disabled={deleting === lead.id}>
-                                <Trash2 size={14} className="mr-2" /> {deleting === lead.id ? 'Deleting...' : 'Delete'}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                        <div className="space-y-1.5 text-xs text-muted-foreground">
-                          <div className="flex items-center gap-1">
-                            <Building2 size={12} />
-                            {lead.company || '—'}
-                          </div>
-                          <div className="flex items-center gap-1">
-                            <DollarSign size={12} />
-                            {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
-                          </div>
-                          {lead.source && (
-                            <div className="flex items-center gap-1">
-                              <Code2 size={12} />
-                              {lead.source}
-                            </div>
-                          )}
-                          <div className="flex items-center justify-between">
-                            <span className="flex items-center gap-1">
-                              <Clock size={12} />
-                              {daysBetween(lead.updated_at || lead.created_at)}d
-                            </span>
-                          </div>
-                        </div>
-                        <div className="mt-2" onClick={(e) => e.stopPropagation()}>
-                          <Select
-                            value={lead.status}
-                            onValueChange={(v: LeadStatus) => handleStageChange(lead, v)}
-                          >
-                            <SelectTrigger className="h-7 text-xs">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {pipelineStages.map((s) => (
-                                <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {stageLeads.length === 0 && (
-                    <div className="border-2 border-dashed rounded-lg p-4 text-center">
-                      <p className="text-xs text-muted-foreground">No deals</p>
+        <DragDropContext onDragEnd={onDragEnd}>
+          <div className="flex gap-4 overflow-x-auto pb-4">
+            {pipelineStages.map((stage) => {
+              const stageLeads = grouped[stage] || [];
+              return (
+                <div key={stage} className="flex-shrink-0 w-72 flex flex-col">
+                  <div className="flex items-center justify-between mb-3 shrink-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-semibold">{stageLabels[stage]}</h3>
+                      <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                        {stageLeads.length}
+                      </span>
                     </div>
-                  )}
+                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingLead(null); setDialogOpen(true); }}>
+                      <Plus size={12} />
+                    </Button>
+                  </div>
+                  <Droppable droppableId={stage}>
+                    {(provided, snapshot) => (
+                      <div 
+                        {...provided.droppableProps}
+                        ref={provided.innerRef}
+                        className={`space-y-3 flex-1 transition-colors rounded-xl min-h-[150px] p-1 -m-1 ${snapshot.isDraggingOver ? 'bg-muted/50' : ''}`}
+                      >
+                        {stageLeads.map((lead, index) => (
+                          <Draggable key={lead.id} draggableId={lead.id} index={index}>
+                            {(provided, snapshot) => (
+                              <div
+                                ref={provided.innerRef}
+                                {...provided.draggableProps}
+                                {...provided.dragHandleProps}
+                                style={{
+                                  ...provided.draggableProps.style,
+                                  opacity: snapshot.isDragging ? 0.9 : 1,
+                                }}
+                              >
+                                <Card className={`hover:shadow-sm transition-all cursor-grab active:cursor-grabbing ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/20 scale-[1.02]' : ''}`} onClick={() => openDetailDrawer(lead)}>
+                                  <CardContent className="p-4">
+                                    <div className="flex items-start justify-between mb-2">
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <div className={`w-2 h-2 rounded-full shrink-0 ${
+                                          (0 || 0) <= 30 ? 'bg-blue-500' :
+                                          (0 || 0) <= 60 ? 'bg-amber-500' :
+                                          'bg-emerald-500'
+                                        }`} />
+                                        <p className="text-sm font-medium truncate">{lead.name}</p>
+                                      </div>
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                          <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0" aria-label="Deal actions">
+                                            <MoreHorizontal size={12} />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openDetailDrawer(lead); }}>
+                                            <Eye size={14} className="mr-2" /> View
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingLead(lead); setDialogOpen(true); }}>
+                                            <Pencil size={14} className="mr-2" /> Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuSeparator />
+                                          <DropdownMenuItem className="text-red-600" onClick={(e) => { e.stopPropagation(); handleDelete(lead); }} disabled={deleting === lead.id}>
+                                            <Trash2 size={14} className="mr-2" /> {deleting === lead.id ? 'Deleting...' : 'Delete'}
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
+                                    <div className="space-y-1.5 text-xs text-muted-foreground">
+                                      <div className="flex items-center gap-1">
+                                        <Building2 size={12} />
+                                        {lead.company || '—'}
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <DollarSign size={12} />
+                                        {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
+                                      </div>
+                                      {lead.source && (
+                                        <div className="flex items-center gap-1">
+                                          <Code2 size={12} />
+                                          {lead.source}
+                                        </div>
+                                      )}
+                                      <div className="flex items-center justify-between">
+                                        <span className="flex items-center gap-1">
+                                          <Clock size={12} />
+                                          {daysBetween(lead.updated_at || lead.created_at)}d
+                                        </span>
+                                      </div>
+                                    </div>
+                                    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+                                      <Select
+                                        value={lead.status}
+                                        onValueChange={(v: LeadStatus) => handleStageChange(lead, v)}
+                                      >
+                                        <SelectTrigger className="h-7 text-xs">
+                                          <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          {pipelineStages.map((s) => (
+                                            <SelectItem key={s} value={s}>{stageLabels[s]}</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    </div>
+                                  </CardContent>
+                                </Card>
+                              </div>
+                            )}
+                          </Draggable>
+                        ))}
+                        {provided.placeholder}
+                        {stageLeads.length === 0 && (
+                          <div className="border-2 border-dashed rounded-lg p-4 text-center mt-2">
+                            <p className="text-xs text-muted-foreground">No deals</p>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </Droppable>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </DragDropContext>
       )}
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
