@@ -219,11 +219,11 @@ export default function FunnelPage() {
                     
                     let topWidth, bottomWidth;
                     if (index < taperStages) {
-                      topWidth = 100 - (60 * (index / taperStages));
-                      bottomWidth = 100 - (60 * ((index + 1) / taperStages));
+                      topWidth = 100 - (70 * (index / taperStages));
+                      bottomWidth = 100 - (70 * ((index + 1) / taperStages));
                     } else {
-                      topWidth = 40;
-                      bottomWidth = 40;
+                      topWidth = 30;
+                      bottomWidth = 30;
                     }
                     
                     const topLeft = (100 - topWidth) / 2;
@@ -238,7 +238,7 @@ export default function FunnelPage() {
                         </span>
                         <div className="flex-1 flex items-center justify-center">
                           <div
-                            className="h-12 w-full flex items-center justify-center transition-all duration-300"
+                            className="h-12 w-[85%] sm:w-[75%] lg:w-[65%] flex items-center justify-center transition-all duration-300"
                             style={{
                               backgroundColor: stage.fill,
                               clipPath: `polygon(${topLeft}% 0%, ${topRight}% 0%, ${bottomRight}% 100%, ${bottomLeft}% 100%)`,
