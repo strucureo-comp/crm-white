@@ -52,7 +52,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Send notifications, update channels, and manage messages from Slack.',
     category: 'Communication',
     icon: <MessageSquare size={24} />,
-    color: 'bg-purple-100 text-purple-600',
+    color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
     features: ['Send messages', 'Create channels', 'Update status'],
     popular: true,
   },
@@ -62,7 +62,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Post updates, manage servers, and engage with communities on Discord.',
     category: 'Communication',
     icon: <MessageSquare size={24} />,
-    color: 'bg-indigo-100 text-indigo-600',
+    color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
     features: ['Post messages', 'Manage channels', 'User roles'],
     popular: true,
   },
@@ -72,7 +72,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Manage ad campaigns, track performance, and optimize spending.',
     category: 'Advertising',
     icon: <TrendingUp size={24} />,
-    color: 'bg-blue-100 text-blue-600',
+    color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
     features: ['Campaign management', 'Performance tracking', 'Budget alerts'],
     popular: true,
   },
@@ -82,7 +82,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Run Facebook and Instagram ad campaigns with advanced targeting.',
     category: 'Advertising',
     icon: <BarChart3 size={24} />,
-    color: 'bg-blue-100 text-blue-600',
+    color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
     features: ['Ad creation', 'Audience targeting', 'Performance reports'],
     popular: true,
   },
@@ -92,7 +92,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Sync issues, manage repositories, and track development progress.',
     category: 'Development',
     icon: <Code size={24} />,
-    color: 'bg-gray-100 text-gray-600',
+    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     features: ['Issue sync', 'PR notifications', 'Release tracking'],
     popular: false,
   },
@@ -102,7 +102,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Sync events, schedule meetings, and manage your team calendar.',
     category: 'Productivity',
     icon: <Calendar size={24} />,
-    color: 'bg-green-100 text-green-600',
+    color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
     features: ['Event sync', 'Meeting scheduling', 'Calendar sharing'],
     popular: true,
   },
@@ -112,7 +112,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Process payments, manage subscriptions, and track revenue.',
     category: 'Finance',
     icon: <ShoppingCart size={24} />,
-    color: 'bg-indigo-100 text-indigo-600',
+    color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
     features: ['Payment processing', 'Subscription management', 'Revenue tracking'],
     popular: true,
   },
@@ -122,7 +122,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Manage email campaigns, subscribers, and marketing automation.',
     category: 'Email Marketing',
     icon: <Mail size={24} />,
-    color: 'bg-yellow-100 text-yellow-600',
+    color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
     features: ['Email campaigns', 'Subscriber management', 'Analytics'],
     popular: false,
   },
@@ -132,7 +132,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Connect to 5,000+ apps and automate workflows without code.',
     category: 'Automation',
     icon: <Zap size={24} />,
-    color: 'bg-orange-100 text-orange-600',
+    color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
     features: ['5000+ integrations', 'Multi-step zaps', 'Conditional logic'],
     popular: true,
   },
@@ -142,7 +142,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Sync data between Airtable bases and manage your databases.',
     category: 'Database',
     icon: <Database size={24} />,
-    color: 'bg-cyan-100 text-cyan-600',
+    color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',
     features: ['Base sync', 'Record management', 'Views'],
     popular: false,
   },
@@ -152,7 +152,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Sync contacts, deals, and marketing data with HubSpot CRM.',
     category: 'CRM',
     icon: <Users size={24} />,
-    color: 'bg-orange-100 text-orange-600',
+    color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
     features: ['Contact sync', 'Deal tracking', 'Marketing automation'],
     popular: false,
   },
@@ -162,7 +162,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Integrate with Salesforce for enterprise CRM synchronization.',
     category: 'CRM',
     icon: <Cloud size={24} />,
-    color: 'bg-blue-100 text-blue-600',
+    color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
     features: ['Lead sync', 'Opportunity tracking', 'Custom objects'],
     popular: false,
   },
@@ -172,7 +172,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Sync pages, databases, and content between Notion and your apps.',
     category: 'Productivity',
     icon: <FileText size={24} />,
-    color: 'bg-gray-100 text-gray-600',
+    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     features: ['Page sync', 'Database sync', 'Content management'],
     popular: false,
   },
@@ -182,7 +182,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Connect to any service using HTTP webhooks.',
     category: 'Developer',
     icon: <Globe size={24} />,
-    color: 'bg-teal-100 text-teal-600',
+    color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400',
     features: ['HTTP requests', 'Custom headers', 'JSON payloads'],
     popular: false,
   },
@@ -192,7 +192,7 @@ const marketplaceApps: MarketplaceApp[] = [
     description: 'Integrate with any REST API endpoint.',
     category: 'Developer',
     icon: <Code size={24} />,
-    color: 'bg-gray-100 text-gray-600',
+    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
     features: ['GET/POST/PUT/DELETE', 'Authentication', 'Custom headers'],
     popular: false,
   },
@@ -248,7 +248,7 @@ export default function MarketplacePage() {
           <h1 className="text-2xl font-bold tracking-tight">Integration Marketplace</h1>
           <p className="text-muted-foreground">Connect your favorite tools and services</p>
         </div>
-        <Button>
+        <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white dark:bg-indigo-600 dark:hover:bg-indigo-700">
           <Plus size={16} className="mr-2" />
           Request Integration
         </Button>
@@ -326,7 +326,7 @@ export default function MarketplacePage() {
               <Card key={app.id} className="relative overflow-hidden">
                 {app.popular && (
                   <div className="absolute top-2 right-2">
-                    <Badge className="bg-primary text-primary-foreground">Popular</Badge>
+                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100 border-none shadow-none">Popular</Badge>
                   </div>
                 )}
                 <CardContent className="p-6">
@@ -351,7 +351,7 @@ export default function MarketplacePage() {
                         Connected
                       </Button>
                     ) : (
-                      <Button className="flex-1">
+                      <Button className="flex-1 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm">
                         <Zap size={16} className="mr-2" />
                         Connect
                       </Button>
@@ -402,7 +402,7 @@ export default function MarketplacePage() {
                                   Connected
                                 </Button>
                               ) : (
-                                <Button className="flex-1">
+                                <Button className="flex-1 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm">
                                   <Zap size={16} className="mr-2" />
                                   Connect
                                 </Button>
@@ -445,7 +445,7 @@ export default function MarketplacePage() {
                           Connected
                         </Button>
                       ) : (
-                        <Button className="flex-1">
+                        <Button className="flex-1 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm">
                           <Zap size={16} className="mr-2" />
                           Connect
                         </Button>
