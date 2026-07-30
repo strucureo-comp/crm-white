@@ -179,7 +179,7 @@ export default function CalendarAgendaPage() {
             ))}
           </div>
           
-          <Button className="bg-[#8b5cf6] hover:bg-[#7c3aed] text-white rounded-xl shadow-md font-bold px-5" onClick={() => setIsScheduleOpen(true)}>
+          <Button className="bg-[#8b5cf6] hover:bg-[#7c3aed] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-white rounded-xl shadow-md font-bold px-5" onClick={() => setIsScheduleOpen(true)}>
             <Plus className="w-4 h-4 mr-2" /> Schedule Event
           </Button>
         </div>
@@ -428,46 +428,46 @@ export default function CalendarAgendaPage() {
 
       {/* Schedule Event Modal */}
       <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
-        <DialogContent className="sm:max-w-[500px] p-8 bg-[#fdfcff] border-0 shadow-2xl rounded-[1.5rem] gap-6">
+        <DialogContent className="sm:max-w-[500px] p-8 bg-[#fdfcff] dark:bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-black text-[#1e1a4f] tracking-tight">Schedule Event</DialogTitle>
-            <button className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-600 hover:bg-purple-200 transition-colors" onClick={() => setIsScheduleOpen(false)}>
+            <DialogTitle className="text-2xl font-black text-[#1e1a4f] dark:text-slate-100 tracking-tight">Schedule Event</DialogTitle>
+            <button className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors" onClick={() => setIsScheduleOpen(false)}>
               <X className="w-4 h-4" />
             </button>
           </div>
           
           <div className="space-y-5">
             <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase text-purple-600 tracking-wider">Event Title</label>
-              <Input placeholder="e.g. Design Sync" className="h-11 bg-purple-50/50 border-purple-100 text-purple-900 placeholder:text-purple-400 rounded-xl px-4 font-bold focus-visible:ring-purple-500" value={formTitle} onChange={e=>setFormTitle(e.target.value)} />
+              <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Event Title</label>
+              <Input placeholder="e.g. Design Sync" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-bold focus-visible:ring-purple-500" value={formTitle} onChange={e=>setFormTitle(e.target.value)} />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase text-purple-600 tracking-wider">Date</label>
-                <Input type="date" className="h-11 bg-purple-50/50 border-purple-100 text-purple-900 rounded-xl px-4 font-bold focus-visible:ring-purple-500" value={formDate} onChange={e=>setFormDate(e.target.value)} />
+                <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Date</label>
+                <Input type="date" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-bold focus-visible:ring-purple-500" value={formDate} onChange={e=>setFormDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase text-purple-600 tracking-wider">Time</label>
-                <Input type="time" className="h-11 bg-purple-50/50 border-purple-100 text-purple-900 rounded-xl px-4 font-bold focus-visible:ring-purple-500" value={formTime} onChange={e=>setFormTime(e.target.value)} />
+                <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Time</label>
+                <Input type="time" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-bold focus-visible:ring-purple-500" value={formTime} onChange={e=>setFormTime(e.target.value)} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <label className="text-[11px] font-black uppercase text-purple-600 tracking-wider">Link to Project (Optional)</label>
+              <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Link to Project (Optional)</label>
               <Select>
-                <SelectTrigger className="h-11 bg-purple-50/50 border-purple-100 text-purple-900 rounded-xl px-4 font-bold focus:ring-purple-500"><SelectValue placeholder="Select a project..." /></SelectTrigger>
+                <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-bold focus:ring-purple-500"><SelectValue placeholder="Select a project..." /></SelectTrigger>
                 <SelectContent><SelectItem value="Alpha">Alpha Redesign</SelectItem><SelectItem value="Beta">Beta Launch</SelectItem></SelectContent>
               </Select>
             </div>
 
             <div className="space-y-2 pt-1">
-              <label className="text-[11px] font-black uppercase text-purple-600 tracking-wider block">Event Color</label>
+              <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider block">Event Color</label>
               <div className="flex items-center gap-3">
                 {EVENT_COLORS.map(c => (
                   <div 
                     key={c}
-                    className={`w-7 h-7 rounded-full cursor-pointer ring-2 ring-offset-2 transition-all ${formColor === c ? 'ring-purple-500' : 'ring-transparent hover:ring-purple-200'}`}
+                    className={`w-7 h-7 rounded-full cursor-pointer ring-2 ring-offset-2 dark:ring-offset-background transition-all ${formColor === c ? 'ring-purple-500' : 'ring-transparent hover:ring-purple-200'}`}
                     style={{ backgroundColor: c }}
                     onClick={() => setFormColor(c)}
                   />
@@ -476,22 +476,22 @@ export default function CalendarAgendaPage() {
             </div>
 
             <div className="space-y-3 pt-2">
-              <label className="text-[11px] font-black uppercase text-purple-600 tracking-wider block border-b border-purple-100 pb-2">Attendees</label>
+              <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider block border-b border-purple-100 dark:border-slate-800 pb-2">Attendees</label>
               <div className="max-h-40 overflow-y-auto space-y-1">
                 {MEMBERS.map(m => (
-                  <label key={m.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-purple-50 cursor-pointer transition-colors">
+                  <label key={m.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-purple-50 dark:hover:bg-slate-800 cursor-pointer transition-colors">
                     <input type="checkbox" className="rounded border-purple-300 text-purple-600 focus:ring-purple-500" defaultChecked />
-                    <Avatar className="w-7 h-7"><AvatarFallback className="bg-white text-purple-700 text-[10px] font-bold border border-purple-200">{m.avatar}</AvatarFallback></Avatar>
-                    <div className="flex flex-col"><span className="text-sm font-bold text-purple-950 leading-none mb-0.5">{m.name}</span><span className="text-[10px] font-semibold text-purple-600">{m.role}</span></div>
+                    <Avatar className="w-7 h-7"><AvatarFallback className="bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-400 text-[10px] font-bold border border-purple-200 dark:border-slate-700">{m.avatar}</AvatarFallback></Avatar>
+                    <div className="flex flex-col"><span className="text-sm font-bold text-purple-950 dark:text-slate-200 leading-none mb-0.5">{m.name}</span><span className="text-[10px] font-semibold text-purple-600 dark:text-slate-400">{m.role}</span></div>
                   </label>
                 ))}
               </div>
             </div>
           </div>
           
-          <div className="flex items-center justify-end gap-3 pt-4 border-t border-purple-100">
-            <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-purple-200 text-[#1e1a4f] font-bold hover:bg-purple-50 hover:text-[#1e1a4f]" onClick={() => setIsScheduleOpen(false)}>Cancel</Button>
-            <Button className="h-11 px-6 rounded-[2rem] bg-[#8b5cf6] hover:bg-[#7c3aed] text-white font-bold shadow-md" onClick={handleCreateEvent}>+ Schedule Event</Button>
+          <div className="flex items-center justify-end gap-3 pt-4 border-t border-purple-100 dark:border-slate-800">
+            <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-purple-200 dark:border-slate-700 text-[#1e1a4f] dark:text-slate-200 font-bold hover:bg-purple-50 dark:hover:bg-slate-800 hover:text-[#1e1a4f] dark:hover:text-slate-100" onClick={() => setIsScheduleOpen(false)}>Cancel</Button>
+            <Button className="h-11 px-6 rounded-[2rem] bg-[#8b5cf6] hover:bg-[#7c3aed] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-white font-bold shadow-md" onClick={handleCreateEvent}>+ Schedule Event</Button>
           </div>
         </DialogContent>
       </Dialog>
