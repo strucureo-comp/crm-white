@@ -37,7 +37,6 @@ import {
   Receipt,
   X,
   Activity,
-  TrendUp,
   Target,
   Camera,
   Mail,
