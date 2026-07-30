@@ -220,7 +220,7 @@ export default function TaskManagerPage() {
                 className="pl-9 h-9 bg-background focus-visible:ring-purple-500 text-sm" 
               />
             </div>
-            <Button onClick={() => setIsNewTaskOpen(true)} className="h-9 bg-purple-600 hover:bg-purple-700 text-white font-bold shadow-sm">
+            <Button onClick={() => setIsNewTaskOpen(true)} className="h-9 bg-purple-600 hover:bg-purple-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-white font-bold shadow-sm">
               <Plus className="w-4 h-4 mr-1.5" /> New Task
             </Button>
           </div>
@@ -550,20 +550,20 @@ export default function TaskManagerPage() {
           
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Task Title</Label>
+              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Task Title</Label>
               <Input placeholder="e.g. Audit regional liabilities" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-medium focus-visible:ring-purple-500" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Initial Status</Label>
+                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Initial Status</Label>
                 <Select value={formStatus} onValueChange={setFormStatus}>
                   <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500"><SelectValue/></SelectTrigger>
                   <SelectContent><SelectItem value="To Do">To Do</SelectItem><SelectItem value="In Progress">In Progress</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Done">Done</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Priority</Label>
+                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Priority</Label>
                 <Select value={formPriority} onValueChange={(v: TaskPriority) => setFormPriority(v)}>
                   <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500"><SelectValue/></SelectTrigger>
                   <SelectContent><SelectItem value="Urgent">Urgent</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Low">Low</SelectItem></SelectContent>
@@ -572,7 +572,7 @@ export default function TaskManagerPage() {
             </div>
 
             <div className="space-y-2 pt-1">
-              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider block">Label Tags</Label>
+              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider block">Label Tags</Label>
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-[#4f46e5] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#4f46e5]/50 transition-all"></div>
                 <div className="w-7 h-7 rounded-full bg-[#3b82f6] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#3b82f6]/50 transition-all"></div>
@@ -585,11 +585,11 @@ export default function TaskManagerPage() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Date</Label>
+                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Date</Label>
                 <Input type="date" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-medium focus-visible:ring-purple-500" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Assignee</Label>
+                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Assignee</Label>
                 <Select value={formAssigneeId} onValueChange={setFormAssigneeId}>
                   <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500"><SelectValue/></SelectTrigger>
                   <SelectContent>{MOCK_ASSIGNEES.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
@@ -598,14 +598,14 @@ export default function TaskManagerPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-purple-400 tracking-wider">Description</Label>
+              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Description</Label>
               <textarea placeholder="Provide more details..." className="w-full min-h-[80px] bg-purple-50/50 dark:bg-slate-900 border border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl p-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
             </div>
           </div>
           
           <div className="flex items-center justify-end gap-3 pt-2">
             <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-purple-200 dark:border-slate-700 text-[#1e1a4f] dark:text-slate-200 font-bold hover:bg-purple-50 dark:hover:bg-slate-800 hover:text-[#1e1a4f] dark:hover:text-slate-100" onClick={() => setIsNewTaskOpen(false)}>Cancel</Button>
-            <Button className="h-11 px-6 rounded-[2rem] bg-[#8b5cf6] dark:bg-purple-600 hover:bg-[#7c3aed] dark:hover:bg-purple-700 text-white font-bold shadow-md" onClick={handleCreateTask}>Schedule Task</Button>
+            <Button className="h-11 px-6 rounded-[2rem] bg-[#8b5cf6] hover:bg-[#7c3aed] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-white font-bold shadow-md" onClick={handleCreateTask}>Schedule Task</Button>
           </div>
         </DialogContent>
       </Dialog>
