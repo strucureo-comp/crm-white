@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { createProject, updateProject } from '@/lib/firebase/database';
 import type { Project, ProjectStatus } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface ProjectDialogProps {
   open: boolean;
@@ -47,6 +48,7 @@ const defaultForm = {
 };
 
 export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultStatus, defaultClientId }: ProjectDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm, status: (defaultStatus as ProjectStatus) || 'pending' });
   const [saving, setSaving] = useState(false);
 
@@ -89,6 +91,7 @@ export function ProjectDialog({ open, onOpenChange, onSaved, project, defaultSta
           ...form,
           deadline: form.deadline || undefined,
           client_id: defaultClientId || '',
+          company_id: user?.company_id || '',
         });
         toast.success('Project created');
       }

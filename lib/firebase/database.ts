@@ -65,18 +65,20 @@ export async function getProjects(companyId: string, clientId?: string): Promise
   try {
     if (!companyId) return [];
     const projectsRef = ref(database, 'projects');
-    const queryRef = query(projectsRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(projectsRef);
 
     if (!snapshot.exists()) return [];
 
     const projects: Project[] = [];
-    snapshot.forEach((childSnapshot) => {
-      const project = { id: childSnapshot.key, ...childSnapshot.val() } as Project;
-      if (!clientId || project.client_id === clientId) {
-        projects.push(project);
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        const project = { id: key, ...val } as Project;
+        if (!clientId || project.client_id === clientId) {
+          projects.push(project);
+        }
       }
-    });
+    }
 
     return projects.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -179,18 +181,20 @@ export async function getInvoices(companyId: string, clientId?: string): Promise
   try {
     if (!companyId) return [];
     const invoicesRef = ref(database, 'invoices');
-    const queryRef = query(invoicesRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(invoicesRef);
 
     if (!snapshot.exists()) return [];
 
     const invoices: Invoice[] = [];
-    snapshot.forEach((childSnapshot) => {
-      const invoice = { id: childSnapshot.key, ...childSnapshot.val() } as Invoice;
-      if (!clientId || invoice.client_id === clientId) {
-        invoices.push(invoice);
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        const invoice = { id: key, ...val } as Invoice;
+        if (!clientId || invoice.client_id === clientId) {
+          invoices.push(invoice);
+        }
       }
-    });
+    }
 
     return invoices.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -299,18 +303,20 @@ export async function getSupportRequests(companyId: string, clientId?: string): 
   try {
     if (!companyId) return [];
     const supportRef = ref(database, 'support_requests');
-    const queryRef = query(supportRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(supportRef);
 
     if (!snapshot.exists()) return [];
 
     const requests: SupportRequest[] = [];
-    snapshot.forEach((childSnapshot) => {
-      const request = { id: childSnapshot.key, ...childSnapshot.val() } as SupportRequest;
-      if (!clientId || request.client_id === clientId) {
-        requests.push(request);
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        const request = { id: key, ...val } as SupportRequest;
+        if (!clientId || request.client_id === clientId) {
+          requests.push(request);
+        }
       }
-    });
+    }
 
     return requests.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -399,15 +405,17 @@ export async function getUsers(companyId: string): Promise<User[]> {
   try {
     if (!companyId) return [];
     const usersRef = ref(database, 'users');
-    const queryRef = query(usersRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(usersRef);
 
     if (!snapshot.exists()) return [];
 
     const users: User[] = [];
-    snapshot.forEach((childSnapshot) => {
-      users.push({ id: childSnapshot.key, ...childSnapshot.val() } as User);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        users.push({ id: key, ...val } as User);
+      }
+    }
 
     return users;
   } catch (error) {
@@ -665,15 +673,17 @@ export async function getTransactions(companyId: string): Promise<Transaction[]>
   try {
     if (!companyId) return [];
     const transactionsRef = ref(database, 'transactions');
-    const queryRef = query(transactionsRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(transactionsRef);
 
     if (!snapshot.exists()) return [];
 
     const transactions: Transaction[] = [];
-    snapshot.forEach((childSnapshot) => {
-      transactions.push({ id: childSnapshot.key, ...childSnapshot.val() } as Transaction);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        transactions.push({ id: key, ...val } as Transaction);
+      }
+    }
 
     return transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
   } catch (error) {
@@ -812,18 +822,20 @@ export async function getQuotations(companyId: string, clientId?: string): Promi
   try {
     if (!companyId) return [];
     const quotRef = ref(database, 'quotations');
-    const queryRef = query(quotRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(quotRef);
 
     if (!snapshot.exists()) return [];
 
     const quotations: Quotation[] = [];
-    snapshot.forEach((childSnapshot) => {
-      const quotation = { id: childSnapshot.key, ...childSnapshot.val() } as Quotation;
-      if (!clientId || quotation.client_id === clientId) {
-        quotations.push(quotation);
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        const quotation = { id: key, ...val } as Quotation;
+        if (!clientId || quotation.client_id === clientId) {
+          quotations.push(quotation);
+        }
       }
-    });
+    }
 
     return quotations.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -978,15 +990,17 @@ export async function getEnquiries(companyId: string): Promise<Enquiry[]> {
   try {
     if (!companyId) return [];
     const enqRef = ref(database, 'enquiries');
-    const queryRef = query(enqRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(enqRef);
 
     if (!snapshot.exists()) return [];
 
     const enquiries: Enquiry[] = [];
-    snapshot.forEach((childSnapshot) => {
-      enquiries.push({ id: childSnapshot.key, ...childSnapshot.val() } as Enquiry);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        enquiries.push({ id: key, ...val } as Enquiry);
+      }
+    }
 
     return enquiries.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -1036,15 +1050,17 @@ export async function getTasks(companyId: string): Promise<TaskItem[]> {
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'tasks');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
 
     if (!snapshot.exists()) return [];
 
     const tasks: TaskItem[] = [];
-    snapshot.forEach((childSnapshot) => {
-      tasks.push({ id: childSnapshot.key, ...childSnapshot.val() } as TaskItem);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        tasks.push({ id: key, ...val } as TaskItem);
+      }
+    }
 
     return tasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -1129,19 +1145,18 @@ export async function getLeads(companyId?: string): Promise<Lead[]> {
     if (!companyId) return []; // Prevent fetching all leads if companyId is missing/undefined
 
     const refPath = ref(database, 'leads');
-    
-    // Natively filter in Firebase using company_id if provided
-    let queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-
-    
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
 
     if (!snapshot.exists()) return [];
 
+    const data = snapshot.val();
     const leads: Lead[] = [];
-    snapshot.forEach((childSnapshot) => {
-      leads.push({ id: childSnapshot.key, ...childSnapshot.val() } as Lead);
-    });
+    
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        leads.push({ id: key, ...val } as Lead);
+      }
+    }
 
     return leads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch (error) {
@@ -1189,10 +1204,10 @@ export async function createLead(lead: Omit<Lead, 'id' | 'lead_id' | 'created_at
     await set(newRef, data);
 
     try {
-      await createContact('default', {
+      await createContact(lead.company_id || 'default', {
         name: lead.name,
         email: lead.email,
-        company_id: lead.company || '',
+        company_id: lead.company_id || '',
         phone: lead.phone || '',
         is_primary: true,
         notes: lead.notes || '',
@@ -1252,13 +1267,15 @@ export async function getFieldAgents(companyId: string): Promise<FieldAgent[]> {
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'field_agents');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: FieldAgent[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as FieldAgent);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as FieldAgent);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch {
     return [];
@@ -1299,13 +1316,15 @@ export async function getFieldAlerts(companyId: string): Promise<FieldAlert[]> {
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'field_alerts');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: FieldAlert[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as FieldAlert);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as FieldAlert);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch {
     return [];
@@ -1331,13 +1350,15 @@ export async function getContentItems(companyId: string): Promise<ContentItem[]>
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'content_items');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: ContentItem[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as ContentItem);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as ContentItem);
+      }
+    }
     return items.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
   } catch {
     return [];
@@ -1383,13 +1404,15 @@ export async function getMediaItems(companyId: string): Promise<MediaItem[]> {
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'media_items');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: MediaItem[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as MediaItem);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as MediaItem);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch {
     return [];
@@ -1520,13 +1543,15 @@ export async function getAutomationRules(companyId: string): Promise<AutomationR
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'automation_rules');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: AutomationRule[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as AutomationRule);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as AutomationRule);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch {
     return [];
@@ -1923,13 +1948,15 @@ export async function getCampaigns(companyId: string): Promise<Campaign[]> {
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'campaigns');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: Campaign[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as Campaign);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as Campaign);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch { return []; }
 }
@@ -2051,13 +2078,15 @@ export async function getActivityLogs(companyId: string, limitCount: number = 50
   try {
     if (!companyId) return [];
     const logsRef = ref(database, 'activity_logs');
-    const queryRef = query(logsRef, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(logsRef);
     if (!snapshot.exists()) return [];
     const items: ActivityLog[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as ActivityLog);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as ActivityLog);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limitCount);
   } catch { return []; }
 }
@@ -2119,13 +2148,15 @@ export async function getEmailCampaigns(companyId: string): Promise<EmailCampaig
   try {
     if (!companyId) return [];
     const refPath = ref(database, 'email_campaigns');
-    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
-    const snapshot = await get(queryRef);
+    const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: EmailCampaign[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as EmailCampaign);
-    });
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        items.push({ id: key, ...val } as EmailCampaign);
+      }
+    }
     return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
   } catch { return []; }
 }

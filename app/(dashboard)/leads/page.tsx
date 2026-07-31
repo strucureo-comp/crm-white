@@ -97,8 +97,9 @@ export default function LeadsPage() {
       // Pass the logged-in user's company_id to securely filter leads
       const data = await getLeads(user?.company_id);
       setLeads(data);
-    } catch (err) {
+    } catch (err: any) {
       console.error('Failed to load leads:', err);
+      toast.error(`Failed to load leads: ${err.message || err}`);
     } finally {
       setLoading(false);
     }
@@ -107,6 +108,8 @@ export default function LeadsPage() {
   useEffect(() => {
     if (user?.company_id) {
       load();
+    } else {
+      setLoading(false);
     }
   }, [user?.company_id]);
 

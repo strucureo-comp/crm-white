@@ -24,6 +24,7 @@ import {
 import { toast } from 'sonner';
 import { createQuotation, updateQuotation } from '@/lib/firebase/database';
 import type { Quotation, QuotationStatus, QuotationItem } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface QuoteDialogProps {
   open: boolean;
@@ -48,6 +49,7 @@ const defaultForm = {
 };
 
 export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({
     ...defaultForm,
     quotation_number: `Q-${Date.now().toString().slice(-6)}`,
@@ -126,6 +128,7 @@ export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogP
         await createQuotation({
           ...form,
           client_id: '',
+          company_id: user?.company_id || '',
           valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : '',
         });
         toast.success('Quote created');

@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { createContentItem, updateContentItem } from '@/lib/firebase/database';
 import type { ContentItem, ContentStatus } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface ContentItemDialogProps {
   open: boolean;
@@ -38,6 +39,7 @@ const defaultForm = {
 };
 
 export function ContentItemDialog({ open, onOpenChange, onSaved, item }: ContentItemDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -70,7 +72,10 @@ export function ContentItemDialog({ open, onOpenChange, onSaved, item }: Content
         await updateContentItem(item.id, form);
         toast.success('Content updated');
       } else {
-        await createContentItem(form);
+        await createContentItem({
+          ...form,
+          company_id: user?.company_id || '',
+        });
         toast.success('Content created');
       }
       onSaved();

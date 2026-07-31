@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { createSocialPost, updateSocialPost } from '@/lib/firebase/database';
 import type { SocialPost, SocialPlatform } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface SocialPostDialogProps {
   open: boolean;
@@ -36,11 +37,12 @@ const defaultForm = {
   content: '',
   media_url: '',
   scheduled_at: '',
-  status: 'draft' as SocialPost['status'],
-  created_by: '',
+  status: 'scheduled' as const,
+  created_by: 'admin',
 };
 
 export function SocialPostDialog({ open, onOpenChange, onSaved, post }: SocialPostDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -79,7 +81,10 @@ export function SocialPostDialog({ open, onOpenChange, onSaved, post }: SocialPo
         await updateSocialPost(post.id, form);
         toast.success('Post updated successfully');
       } else {
-        await createSocialPost(form);
+        await createSocialPost({
+          ...form,
+          company_id: user?.company_id || '',
+        });
         toast.success('Post created successfully');
       }
       onSaved();

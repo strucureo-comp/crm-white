@@ -25,6 +25,7 @@ import { createLead, updateLead } from '@/lib/firebase/database';
 import { Badge } from '@/components/ui/badge';
 import type { Lead, LeadStatus, LeadSource, LeadTag, LeadPriority } from '@/lib/db/types';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface LeadDialogProps {
   open: boolean;
@@ -54,7 +55,7 @@ const defaultForm: LeadForm = {
   company: '',
   phone: '',
   status: 'new',
-  source: '',
+  source: 'Manual',
   estimated_value: 0,
   owner_id: '',
   notes: '',
@@ -104,12 +105,20 @@ function formToPayload(f: LeadForm) {
 }
 
 export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState<LeadForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setForm(lead ? leadToForm(lead) : { ...defaultForm });
-  }, [lead]);
+    if (lead) {
+      setForm(leadToForm(lead));
+    } else {
+      setForm({
+        ...defaultForm,
+        owner_id: user?.id || '',
+      });
+    }
+  }, [lead, user]);
 
   function set<K extends keyof LeadForm>(key: K, value: LeadForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -128,7 +137,10 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
         await updateLead(lead.id, payload as any);
         toast.success('Updated successfully');
       } else {
-        await createLead(payload as any);
+        await createLead({
+          ...payload,
+          company_id: user?.company_id || '',
+        } as any);
         toast.success('Created successfully');
       }
       onSaved();
@@ -141,7 +153,7 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
   }
 
   function handleCancel() {
-    setForm(lead ? leadToForm(lead) : { ...defaultForm });
+    setForm(lead ? leadToForm(lead) : { ...defaultForm, owner_id: user?.id || '' });
     onOpenChange(false);
   }
 
@@ -149,35 +161,33 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>{lead ? 'Edit' : 'Add'} {lead ? 'Lead' : 'Lead'}</DialogTitle>
+          <DialogTitle>{lead ? 'Edit Lead' : 'New Lead'}</DialogTitle>
           <DialogDescription>
-            {lead ? 'Update the lead details below.' : 'Enter the lead details below.'}
+            {lead ? 'Update the lead details.' : 'Enter the lead details.'}
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-          <div className="grid grid-cols-2 gap-4 overflow-y-auto max-h-[55vh] pr-1 -mr-1">
-            <div className="col-span-2 sm:col-span-1">
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
               <Label htmlFor="name">Name *</Label>
-              <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} placeholder="John Doe" />
+              <Input id="name" value={form.name} onChange={(e) => set('name', e.target.value)} required placeholder="John Doe" />
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            <div className="col-span-2">
               <Label htmlFor="email">Email *</Label>
-              <Input id="email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} placeholder="john@example.com" />
+              <Input id="email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required placeholder="john@example.com" />
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            <div>
               <Label htmlFor="company">Company</Label>
               <Input id="company" value={form.company} onChange={(e) => set('company', e.target.value)} placeholder="Acme Inc." />
             </div>
-            <div className="col-span-2 sm:col-span-1">
+            <div>
               <Label htmlFor="phone">Phone</Label>
-              <Input id="phone" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+1 555-0123" />
+              <Input id="phone" type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+1 234 567 8900" />
             </div>
             <div>
               <Label htmlFor="status">Status</Label>
               <Select value={form.status} onValueChange={(v: LeadStatus) => set('status', v)}>
-                <SelectTrigger id="status">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger id="status"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="new">New</SelectItem>
                   <SelectItem value="contacted">Contacted</SelectItem>
@@ -190,25 +200,9 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
               </Select>
             </div>
             <div>
-              <Label htmlFor="priority">Priority</Label>
-              <Select value={form.priority} onValueChange={(v: LeadPriority) => set('priority', v)}>
-                <SelectTrigger id="priority">
-                  <SelectValue placeholder="Select priority" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Low">Low</SelectItem>
-                  <SelectItem value="Medium">Medium</SelectItem>
-                  <SelectItem value="High">High</SelectItem>
-                  <SelectItem value="Urgent">Urgent</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
               <Label htmlFor="source">Source</Label>
               <Select value={form.source} onValueChange={(v: LeadSource) => set('source', v)}>
-                <SelectTrigger id="source">
-                  <SelectValue />
-                </SelectTrigger>
+                <SelectTrigger id="source"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="Website">Website</SelectItem>
                   <SelectItem value="Facebook">Facebook</SelectItem>
@@ -224,12 +218,24 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
               </Select>
             </div>
             <div>
-              <Label htmlFor="estimated_value">Estimated Value ($)</Label>
-              <Input id="estimated_value" type="number" min={0} value={form.estimated_value} onChange={(e) => set('estimated_value', Number(e.target.value))} />
+              <Label htmlFor="priority">Priority</Label>
+              <Select value={form.priority} onValueChange={(v: LeadPriority) => set('priority', v)}>
+                <SelectTrigger id="priority"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Low">Low</SelectItem>
+                  <SelectItem value="Medium">Medium</SelectItem>
+                  <SelectItem value="High">High</SelectItem>
+                  <SelectItem value="Urgent">Urgent</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div>
-              <Label htmlFor="owner_id">Owner ID</Label>
-              <Input id="owner_id" value={form.owner_id} onChange={(e) => set('owner_id', e.target.value)} placeholder="User ID" />
+              <Label htmlFor="next_follow_up">Next Follow Up</Label>
+              <Input id="next_follow_up" type="date" value={form.next_follow_up} onChange={(e) => set('next_follow_up', e.target.value)} />
+            </div>
+            <div className="col-span-2">
+              <Label htmlFor="estimated_value">Estimated Value ($)</Label>
+              <Input id="estimated_value" type="number" min={0} value={form.estimated_value} onChange={(e) => set('estimated_value', Number(e.target.value))} />
             </div>
             <div className="col-span-2">
               <Label htmlFor="notes">Notes</Label>

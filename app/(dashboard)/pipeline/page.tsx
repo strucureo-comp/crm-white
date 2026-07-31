@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -47,6 +47,7 @@ import { LeadDialog } from '@/components/dialogs/lead-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { formatCurrency } from '@/lib/utils';
 
 const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal", 'negotiation', 'won', 'lost'];
@@ -77,6 +78,7 @@ function daysBetween(dateStr: string): number {
 }
 
 export default function DealsPage() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('all');
@@ -91,10 +93,15 @@ export default function DealsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
       const [leadData, pipelineData] = await Promise.all([
-        getLeads(),
+        getLeads(user.company_id),
         getPipelines(),
       ]);
       setLeads(leadData);
@@ -104,9 +111,11 @@ export default function DealsPage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user?.company_id]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
 
   const selectedPipeline = useMemo(
     () => pipelines.find(p => p.id === selectedPipelineId),

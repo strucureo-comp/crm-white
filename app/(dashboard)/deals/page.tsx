@@ -49,6 +49,7 @@ import type { Lead, LeadStatus, Pipeline, PipelineStage } from '@/lib/db/types';
 import { getCurrentUserId } from '@/lib/firebase/auth';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { formatCurrency } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 
@@ -93,6 +94,7 @@ const mockWhatsAppMessages = [
 ];
 
 export default function PipelinePage() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
@@ -136,9 +138,17 @@ export default function PipelinePage() {
   const activePipeline = pipelines.find((p) => p.id === activePipelineId);
   const stages = activePipeline?.stages || DEFAULT_PIPELINE_STAGES;
 
-  async function load() {
+  const load = useCallback(async () => {
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     try {
-      const [leadData, pipelineData] = await Promise.all([getLeads(), getPipelines()]);
+      const [leadData, pipelineData] = await Promise.all([
+        getLeads(user.company_id),
+        getPipelines()
+      ]);
       setLeads(leadData);
       setPipelines(pipelineData);
       if (pipelineData.length > 0 && !activePipelineId) {
@@ -149,9 +159,11 @@ export default function PipelinePage() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [user?.company_id, activePipelineId]);
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
   useEffect(() => { setIsMounted(true); }, []);
 
   const grouped: Record<string, Lead[]> = {};

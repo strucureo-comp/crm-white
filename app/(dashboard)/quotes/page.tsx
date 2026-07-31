@@ -48,7 +48,10 @@ export default function QuotesPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
-    if (!user?.company_id) return;
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const data = await getQuotations(user.company_id);

@@ -32,7 +32,10 @@ export default function PaymentsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.company_id) return;
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
     const unsubscribe = subscribeToPayments(user.company_id, (data) => {
       data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPayments(data);

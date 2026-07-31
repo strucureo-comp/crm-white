@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { createEmailCampaign, updateEmailCampaign } from '@/lib/firebase/database';
 import type { EmailCampaign, EmailTemplate, EmailCampaignStatus } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface EmailCampaignDialogProps {
   open: boolean;
@@ -38,10 +39,11 @@ const defaultForm = {
   recipient_list: '',
   scheduled_at: '',
   status: 'draft' as EmailCampaignStatus,
-  created_by: '',
+  created_by: 'admin',
 };
 
 export function EmailCampaignDialog({ open, onOpenChange, onSaved, item, templates }: EmailCampaignDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -51,10 +53,10 @@ export function EmailCampaignDialog({ open, onOpenChange, onSaved, item, templat
         name: item.name,
         subject: item.subject,
         template_id: item.template_id || '',
-        recipient_list: (item.recipient_list || []).join(', '),
-        scheduled_at: item.scheduled_at || '',
+        recipient_list: item.recipient_list ? item.recipient_list.join(', ') : '',
+        scheduled_at: item.scheduled_at ? item.scheduled_at.split('T')[0] : '',
         status: item.status,
-        created_by: item.created_by || '',
+        created_by: item.created_by || 'admin',
       });
     } else {
       setForm({ ...defaultForm });
@@ -90,7 +92,10 @@ export function EmailCampaignDialog({ open, onOpenChange, onSaved, item, templat
         await updateEmailCampaign(item.id, payload);
         toast.success('Campaign updated');
       } else {
-        await createEmailCampaign(payload);
+        await createEmailCampaign({
+          ...payload,
+          company_id: user?.company_id || '',
+        });
         toast.success('Campaign created');
       }
       onSaved();

@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { createAutomationRule, updateAutomationRule } from '@/lib/firebase/database';
 import type { AutomationRule } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface AutomationRuleDialogProps {
   open: boolean;
@@ -33,13 +34,12 @@ interface AutomationRuleDialogProps {
 const defaultForm = {
   name: '',
   trigger: '',
-  actions: [] as string[],
-  status: 'Active',
-  enabled: true as boolean,
-  execution_count: 0,
+  actions: [''] as string[],
+  enabled: true,
 };
 
 export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: AutomationRuleDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -47,11 +47,9 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
     if (rule) {
       setForm({
         name: rule.name || '',
-        trigger: rule.trigger,
-        actions: (rule.actions || []).map(a => typeof a === 'string' ? a : a.type),
-        status: rule.status || 'Active',
+        trigger: rule.trigger || '',
+        actions: rule.actions ? rule.actions.map(a => a.type) : [rule.action || ''],
         enabled: rule.enabled ?? true,
-        execution_count: rule.execution_count || 0,
       });
     } else {
       setForm({ ...defaultForm });
@@ -74,7 +72,15 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
         await updateAutomationRule(rule.id, form as unknown as Partial<AutomationRule>);
         toast.success('Rule updated');
       } else {
-        await createAutomationRule({ ...form, workspace_id: '', description: '', trigger_config: {}, conditions: [], actions: form.actions.map(a => ({ type: a, config: {} })) } as unknown as Omit<AutomationRule, 'id' | 'rule_id' | 'created_at' | 'updated_at'>);
+        await createAutomationRule({
+          ...form,
+          workspace_id: '',
+          company_id: user?.company_id || '',
+          description: '',
+          trigger_config: {},
+          conditions: [],
+          actions: form.actions.map(a => ({ type: a, config: {} }))
+        } as unknown as Omit<AutomationRule, 'id' | 'rule_id' | 'created_at' | 'updated_at'>);
         toast.success('Rule created');
       }
       onSaved();

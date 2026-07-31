@@ -47,7 +47,10 @@ export default function InvoicesPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   const load = useCallback(async () => {
-    if (!user?.company_id) return;
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     const data = await getInvoices(user.company_id);
     setInvoices(data);

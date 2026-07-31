@@ -28,8 +28,8 @@ import type { Contact } from '@/lib/db/types';
 import { ContactDialog } from '@/components/dialogs/contact-dialog';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { toast } from 'sonner';
-
 
 function isRecentlyAdded(contact: Contact): boolean {
   if (!contact.created_at) return false;
@@ -63,7 +63,10 @@ export default function ContactsPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
-    if (!user?.company_id) return;
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
     try {
       const data = await getContacts(user.company_id);
       setContacts(data);

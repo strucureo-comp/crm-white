@@ -27,7 +27,8 @@ import {
   Loader2,
   List,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { getLeads, getPipelines } from '@/lib/firebase/database';
 import type { Lead, Pipeline } from '@/lib/db/types';
 
@@ -56,24 +57,36 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export default function FunnelPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipeline, setSelectedPipeline] = useState('all');
   const [dateRange, setDateRange] = useState('30d');
 
+  const load = useCallback(async () => {
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const [leadsData, pipelinesData] = await Promise.all([
+        getLeads(user.company_id),
+        getPipelines(),
+      ]);
+      setLeads(leadsData);
+      setPipelines(pipelinesData);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.company_id]);
+
   useEffect(() => {
-    Promise.all([
-      getLeads(),
-      getPipelines(),
-    ])
-      .then(([leadsData, pipelinesData]) => {
-        setLeads(leadsData);
-        setPipelines(pipelinesData);
-      })
-      .catch(console.error)
-      .finally(() => setLoading(false));
-  }, []);
+    load();
+  }, [load]);
 
   const daysOld = dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : dateRange === '1y' ? 365 : 30;
   const cutoff = new Date(Date.now() - daysOld * 86400000).toISOString();

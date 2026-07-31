@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { createCalendarEvent, updateCalendarEvent } from '@/lib/firebase/database';
 import type { CalendarEvent } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface CalendarEventDialogProps {
   open: boolean;
@@ -33,19 +34,22 @@ interface CalendarEventDialogProps {
 const defaultForm = {
   title: '',
   type: 'Blog',
-  date: new Date().toISOString().split('T')[0],
+  date: '',
+  description: '',
 };
 
 export function CalendarEventDialog({ open, onOpenChange, onSaved, event }: CalendarEventDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (event) {
       setForm({
-        title: event.title,
-        type: event.type,
-        date: (event.date || '').split('T')[0],
+        title: event.title || '',
+        type: event.type || 'Blog',
+        date: event.date || '',
+        description: event.description || '',
       });
     } else {
       setForm({ ...defaultForm });
@@ -68,7 +72,10 @@ export function CalendarEventDialog({ open, onOpenChange, onSaved, event }: Cale
         await updateCalendarEvent(event.id, form);
         toast.success('Event updated');
       } else {
-        await createCalendarEvent(form);
+        await createCalendarEvent({
+          ...form,
+          company_id: user?.company_id || '',
+        });
         toast.success('Event created');
       }
       onSaved();

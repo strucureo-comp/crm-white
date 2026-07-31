@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { createCampaign, updateCampaign } from '@/lib/firebase/database';
 import type { Campaign, CampaignChannel, CampaignStatus } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface CampaignDialogProps {
   open: boolean;
@@ -44,6 +45,7 @@ const defaultForm = {
 };
 
 export function CampaignDialog({ open, onOpenChange, onSaved, campaign }: CampaignDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -89,7 +91,14 @@ export function CampaignDialog({ open, onOpenChange, onSaved, campaign }: Campai
         await updateCampaign(campaign.id, form);
         toast.success('Campaign updated successfully');
       } else {
-        await createCampaign({ ...form, workspace_id: '', currency: 'USD', content: {}, metrics: { impressions: 0, clicks: 0, conversions: 0, ctr: 0, cpc: 0, cpm: 0, roas: 0, spend: 0, revenue: 0 } } as Omit<Campaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>);
+        await createCampaign({
+          ...form,
+          workspace_id: '',
+          company_id: user?.company_id || '',
+          currency: 'USD',
+          content: {},
+          metrics: { impressions: 0, clicks: 0, conversions: 0, ctr: 0, cpc: 0, cpm: 0, roas: 0, spend: 0, revenue: 0 }
+        } as Omit<Campaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>);
         toast.success('Campaign created successfully');
       }
       onSaved();

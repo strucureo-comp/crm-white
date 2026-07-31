@@ -8,6 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { createContact, updateContact } from '@/lib/db/contacts/api';
 import type { Contact } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface ContactDialogProps {
   open: boolean;
@@ -50,12 +51,17 @@ function contactToForm(c: Contact): ContactForm {
 }
 
 export function ContactDialog({ open, onOpenChange, onSaved, contact, workspaceId }: ContactDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState<ContactForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    setForm(contact ? contactToForm(contact) : { ...defaultForm });
-  }, [contact, open]);
+    if (contact) {
+      setForm(contactToForm(contact));
+    } else {
+      setForm({ ...defaultForm, company_id: user?.company_id || '' });
+    }
+  }, [contact, open, user]);
 
   function set<K extends keyof ContactForm>(key: K, value: ContactForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -115,10 +121,6 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, workspaceI
             <div className="col-span-2">
               <Label htmlFor="email">Email <span className="text-red-500">*</span></Label>
               <Input id="email" type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required placeholder="john@example.com" />
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="company_id">Company ID <span className="text-red-500">*</span></Label>
-              <Input id="company_id" value={form.company_id} onChange={(e) => set('company_id', e.target.value)} required placeholder="Company ID" />
             </div>
             <div>
               <Label htmlFor="phone">Phone</Label>

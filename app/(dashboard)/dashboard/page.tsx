@@ -40,7 +40,10 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      if (!user?.company_id) return;
+      if (!user?.company_id) {
+        setLoading(false);
+        return;
+      }
       try {
         const [leadData, invoiceData, activityData, ruleData, emailData] = await Promise.all([
           getLeads(user.company_id),
@@ -61,7 +64,7 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, []);
+  }, [user?.company_id]);
 
   const totalLeads = leads.length;
   const activeDeals = leads.filter((l) => l.status !== 'won' && l.status !== 'lost').length;

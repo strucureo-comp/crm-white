@@ -56,7 +56,11 @@ export default function OverviewPage() {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
 
   useEffect(() => {
-    if (!user?.company_id) return;
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
     Promise.all([
       getLeads(user.company_id),
       getInvoices(user.company_id),
@@ -77,7 +81,7 @@ export default function OverviewPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, []);
+  }, [user?.company_id]);
 
   const activeDeals = leads.filter((l) => l.status !== 'won' && l.status !== 'lost').length;
   const pipelineValue = leads

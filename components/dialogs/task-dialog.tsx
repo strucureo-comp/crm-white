@@ -23,6 +23,7 @@ import {
 import { toast } from 'sonner';
 import { createTask, updateTask } from '@/lib/firebase/database';
 import type { TaskItem, TaskPriority, TaskStatus } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface TaskDialogProps {
   open: boolean;
@@ -42,6 +43,7 @@ const defaultForm = {
 };
 
 export function TaskDialog({ open, onOpenChange, onSaved, task }: TaskDialogProps) {
+  const { user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -77,7 +79,11 @@ export function TaskDialog({ open, onOpenChange, onSaved, task }: TaskDialogProp
         await updateTask(task.id, { ...form, due_date: form.due_date || undefined });
         toast.success('Task updated');
       } else {
-        await createTask({ ...form, due_date: form.due_date || undefined });
+        await createTask({
+          ...form,
+          due_date: form.due_date || undefined,
+          company_id: user?.company_id || '',
+        });
         toast.success('Task created');
       }
       onSaved();

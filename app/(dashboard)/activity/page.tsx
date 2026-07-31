@@ -162,7 +162,10 @@ export default function ActivityPage() {
   }
 
   async function load() {
-    if (!user?.company_id) return;
+    if (!user?.company_id) {
+      setLoading(false);
+      return;
+    }
     try {
       const [activityLogs, tasks] = await Promise.all([
         getActivityLogs(user.company_id, 100),

@@ -22,6 +22,7 @@ import {
 import { toast } from 'sonner';
 import { createInvoice, updateInvoice, getProjects } from '@/lib/firebase/database';
 import type { Invoice, InvoiceStatus, Project } from '@/lib/db/types';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface InvoiceDialogProps {
   open: boolean;
@@ -31,6 +32,7 @@ interface InvoiceDialogProps {
 }
 
 export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceDialogProps) {
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState({
     project_id: '',
@@ -46,7 +48,9 @@ export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceD
 
   useEffect(() => {
     if (open) {
-      getProjects().then(setProjects).catch(() => {});
+      if (user?.company_id) {
+        getProjects(user.company_id).then(setProjects).catch(() => {});
+      }
       if (invoice) {
         setForm({
           project_id: invoice.project_id || '',
@@ -71,7 +75,7 @@ export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceD
         });
       }
     }
-  }, [open, invoice]);
+  }, [open, invoice, user]);
 
   function set<K extends keyof typeof form>(key: K, value: (typeof form)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -89,7 +93,10 @@ export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceD
         await updateInvoice(invoice.id, form);
         toast.success('Invoice updated');
       } else {
-        await createInvoice(form);
+        await createInvoice({
+          ...form,
+          company_id: user?.company_id || '',
+        });
         toast.success('Invoice created');
       }
       onSaved();
