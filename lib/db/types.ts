@@ -1619,7 +1619,7 @@ export interface PurchaseOrder {
 }
 
 // ===== 19. CONTRACTS =====
-export interface Contract {
+export interface ContractLegacy {
   contract_id: string;
   workspace_id: string;
   company_id: string;
