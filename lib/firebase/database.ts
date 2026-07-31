@@ -1047,9 +1047,8 @@ export async function updateEnquiry(id: string, updates: Partial<Enquiry>): Prom
 // TASK FUNCTIONS
 // ----------------------------------------------------
 
-export async function getTasks(companyId: string): Promise<TaskItem[]> {
+export async function getTasks(companyId?: string): Promise<TaskItem[]> {
   try {
-    if (!companyId) return [];
     const refPath = ref(database, 'tasks');
     const snapshot = await get(refPath);
 
@@ -1058,7 +1057,8 @@ export async function getTasks(companyId: string): Promise<TaskItem[]> {
     const tasks: TaskItem[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object') {
+        if (companyId && (val as any).company_id !== companyId) continue;
         tasks.push({ id: key, ...val } as TaskItem);
       }
     }
