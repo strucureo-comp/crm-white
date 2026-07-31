@@ -19,6 +19,7 @@ interface ResponsiveTableProps<T> {
   mobileCardTitle?: (item: T) => string;
   emptyMessage?: string;
   className?: string;
+  onRowClick?: (item: T) => void;
 }
 
 export function ResponsiveTable<T>({
@@ -28,6 +29,7 @@ export function ResponsiveTable<T>({
   mobileCardTitle,
   emptyMessage = 'No data found',
   className,
+  onRowClick,
 }: ResponsiveTableProps<T>) {
   if (data.length === 0) {
     return (
@@ -61,7 +63,11 @@ export function ResponsiveTable<T>({
           </thead>
           <tbody>
             {data.map((item) => (
-              <tr key={keyExtractor(item)} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
+              <tr 
+                key={keyExtractor(item)} 
+                className={cn("border-b last:border-0 hover:bg-muted/50 transition-colors", onRowClick && "cursor-pointer")}
+                onClick={() => onRowClick?.(item)}
+              >
                 {visibleColumns.map((col) => (
                   <td
                     key={col.key}
@@ -82,7 +88,11 @@ export function ResponsiveTable<T>({
       {/* Mobile cards */}
       <div className={cn('sm:hidden space-y-3', className)}>
         {data.map((item) => (
-          <div key={keyExtractor(item)} className="rounded-lg border bg-card p-4 space-y-3">
+          <div 
+            key={keyExtractor(item)} 
+            className={cn("rounded-lg border bg-card p-4 space-y-3", onRowClick && "cursor-pointer")}
+            onClick={() => onRowClick?.(item)}
+          >
             {mobileCardTitle && (
               <div className="text-sm font-semibold text-foreground">
                 {mobileCardTitle(item)}
