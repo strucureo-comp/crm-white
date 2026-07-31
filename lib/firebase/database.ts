@@ -402,9 +402,8 @@ export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 
   }
 }
 
-export async function getUsers(companyId: string): Promise<User[]> {
+export async function getUsers(companyId?: string): Promise<User[]> {
   try {
-    if (!companyId) return [];
     const usersRef = ref(database, 'users');
     const snapshot = await get(usersRef);
 
@@ -413,7 +412,8 @@ export async function getUsers(companyId: string): Promise<User[]> {
     const users: User[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object') {
+        if (companyId && (val as any).company_id !== companyId) continue;
         users.push({ id: key, ...val } as User);
       }
     }
@@ -951,6 +951,7 @@ export async function markInvoiceAsPaid(
 ): Promise<boolean> {
   try {
     const now = new Date().toISOString();
+    const invoice = await getInvoice(invoiceId);
     await updateInvoice(invoiceId, {
       status: 'paid',
       paid_at: now,
@@ -963,6 +964,7 @@ export async function markInvoiceAsPaid(
       description: `Payment for invoice ${invoiceId}`,
       date: now,
       created_by: '',
+      company_id: invoice?.company_id || '',
     });
 
     return true;
