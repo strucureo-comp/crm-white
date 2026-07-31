@@ -694,7 +694,7 @@ export type EnquiryStatus = 'new' | 'read' | 'replied' | 'converted';
 
 export interface Enquiry {
   id: string;
-  company_id: string;
+  company_id?: string;
   name: string;
   email: string;
   subject: string;
