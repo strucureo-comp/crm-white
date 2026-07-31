@@ -13,10 +13,11 @@ import {
 
 interface ConfirmDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange?: (open: boolean) => void;
   title: string;
   description: string;
   onConfirm: () => void;
+  onCancel?: () => void;
   confirmLabel?: string;
   variant?: 'default' | 'destructive';
   loading?: boolean;
@@ -28,12 +29,19 @@ export function ConfirmDialog({
   title,
   description,
   onConfirm,
+  onCancel,
   confirmLabel = 'Delete',
   variant = 'destructive',
   loading = false,
 }: ConfirmDialogProps) {
   return (
-    <AlertDialog open={open} onOpenChange={onOpenChange}>
+    <AlertDialog 
+      open={open} 
+      onOpenChange={(isOpen) => {
+        if (onOpenChange) onOpenChange(isOpen);
+        if (!isOpen && onCancel) onCancel();
+      }}
+    >
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>{title}</AlertDialogTitle>
