@@ -93,27 +93,21 @@ const MOCK_ROLES: Role[] = [
   }
 ];
 
-const MOCK_MEMBERS: Member[] = [
-  { id: 'm1', name: 'Alex Rivera', email: 'alex@tagverse.com', role: 'Admin', status: 'Active', lastActive: 'Just now', initials: 'AR', color: '#8b5cf6' },
-  { id: 'm2', name: 'Sarah Jones', email: 'sarah@tagverse.com', role: 'Manager', status: 'Active', lastActive: '2h ago', initials: 'SJ', color: '#ec4899' },
-  { id: 'm3', name: 'Mike Chen', email: 'mike@tagverse.com', role: 'Sales Rep', status: 'Invited', lastActive: 'Never', initials: 'MC', color: '#3b82f6' },
-  { id: 'm4', name: 'Emma Wilson', email: 'emma@tagverse.com', role: 'Sales Rep', status: 'Active', lastActive: '5h ago', initials: 'EW', color: '#10b981' },
-  { id: 'm5', name: 'David Kim', email: 'david@tagverse.com', role: 'Viewer', status: 'Inactive', lastActive: '3 days ago', initials: 'DK', color: '#64748b' },
-];
+const MOCK_MEMBERS: Member[] = [];
 
-const MOCK_ACTIVITY: ActivityItem[] = [
-  { id: 'a1', repId: 'm1', action: 'updated permissions for', target: 'Sales Rep role', time: '10 mins ago' },
-  { id: 'a2', repId: 'm2', action: 'invited', target: 'Mike Chen to workspace', time: '1 hour ago' },
-  { id: 'a3', repId: 'm4', action: 'logged in from', target: 'new device (Mac OS)', time: '5 hours ago' },
-  { id: 'a4', repId: 'm1', action: 'changed role of', target: 'David Kim to Viewer', time: '3 days ago' },
-  { id: 'a5', repId: 'm5', action: 'deactivated', target: 'their own account', time: '3 days ago' },
-];
+const MOCK_ACTIVITY: ActivityItem[] = [];
 
 const MODULE_NAMES = ['contracts', 'payments', 'marketing', 'workspace', 'analytics'] as const;
 type ModuleKey = typeof MODULE_NAMES[number];
 
 export default function TeamPage() {
   const [activeTab, setActiveTab] = useState<'Members' | 'Roles' | 'Activity'>('Members');
+  
+  // Invite Modal State
+  const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [inviteName, setInviteName] = useState('');
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [inviteRole, setInviteRole] = useState('Viewer');
   
   // Members Tab State
   const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
@@ -178,6 +172,32 @@ export default function TeamPage() {
 
   const filteredActivity = MOCK_ACTIVITY.filter(a => filterAction === 'All' || a.action.includes(filterAction));
 
+  const handleInvite = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteName || !inviteEmail) return;
+    
+    const initials = inviteName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+    const colors = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
+    const color = colors[Math.floor(Math.random() * colors.length)];
+    
+    const newMember: Member = {
+      id: 'm' + Date.now(),
+      name: inviteName,
+      email: inviteEmail,
+      role: inviteRole,
+      status: 'Invited',
+      lastActive: 'Never',
+      initials,
+      color,
+    };
+    
+    setMembers([newMember, ...members]);
+    setIsInviteModalOpen(false);
+    setInviteName('');
+    setInviteEmail('');
+    setInviteRole('Viewer');
+  };
+
   return (
     <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] dark:bg-background text-slate-900 dark:text-slate-100">
       
@@ -189,7 +209,10 @@ export default function TeamPage() {
             {members.length} Members
           </Badge>
         </div>
-        <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white rounded-xl shadow-md font-bold px-5">
+        <Button 
+          className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white rounded-xl shadow-md font-bold px-5"
+          onClick={() => setIsInviteModalOpen(true)}
+        >
           <Plus className="w-4 h-4 mr-2" /> Invite Member
         </Button>
       </div>
@@ -465,6 +488,73 @@ export default function TeamPage() {
 
         </div>
       </div>
+
+      {/* Invite Member Modal */}
+      {isInviteModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setIsInviteModalOpen(false)}></div>
+          <div className="bg-white dark:bg-card rounded-2xl border shadow-xl w-full max-w-md relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-lg font-black tracking-tight">Invite New Member</h3>
+              <button onClick={() => setIsInviteModalOpen(false)} className="text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleInvite} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
+                <Input 
+                  required
+                  placeholder="e.g. John Doe" 
+                  value={inviteName}
+                  onChange={(e) => setInviteName(e.target.value)}
+                  className="h-11 bg-slate-50 dark:bg-slate-900/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                <Input 
+                  required
+                  type="email"
+                  placeholder="e.g. john@example.com" 
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  className="h-11 bg-slate-50 dark:bg-slate-900/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Assign Role</label>
+                <Select value={inviteRole} onValueChange={setInviteRole}>
+                  <SelectTrigger className="w-full h-11 bg-slate-50 dark:bg-slate-900/50 font-bold">
+                    <SelectValue placeholder="Select a role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {roles.map(r => (
+                      <SelectItem key={r.id} value={r.name}>{r.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex justify-end gap-3 pt-4 mt-6">
+                <Button 
+                  type="button" 
+                  variant="ghost"
+                  onClick={() => setIsInviteModalOpen(false)}
+                  className="font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 shadow-sm"
+                >
+                  Send Invite
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

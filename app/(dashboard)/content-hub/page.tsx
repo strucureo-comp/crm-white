@@ -62,37 +62,7 @@ const FUNNELS = ['Awareness', 'Consideration', 'Decision', 'Retention'];
 const PERSONAS = ['Founder', 'CEO', 'Marketing Manager', 'Sales Manager', 'Agency Owner', 'Developer', 'Customer'];
 const CAMPAIGNS = ['Summer Product Launch 2026', 'Inbound SEO Engine', 'Customer Success Highlights', 'SaaS Growth Playbook', 'Lead Gen Q2', 'Re-engagement Campaign'];
 
-const INITIAL_DATA: ContentItem[] = [
-  {
-    id: '1', title: 'Top 10 SaaS Growth Strategies', type: 'Blog', campaign: 'SaaS Growth Playbook',
-    funnelStage: 'Awareness', persona: 'Founder', author: 'Alex Rivera', owner: 'Alex Rivera',
-    lastEdited: '2026-07-28', status: 'Draft', priority: 'High', dueDate: '2026-08-05',
-    description: 'A comprehensive guide on growing a SaaS startup in 2026.',
-    comments: [{ id: 'c1', author: 'Sarah', avatar: 'S', text: 'Looks good so far!', date: '2026-07-28' }],
-    history: [{ date: '2026-07-28', action: 'Created draft', user: 'Alex Rivera' }]
-  },
-  {
-    id: '2', title: 'Q2 Feature Highlights', type: 'Newsletter', campaign: 'Customer Success Highlights',
-    funnelStage: 'Retention', persona: 'Customer', author: 'Jamie Doe', owner: 'Jamie Doe',
-    lastEdited: '2026-07-29', status: 'Ideas', priority: 'Medium', dueDate: '2026-08-10',
-    description: 'Highlighting the new features shipped in Q2.',
-    comments: [], history: [{ date: '2026-07-29', action: 'Added to Ideas', user: 'Jamie Doe' }]
-  },
-  {
-    id: '3', title: 'How to automate workflows', type: 'Video Script', campaign: 'Inbound SEO Engine',
-    funnelStage: 'Consideration', persona: 'Marketing Manager', author: 'Sam Smith', owner: 'Sam Smith',
-    lastEdited: '2026-07-25', status: 'In Review', priority: 'High', dueDate: '2026-08-01',
-    description: 'Script for our upcoming YouTube video on workflow automation.',
-    comments: [], history: []
-  },
-  {
-    id: '4', title: 'Ultimate Pricing Guide', type: 'Landing Page', campaign: 'SaaS Growth Playbook',
-    funnelStage: 'Decision', persona: 'Founder', author: 'Alice Brown', owner: 'Alice Brown',
-    lastEdited: '2026-07-20', status: 'Approved', priority: 'High', dueDate: '2026-08-15',
-    description: 'Pricing page copy and layout instructions.',
-    comments: [], history: []
-  }
-];
+const INITIAL_DATA: ContentItem[] = [];
 
 export default function ContentHubPage() {
   const [isMounted, setIsMounted] = useState(false);
