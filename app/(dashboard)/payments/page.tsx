@@ -553,6 +553,64 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
+      
+      {/* View Payment Modal */}
+      {viewingPayment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setViewingPayment(null)}></div>
+          <div className="bg-background rounded-xl border shadow-lg w-full max-w-md relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b">
+              <h3 className="text-lg font-semibold">Payment Details</h3>
+              <button onClick={() => setViewingPayment(null)} className="text-muted-foreground hover:bg-muted p-1 rounded-md transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="p-5 space-y-4 text-sm">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
+                  <p className="font-medium font-mono">{viewingPayment.payment_id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Date</p>
+                  <p className="font-medium">{new Date(viewingPayment.date).toLocaleDateString()}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Client</p>
+                  <p className="font-medium">{viewingPayment.company_id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Invoice ID</p>
+                  <p className="font-medium text-blue-600 dark:text-blue-400">{viewingPayment.invoice_id}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Amount</p>
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(viewingPayment.amount)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Method</p>
+                  <p className="font-medium capitalize">{viewingPayment.method.replace('_', ' ')}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-muted-foreground mb-1">Status</p>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    viewingPayment.status === 'completed' ? 'bg-emerald-100 text-emerald-700' :
+                    viewingPayment.status === 'failed' ? 'bg-rose-100 text-rose-700' :
+                    'bg-amber-100 text-amber-700'
+                  }`}>
+                    {viewingPayment.status}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="p-5 border-t flex justify-end">
+              <button onClick={() => setViewingPayment(null)} className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 text-sm font-medium rounded-md transition-colors shadow-sm">
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
