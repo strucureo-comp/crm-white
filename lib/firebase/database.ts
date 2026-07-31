@@ -62,9 +62,8 @@ function cleanData(data: any) {
   return cleaned;
 }
 
-export async function getProjects(companyId: string, clientId?: string): Promise<Project[]> {
+export async function getProjects(companyId?: string, clientId?: string): Promise<Project[]> {
   try {
-    if (!companyId) return [];
     const projectsRef = ref(database, 'projects');
     const snapshot = await get(projectsRef);
 
@@ -73,7 +72,8 @@ export async function getProjects(companyId: string, clientId?: string): Promise
     const projects: Project[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object') {
+        if (companyId && (val as any).company_id !== companyId) continue;
         const project = { id: key, ...val } as Project;
         if (!clientId || project.client_id === clientId) {
           projects.push(project);
