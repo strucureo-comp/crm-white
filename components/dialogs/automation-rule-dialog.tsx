@@ -36,6 +36,7 @@ const defaultForm = {
   trigger: '',
   actions: [''] as string[],
   enabled: true,
+  status: 'Active',
 };
 
 export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: AutomationRuleDialogProps) {
@@ -50,6 +51,7 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
         trigger: rule.trigger || '',
         actions: rule.actions ? rule.actions.map(a => a.type) : [rule.action || ''],
         enabled: rule.enabled ?? true,
+        status: rule.status || 'Active',
       });
     } else {
       setForm({ ...defaultForm });
