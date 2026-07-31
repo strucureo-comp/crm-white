@@ -20,22 +20,48 @@ export async function middleware(req: NextRequest) {
 
   const isPublicApiPath = publicApiPaths.some(p => pathname.startsWith(p));
   const isPublicPath = publicPaths.some(p => pathname === p);
-  const session = req.cookies.get('__session')?.value;
+  const sessionCookie = req.cookies.get('__session')?.value;
+  
+  let sessionValid = false;
+  let companyId = '';
+
+  if (sessionCookie) {
+    try {
+      // Decode base64 JSON payload
+      const decoded = JSON.parse(atob(sessionCookie));
+      sessionValid = !!decoded.uid;
+      companyId = decoded.companyId || '';
+    } catch (e) {
+      // Fallback for legacy generic sessions (dev_uid_timestamp)
+      sessionValid = sessionCookie.startsWith('dev_');
+    }
+  }
 
   if (pathname.startsWith('/api/')) {
     if (isPublicApiPath) {
       return NextResponse.next();
     }
-    if (!session) {
+    if (!sessionValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
-    return NextResponse.next();
+    
+    // Inject company_id into headers for the API to consume
+    const requestHeaders = new Headers(req.headers);
+    if (companyId) {
+      requestHeaders.set('x-company-id', companyId);
+    }
+    
+    return NextResponse.next({
+      request: {
+        headers: requestHeaders,
+      }
+    });
   }
 
   const isProtectedRoute = !isPublicPath && !pathname.startsWith('/api');
 
   if (isProtectedRoute) {
-    if (!session) {
+    if (!sessionValid) {
       const loginUrl = new URL('/login', req.url);
       loginUrl.searchParams.set('redirect', pathname);
       return NextResponse.redirect(loginUrl);
@@ -45,7 +71,7 @@ export async function middleware(req: NextRequest) {
 
   // Allow public paths with session (login, register redirect to dashboard via client-side)
   // But /setup needs session to work, so don't redirect away from it
-  if (isPublicPath && session && pathname !== '/setup') {
+  if (isPublicPath && sessionValid && pathname !== '/setup') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
   }
 

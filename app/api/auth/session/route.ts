@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 
 export async function POST(req: Request) {
   try {
-    const { idToken } = await req.json();
+    const { idToken, companyId } = await req.json();
     if (!idToken) {
       return NextResponse.json({ error: 'No ID token provided' }, { status: 400 });
     }
@@ -17,7 +17,15 @@ export async function POST(req: Request) {
     const uid: string = payload.uid || payload.sub;
 
     const response = NextResponse.json({ success: true, uid });
-    response.cookies.set('__session', `dev_${uid}_${Date.now()}`, {
+    
+    // Store JSON in cookie encoded as base64 for easy middleware decoding
+    const sessionData = {
+      uid,
+      companyId: companyId || '',
+      exp: Date.now() + expiresIn
+    };
+    
+    response.cookies.set('__session', Buffer.from(JSON.stringify(sessionData)).toString('base64'), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

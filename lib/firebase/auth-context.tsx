@@ -44,28 +44,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userRef = ref(database, `users/${firebaseUser.uid}`);
       const snapshot = await get(userRef);
 
+      let resolvedUser: User | null = null;
+
       if (snapshot.exists()) {
         const userData = snapshot.val();
-        setUser({
+        resolvedUser = {
           id: firebaseUser.uid,
           user_id: firebaseUser.uid,
           email: firebaseUser.email!,
           ...userData,
-        });
+        };
       } else {
         // User record doesn't exist yet, create a minimal user object
-        setUser({
+        resolvedUser = {
           id: firebaseUser.uid,
           user_id: firebaseUser.uid,
+          company_id: '',
           email: firebaseUser.email!,
           full_name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
           role: 'client',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        };
       }
+      
+      setUser(resolvedUser);
+      return resolvedUser;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
+      
+      let resolvedUser: User | null = null;
       
       // Handle permission denied errors gracefully
       if (errorMsg.includes('Permission denied')) {
@@ -80,18 +88,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const isAdmin = adminEmails.includes(firebaseUser.email?.toLowerCase() || '');
         
         // Still allow user to access the app with basic info
-        setUser({
+        resolvedUser = {
           id: firebaseUser.uid,
           user_id: firebaseUser.uid,
+          company_id: '',
           email: firebaseUser.email!,
           full_name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
           role: isAdmin ? 'admin' : 'client',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
-        });
+        };
       } else {
         console.error('Error fetching user:', error);
       }
+      
+      if (resolvedUser) setUser(resolvedUser);
+      return resolvedUser;
     }
   };
 
@@ -124,13 +136,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onIdTokenChanged(auth, async (firebaseUser) => {
       if (firebaseUser) {
         setFirebaseUser(firebaseUser);
-        await fetchUser(firebaseUser);
+        const resolvedUser = await fetchUser(firebaseUser);
         try {
           const idToken = await firebaseUser.getIdToken();
           await fetch('/api/auth/session', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ idToken }),
+            body: JSON.stringify({ idToken, companyId: resolvedUser?.company_id }),
           });
         } catch (e) {
           console.error('Failed to set session cookie:', e);
@@ -168,7 +180,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const signUp = async (email: string, password: string, fullName: string, companyName?: string) => {
+  const signUp = async (
+    email: string, 
+    password: string, 
+    fullName: string, 
+    companyName?: string,
+    existingCompanyId?: string,
+    existingWorkspaceId?: string
+  ) => {
     try {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
@@ -179,9 +198,40 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'aathish@strucureo.works',
         'aathihacker2004@gmail.com',
       ];
-      const finalRole = adminEmails.includes(email.toLowerCase()) ? 'admin' : 'client';
+      // The first user who signs up gets marked as 'admin' (unless they are invited to an existing company)
+      const finalRole = existingCompanyId ? 'client' : (adminEmails.includes(email.toLowerCase()) ? 'admin' : 'admin');
 
+      let resolvedCompanyId = existingCompanyId || '';
+      let resolvedWorkspaceId = existingWorkspaceId || '';
+
+      if (!existingWorkspaceId) {
+        // 1. When a brand new company signs up, create workspace first
+        const wsName = companyName || `${fullName}'s Workspace`;
+        const workspace = await createWorkspace(wsName, newUser.uid);
+        
+        if (workspace) {
+          resolvedWorkspaceId = workspace.id;
+          setWorkspace(workspace);
+          
+          // Create the new record in the companies table
+          const { createCompany } = await import('@/lib/db/companies/api');
+          const newCompany = await createCompany(workspace.id, {
+            name: companyName || `${fullName}'s Company`,
+            legal_name: companyName || `${fullName}'s Company`,
+            website: '', phone: '', email: email, address: '', city: '', state: '', country: '', pincode: '',
+            gst_number: '', pan_number: '', vat_number: '', registration_number: '',
+            currency: 'USD', timezone: 'UTC',
+            bank_name: '', account_number: '', ifsc: '', swift: '', upi: '',
+            logo_url: '', footer_text: ''
+          });
+          
+          resolvedCompanyId = newCompany.company_id;
+        }
+      }
+
+      // 2 & 3. Link the user to the new or existing company_id
       const userData: Omit<User, 'id' | 'user_id'> = {
+        company_id: resolvedCompanyId,
         email: newUser.email!,
         full_name: fullName,
         role: finalRole,
@@ -190,13 +240,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       await createUser(newUser.uid, userData);
-
-      // Create workspace for the new user
-      const wsName = companyName || `${fullName}'s Workspace`;
-      const workspace = await createWorkspace(wsName, newUser.uid);
-      if (workspace) {
-        setWorkspace(workspace);
-      }
 
       return { error: null };
     } catch (error) {

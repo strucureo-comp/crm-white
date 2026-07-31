@@ -62,6 +62,7 @@ export type TransactionType = 'income' | 'expense';
 
 export interface Transaction {
   id: string;
+  company_id?: string;
   type: TransactionType;
   amount: number;
   category: string;
@@ -79,6 +80,7 @@ export interface Transaction {
 export interface User {
   id: string;
   user_id?: string;
+  company_id: string; // Foreign key referencing the Company
   email: string;
   full_name: string;
   role: UserRole;
@@ -89,6 +91,7 @@ export interface User {
 
 export interface Project {
   id: string;
+  company_id?: string;
   client_id: string;
   title: string;
   description: string;
@@ -169,6 +172,7 @@ export interface ProjectUpdate {
 
 export interface SupportRequest {
   id: string;
+  company_id?: string;
   project_id?: string;
   client_id: string;
   subject: string;
@@ -190,6 +194,7 @@ export interface SupportMessage {
 
 export interface MeetingRequest {
   id: string;
+  company_id?: string;
   project_id?: string;
   client_id: string;
   requested_date: string;
@@ -259,6 +264,7 @@ export interface Payment {
 
 export interface TeamMember {
   id: string;
+  company_id?: string;
   name: string;
   email: string;
   role: string;
@@ -317,6 +323,7 @@ export type ContentStatus = 'Draft' | 'draft' | 'In Review' | 'in_review' | 'Sch
 
 export interface ContentItem {
   id: string;
+  company_id?: string;
   content_id?: string;
   workspace_id?: string;
   title: string;
@@ -345,6 +352,7 @@ export interface MediaItem {
 
 export interface CalendarEvent {
   id: string;
+  company_id?: string;
   event_id?: string;
   workspace_id?: string;
   title: string;
@@ -381,6 +389,7 @@ export interface Integration {
 
 export interface AutomationRule {
   id: string;
+  company_id?: string;
   rule_id?: string;
   workspace_id?: string;
   name?: string;
@@ -433,6 +442,7 @@ export interface QuotationItem {
 
 export interface Quotation {
   id: string;
+  company_id?: string;
   project_id?: string;
   project_title?: string; // Snapshot or manual
   client_id: string; // Can be empty if manual
@@ -480,6 +490,7 @@ export type CampaignChannel = 'email' | 'social' | 'paid' | 'sms';
 
 export interface Campaign {
   id: string;
+  company_id?: string;
   campaign_id?: string;
   workspace_id?: string;
   name: string;
@@ -514,6 +525,7 @@ export type SocialPlatform = 'facebook' | 'instagram' | 'linkedin' | 'twitter' |
 
 export interface SocialPost {
   id: string;
+  company_id?: string;
   post_id?: string;
   workspace_id?: string;
   platform: SocialPlatform;
@@ -623,6 +635,7 @@ export interface EmailTemplate {
 
 export interface EmailCampaign {
   id: string;
+  company_id?: string;
   campaign_id?: string;
   workspace_id?: string;
   name: string;
@@ -656,6 +669,7 @@ export type EnquiryStatus = 'new' | 'read' | 'replied' | 'converted';
 
 export interface Enquiry {
   id: string;
+  company_id?: string;
   name: string;
   email: string;
   subject: string;
@@ -671,6 +685,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done';
 
 export interface TaskItem {
   id: string;
+  company_id?: string;
   title: string;
   project?: string;
   priority: TaskPriority;
@@ -726,6 +741,7 @@ export type LeadPriority =
 
 export interface Lead {
   id: string;
+  company_id?: string;
 
   // Contact Information
   name: string;
