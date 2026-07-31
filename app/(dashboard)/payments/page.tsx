@@ -1,34 +1,44 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { 
   CreditCard, Plus, Search, 
   Wallet, Receipt, TrendingUp, AlertCircle, CheckCircle2,
   Clock, X, ArrowUpRight, Banknote, Smartphone,
   MoreHorizontal, Eye, Pencil, Trash
 } from 'lucide-react';
+import { createPayment, updatePayment, deletePayment, subscribeToPayments } from '@/lib/db/payments/api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import type { NormalizedPayment, PaymentMethod, PaymentStatus } from '@/lib/db/types';
+import { toast } from 'sonner';
 
-type PaymentMethod = 'UPI' | 'NEFT' | 'Cheque' | 'Pending';
-type PaymentStatus = 'Received' | 'Pending' | 'Failed';
-
-type Payment = {
-  id: string;
-  client: string;
-  invoiceId: string;
-  amount: number;
-  date: string;
-  method: PaymentMethod;
-  status: PaymentStatus;
-};
-
-const initialPayments: Payment[] = [];
+const WORKSPACE_ID = 'default';
 
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<Payment[]>(initialPayments);
+  const [payments, setPayments] = useState<NormalizedPayment[]>([]);
+  const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState<'All' | PaymentMethod>('All');
   const [statusFilter, setStatusFilter] = useState<'All' | PaymentStatus>('All');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editingPaymentId, setEditingPaymentId] = useState<string | null>(null);
+  const [viewingPayment, setViewingPayment] = useState<NormalizedPayment | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToPayments(WORKSPACE_ID, (data) => {
+      data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setPayments(data);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
 
   // Form State
   const [form, setForm] = useState<{
@@ -41,29 +51,29 @@ export default function PaymentsPage() {
     client: '',
     invoiceId: '',
     amount: '',
-    method: 'UPI',
-    status: 'Received'
+    method: 'upi',
+    status: 'completed'
   });
 
   // Derived state
-  const collected = useMemo(() => payments.filter(p => p.status === 'Received').reduce((acc, p) => acc + p.amount, 0), [payments]);
-  const pendingCollection = useMemo(() => payments.filter(p => p.status === 'Pending').reduce((acc, p) => acc + p.amount, 0), [payments]);
-  const pendingCount = useMemo(() => payments.filter(p => p.status === 'Pending').length, [payments]);
-  const failedCount = useMemo(() => payments.filter(p => p.status === 'Failed').length, [payments]);
+  const collected = useMemo(() => payments.filter(p => p.status === 'completed').reduce((acc, p) => acc + (p.amount || 0), 0), [payments]);
+  const pendingCollection = useMemo(() => payments.filter(p => p.status === 'pending').reduce((acc, p) => acc + (p.amount || 0), 0), [payments]);
+  const pendingCount = useMemo(() => payments.filter(p => p.status === 'pending').length, [payments]);
+  const failedCount = useMemo(() => payments.filter(p => p.status === 'failed' || p.status === 'refunded').length, [payments]);
   
-  const upiCollected = useMemo(() => payments.filter(p => p.method === 'UPI' && p.status === 'Received').reduce((acc, p) => acc + p.amount, 0), [payments]);
-  const neftCollected = useMemo(() => payments.filter(p => p.method === 'NEFT' && p.status === 'Received').reduce((acc, p) => acc + p.amount, 0), [payments]);
-  const chequeCollected = useMemo(() => payments.filter(p => p.method === 'Cheque' && p.status === 'Received').reduce((acc, p) => acc + p.amount, 0), [payments]);
+  const upiCollected = useMemo(() => payments.filter(p => p.method === 'upi' && p.status === 'completed').reduce((acc, p) => acc + (p.amount || 0), 0), [payments]);
+  const neftCollected = useMemo(() => payments.filter(p => p.method === 'bank_transfer' && p.status === 'completed').reduce((acc, p) => acc + (p.amount || 0), 0), [payments]);
+  const chequeCollected = useMemo(() => payments.filter(p => p.method === 'cheque' && p.status === 'completed').reduce((acc, p) => acc + (p.amount || 0), 0), [payments]);
 
   // Max value for progress bars to be relative to collected
   const maxCollected = Math.max(upiCollected, neftCollected, chequeCollected) || 1; 
 
   const recentActivity = useMemo(() => {
-    return [...payments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 4);
+    return payments.slice(0, 4);
   }, [payments]);
 
   const pendingFollowUps = useMemo(() => {
-    return payments.filter(p => p.status === 'Failed' || p.status === 'Pending');
+    return payments.filter(p => p.status === 'failed' || p.status === 'pending');
   }, [payments]);
 
   const filteredPayments = useMemo(() => {
@@ -72,7 +82,9 @@ export default function PaymentsPage() {
       if (statusFilter !== 'All' && p.status !== statusFilter) return false;
       if (search) {
         const query = search.toLowerCase();
-        return p.client.toLowerCase().includes(query) || p.invoiceId.toLowerCase().includes(query) || p.id.toLowerCase().includes(query);
+        return (p.company_id || '').toLowerCase().includes(query) || 
+               (p.invoice_id || '').toLowerCase().includes(query) || 
+               (p.payment_id || '').toLowerCase().includes(query);
       }
       return true;
     });
@@ -82,27 +94,61 @@ export default function PaymentsPage() {
     return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
   };
 
-  const handleRecordPayment = (e: React.FormEvent) => {
+  const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.client || !form.invoiceId || !form.amount) return;
 
-    const newPayment: Payment = {
-      id: `txn-${Math.floor(Math.random() * 10000)}`,
-      client: form.client,
-      invoiceId: form.invoiceId,
-      amount: parseFloat(form.amount),
-      date: new Date().toISOString().split('T')[0],
-      method: form.method,
-      status: form.status,
-    };
+    try {
+      if (editingPaymentId) {
+        await updatePayment(WORKSPACE_ID, editingPaymentId, {
+          company_id: form.client,
+          invoice_id: form.invoiceId,
+          amount: parseFloat(form.amount),
+          method: form.method,
+          status: form.status,
+        });
+        toast.success('Payment updated');
+      } else {
+        await createPayment(WORKSPACE_ID, {
+          company_id: form.client,
+          contact_id: '',
+          invoice_id: form.invoiceId,
+          quote_id: '',
+          deal_id: '',
+          amount: parseFloat(form.amount),
+          currency: 'INR',
+          method: form.method,
+          reference: '',
+          status: form.status,
+          date: new Date().toISOString(),
+          notes: ''
+        });
+        toast.success('Payment recorded');
+      }
+      setModalOpen(false);
+      setEditingPaymentId(null);
+      setForm({ client: '', invoiceId: '', amount: '', method: 'upi', status: 'completed' });
+    } catch (error) {
+      toast.error('Failed to save payment');
+    }
+  };
 
-    setPayments([newPayment, ...payments]);
-    setModalOpen(false);
-    setForm({ client: '', invoiceId: '', amount: '', method: 'UPI', status: 'Received' });
+  const handleDelete = async (paymentId: string) => {
+    if (!confirm('Are you sure you want to delete this payment?')) return;
+    setDeleting(paymentId);
+    try {
+      await deletePayment(WORKSPACE_ID, paymentId);
+      toast.success('Payment deleted');
+    } catch {
+      toast.error('Failed to delete payment');
+    } finally {
+      setDeleting(null);
+    }
   };
 
   return (
     <div className="space-y-8 pb-8">
+      {loading && <div className="flex justify-center p-8"><p className="text-muted-foreground">Loading payments...</p></div>}
       {/* A. Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -113,7 +159,11 @@ export default function PaymentsPage() {
           <p className="text-sm text-muted-foreground mt-1">Collections, transaction history, and pending follow-ups.</p>
         </div>
         <button 
-          onClick={() => setModalOpen(true)}
+          onClick={() => {
+            setEditingPaymentId(null);
+            setForm({ client: '', invoiceId: '', amount: '', method: 'upi', status: 'completed' });
+            setModalOpen(true);
+          }}
           className="bg-primary text-primary-foreground hover:bg-primary/90 px-4 py-2 rounded-md font-medium text-sm flex items-center justify-center gap-2 transition-colors"
         >
           <Plus className="w-4 h-4" />
@@ -175,30 +225,30 @@ export default function PaymentsPage() {
           <h3 className="font-semibold mb-4">Recent Activity</h3>
           <div className="space-y-4">
             {recentActivity.map(txn => (
-              <div key={txn.id} className="flex items-center gap-4">
+              <div key={txn.payment_id} className="flex items-center gap-4">
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                  txn.status === 'Received' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400' :
-                  txn.status === 'Failed' ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400' :
+                  txn.status === 'completed' ? 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/40 dark:text-emerald-400' :
+                  txn.status === 'failed' ? 'bg-rose-100 text-rose-600 dark:bg-rose-900/40 dark:text-rose-400' :
                   'bg-amber-100 text-amber-600 dark:bg-amber-900/40 dark:text-amber-400'
                 }`}>
-                  {txn.status === 'Received' ? <CheckCircle2 className="w-5 h-5" /> :
-                   txn.status === 'Failed' ? <AlertCircle className="w-5 h-5" /> :
+                  {txn.status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> :
+                   txn.status === 'failed' ? <AlertCircle className="w-5 h-5" /> :
                    <Clock className="w-5 h-5" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium text-sm text-foreground truncate">{txn.client}</p>
+                    <p className="font-medium text-sm text-foreground truncate">{txn.company_id}</p>
                     <span className={`text-sm font-bold ${
-                      txn.status === 'Received' ? 'text-emerald-600 dark:text-emerald-400' :
-                      txn.status === 'Failed' ? 'text-rose-600 dark:text-rose-400' :
+                      txn.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
+                      txn.status === 'failed' ? 'text-rose-600 dark:text-rose-400' :
                       'text-amber-600 dark:text-amber-400'
                     }`}>
                       {formatCurrency(txn.amount)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-0.5 text-xs text-muted-foreground">
-                    <span className="truncate">{txn.invoiceId} &bull; {txn.method}</span>
-                    <span>{txn.date}</span>
+                    <span className="truncate">{txn.invoice_id} &bull; {txn.method}</span>
+                    <span>{new Date(txn.date).toLocaleDateString()}</span>
                   </div>
                 </div>
               </div>
@@ -253,10 +303,10 @@ export default function PaymentsPage() {
                 <tbody>
                   {pendingFollowUps.map((p, i) => (
                     <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                      <td className="p-3 py-2 font-medium">{p.client}</td>
+                      <td className="p-3 py-2 font-medium">{p.company_id}</td>
                       <td className="p-3 py-2 text-right">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
-                          p.status === 'Failed' 
+                          p.status === 'failed' 
                             ? 'bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400' 
                             : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-400'
                         }`}>
@@ -295,10 +345,10 @@ export default function PaymentsPage() {
           onChange={(e) => setMethodFilter(e.target.value as any)}
         >
           <option value="All">All Methods</option>
-          <option value="UPI">UPI</option>
-          <option value="NEFT">NEFT</option>
-          <option value="Cheque">Cheque</option>
-          <option value="Pending">Pending</option>
+          <option value="upi">UPI</option>
+          <option value="bank_transfer">NEFT/Bank Transfer</option>
+          <option value="cheque">Cheque</option>
+          <option value="pending">Pending</option>
         </select>
         <select 
           className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
@@ -306,9 +356,9 @@ export default function PaymentsPage() {
           onChange={(e) => setStatusFilter(e.target.value as any)}
         >
           <option value="All">All Statuses</option>
-          <option value="Received">Received</option>
-          <option value="Pending">Pending</option>
-          <option value="Failed">Failed</option>
+          <option value="completed">Completed</option>
+          <option value="pending">Pending</option>
+          <option value="failed">Failed</option>
         </select>
       </div>
 
@@ -330,12 +380,12 @@ export default function PaymentsPage() {
             </thead>
             <tbody className="divide-y divide-border">
               {filteredPayments.map(txn => (
-                <tr key={txn.id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{txn.id}</td>
-                  <td className="px-4 py-3 font-medium">{txn.client}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400">{txn.invoiceId}</td>
+                <tr key={txn.payment_id} className="hover:bg-muted/30 transition-colors">
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{txn.payment_id}</td>
+                  <td className="px-4 py-3 font-medium">{txn.company_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400">{txn.invoice_id}</td>
                   <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(txn.amount)}</td>
-                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{txn.date}</td>
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{new Date(txn.date).toLocaleDateString()}</td>
                   <td className="px-4 py-3">
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border">
                       {txn.method}
@@ -343,30 +393,47 @@ export default function PaymentsPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium border ${
-                      txn.status === 'Received' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800' :
-                      txn.status === 'Failed' ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-400 dark:border-rose-800' :
+                      txn.status === 'completed' ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950 dark:text-emerald-400 dark:border-emerald-800' :
+                      txn.status === 'failed' ? 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950 dark:text-rose-400 dark:border-rose-800' :
                       'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950 dark:text-amber-400 dark:border-amber-800'
                     }`}>
                       {txn.status}
                     </span>
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <div className="relative group inline-block">
-                      <button className="p-1.5 hover:bg-muted rounded-md text-muted-foreground transition-colors">
-                        <MoreHorizontal className="w-4 h-4" />
-                      </button>
-                      <div className="absolute right-0 top-full mt-1 w-32 bg-background border shadow-lg rounded-md overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 flex flex-col">
-                        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-foreground transition-colors text-left">
-                          <Eye className="w-4 h-4" /> View
-                        </button>
-                        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-foreground transition-colors text-left">
-                          <Pencil className="w-4 h-4" /> Edit
-                        </button>
-                        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-red-600 transition-colors text-left">
-                          <Trash className="w-4 h-4" /> Delete
-                        </button>
-                      </div>
-                    </div>
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <button className="p-1.5 hover:bg-muted rounded-md text-muted-foreground transition-colors">
+                            <MoreHorizontal className="w-4 h-4" />
+                          </button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => setViewingPayment(txn)}>
+                            <Eye size={14} className="mr-2" /> View
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => {
+                            setEditingPaymentId(txn.payment_id);
+                            setForm({
+                              client: txn.company_id,
+                              invoiceId: txn.invoice_id,
+                              amount: txn.amount.toString(),
+                              method: txn.method,
+                              status: txn.status
+                            });
+                            setModalOpen(true);
+                          }}>
+                            <Pencil size={14} className="mr-2" /> Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem 
+                            className="text-red-600"
+                            onClick={() => handleDelete(txn.payment_id)} 
+                            disabled={deleting === txn.payment_id}
+                          >
+                            <Trash size={14} className="mr-2" /> Delete
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                   </td>
                 </tr>
               ))}
@@ -385,11 +452,19 @@ export default function PaymentsPage() {
       {/* F. Record Payment Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setModalOpen(false)}></div>
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => {
+                  setModalOpen(false);
+                  setEditingPaymentId(null);
+                  setForm({ client: '', invoiceId: '', amount: '', method: 'upi', status: 'completed' });
+                }}></div>
           <div className="bg-background rounded-xl border shadow-lg w-full max-w-md relative z-10 animate-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between p-5 border-b">
-              <h3 className="text-lg font-semibold">Record Payment</h3>
-              <button onClick={() => setModalOpen(false)} className="text-muted-foreground hover:bg-muted p-1 rounded-md transition-colors">
+              <h3 className="text-lg font-semibold">{editingPaymentId ? "Edit Payment" : "Record Payment"}</h3>
+              <button onClick={() => {
+                  setModalOpen(false);
+                  setEditingPaymentId(null);
+                  setForm({ client: '', invoiceId: '', amount: '', method: 'upi', status: 'completed' });
+                }} className="text-muted-foreground hover:bg-muted p-1 rounded-md transition-colors">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -436,10 +511,10 @@ export default function PaymentsPage() {
                     value={form.method}
                     onChange={(e) => setForm({...form, method: e.target.value as any})}
                   >
-                    <option value="UPI">UPI</option>
-                    <option value="NEFT">NEFT</option>
-                    <option value="Cheque">Cheque</option>
-                    <option value="Pending">Pending</option>
+                    <option value="upi">UPI</option>
+                    <option value="bank_transfer">NEFT/Bank Transfer</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="pending">Pending</option>
                   </select>
                 </div>
                 <div>
@@ -449,16 +524,20 @@ export default function PaymentsPage() {
                     value={form.status}
                     onChange={(e) => setForm({...form, status: e.target.value as any})}
                   >
-                    <option value="Received">Received</option>
-                    <option value="Pending">Pending</option>
-                    <option value="Failed">Failed</option>
+                    <option value="completed">Completed</option>
+                    <option value="pending">Pending</option>
+                    <option value="failed">Failed</option>
                   </select>
                 </div>
               </div>
               <div className="flex justify-end gap-3 pt-4 border-t mt-6">
                 <button 
                   type="button" 
-                  onClick={() => setModalOpen(false)}
+                  onClick={() => {
+                  setModalOpen(false);
+                  setEditingPaymentId(null);
+                  setForm({ client: '', invoiceId: '', amount: '', method: 'upi', status: 'completed' });
+                }}
                   className="px-4 py-2 text-sm font-medium hover:bg-muted rounded-md transition-colors"
                 >
                   Cancel
