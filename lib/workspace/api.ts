@@ -63,6 +63,26 @@ export async function getWorkspace(workspaceId: string): Promise<Workspace | nul
   }
 }
 
+export async function findWorkspaceByName(name: string): Promise<Workspace | null> {
+  try {
+    const snapshot = await get(ref(database, WORKSPACES_PATH));
+    if (!snapshot.exists()) return null;
+
+    const workspaces = snapshot.val() as Record<string, Workspace>;
+    const targetName = name.toLowerCase();
+
+    for (const workspace of Object.values(workspaces)) {
+      if (workspace.name.toLowerCase() === targetName) {
+        return workspace;
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error finding workspace by name:', error);
+    return null;
+  }
+}
+
 export async function getUserWorkspace(userId: string): Promise<Workspace | null> {
   try {
     const membersRef = ref(database, WORKSPACE_MEMBERS_PATH);
@@ -206,4 +226,46 @@ export async function isPlatformAdmin(userId: string): Promise<boolean> {
 
 export function generateWorkspaceSlug(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+}
+
+export async function findCompanyById(companyId: string): Promise<{ name: string, workspaceId: string } | null> {
+  try {
+    const snapshot = await get(ref(database, 'workspaces'));
+    if (!snapshot.exists()) return null;
+    const workspaces = snapshot.val();
+    
+    for (const [workspaceId, workspace] of Object.entries<any>(workspaces)) {
+      if (workspace.companies && workspace.companies[companyId]) {
+        return { name: workspace.companies[companyId].name, workspaceId };
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error finding company by ID:', error);
+    return null;
+  }
+}
+
+export async function findCompanyGlobalByName(name: string): Promise<{ companyId: string, workspaceId: string } | null> {
+  try {
+    const snapshot = await get(ref(database, 'workspaces'));
+    if (!snapshot.exists()) return null;
+    const workspaces = snapshot.val();
+    
+    const targetName = name.toLowerCase();
+
+    for (const [workspaceId, workspace] of Object.entries<any>(workspaces)) {
+      if (workspace.companies) {
+        for (const [companyId, company] of Object.entries<any>(workspace.companies)) {
+          if (company.name && company.name.toLowerCase() === targetName) {
+            return { companyId, workspaceId };
+          }
+        }
+      }
+    }
+    return null;
+  } catch (error) {
+    console.error('Error finding global company by name:', error);
+    return null;
+  }
 }

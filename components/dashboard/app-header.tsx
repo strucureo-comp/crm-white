@@ -63,7 +63,7 @@ const breadcrumbs: Record<string, string> = {
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut } = useAuth();
+  const { user, signOut, workspace } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [notifList, setNotifList] = useState<Notification[]>([]);
@@ -204,6 +204,11 @@ export function AppHeader() {
                 <div className="flex flex-col">
                   <span>{user?.full_name || 'User'}</span>
                   <span className="text-xs text-muted-foreground font-normal">{user?.email || '—'}</span>
+                  {workspace?.name && (
+                    <span className="text-xs font-medium mt-1 truncate" title={workspace.name}>
+                      {workspace.name}
+                    </span>
+                  )}
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />

@@ -13,7 +13,7 @@ import { ref, set, get, child } from 'firebase/database';
 import { auth, database } from './config';
 import { User, UserRole } from '@/lib/db/types';
 import { createUser } from './database';
-import { getUserWorkspace, createWorkspace } from '@/lib/workspace/api';
+import { getUserWorkspace, createWorkspace, findWorkspaceByName, createWorkspaceMember } from '@/lib/workspace/api';
 import type { Workspace } from '@/lib/db/types';
 
 interface AuthContextType {
@@ -113,10 +113,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const fetchWorkspace = async (userId: string) => {
+  const fetchWorkspace = async (userId: string, companyId?: string) => {
     try {
       setWorkspaceLoading(true);
-      const ws = await getUserWorkspace(userId);
+      let ws = await getUserWorkspace(userId);
+      
+      if (!ws && companyId) {
+        const { findCompanyById } = await import('@/lib/workspace/api');
+        const companyInfo = await findCompanyById(companyId);
+        if (companyInfo) {
+          ws = {
+            id: companyInfo.workspaceId,
+            workspace_id: companyInfo.workspaceId,
+            name: companyInfo.name,
+            slug: companyInfo.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),
+            owner_id: userId,
+            setup_completed: true,
+            setup_step: 5,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+        }
+      }
+      
       setWorkspace(ws);
     } catch (error) {
       console.error('Error fetching workspace:', error);
@@ -128,7 +147,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const refreshWorkspace = async () => {
     if (user) {
-      await fetchWorkspace(user.id);
+      await fetchWorkspace(user.id, user.company_id);
     }
   };
 
@@ -166,7 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // Fetch workspace when user changes
   useEffect(() => {
     if (user && !loading) {
-      fetchWorkspace(user.id);
+      fetchWorkspace(user.id, user.company_id);
     }
   }, [user, loading]);
 
@@ -199,12 +218,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         'aathihacker2004@gmail.com',
       ];
       // The first user who signs up gets marked as 'admin' (unless they are invited to an existing company)
-      const finalRole = existingCompanyId ? 'client' : (adminEmails.includes(email.toLowerCase()) ? 'admin' : 'admin');
+      let finalRole: UserRole = existingCompanyId ? 'client' : (adminEmails.includes(email.toLowerCase()) ? 'admin' : 'admin');
 
       let resolvedCompanyId = existingCompanyId || '';
       let resolvedWorkspaceId = existingWorkspaceId || '';
 
-      if (!existingWorkspaceId) {
+      if (!existingWorkspaceId && companyName) {
+        const { findCompanyGlobalByName } = await import('@/lib/workspace/api');
+        const existingCompany = await findCompanyGlobalByName(companyName);
+        if (existingCompany) {
+          resolvedWorkspaceId = existingCompany.workspaceId;
+          resolvedCompanyId = existingCompany.companyId;
+          finalRole = 'client';
+          // Add user to workspace first so they have permission to read companies
+          await createWorkspaceMember(resolvedWorkspaceId, newUser.uid, 'client');
+        }
+      }
+
+      if (!resolvedWorkspaceId) {
         // 1. When a brand new company signs up, create workspace first
         const wsName = companyName || `${fullName}'s Workspace`;
         const workspace = await createWorkspace(wsName, newUser.uid);
@@ -244,7 +275,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Fix the race condition: fetch the fresh data now that DB writes are done
       await refreshUser();
       if (resolvedWorkspaceId) {
-        await fetchWorkspace(newUser.uid);
+        await fetchWorkspace(newUser.uid, resolvedCompanyId);
       }
 
       return { error: null };
