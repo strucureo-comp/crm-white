@@ -37,7 +37,7 @@ const defaultForm = {
   content: '',
   media_url: '',
   scheduled_at: '',
-  status: 'scheduled' as const,
+  status: 'scheduled' as SocialPost['status'],
   created_by: 'admin',
 };
 
