@@ -12,8 +12,10 @@ import { getFieldAgents, deleteFieldAgent, getFieldAlerts } from '@/lib/firebase
 import type { FieldAgent, FieldAlert } from '@/lib/db/types';
 import { toast } from 'sonner';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 export default function FieldMonitoringPage() {
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [agents, setAgents] = useState<FieldAgent[]>([]);
   const [alerts, setAlerts] = useState<FieldAlert[]>([]);
@@ -24,9 +26,10 @@ export default function FieldMonitoringPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   const load = useCallback(async () => {
+    if (!user?.company_id) return;
     setLoading(true);
     try {
-      const [a, al] = await Promise.all([getFieldAgents(), getFieldAlerts()]);
+      const [a, al] = await Promise.all([getFieldAgents(user.company_id), getFieldAlerts(user.company_id)]);
       setAgents(a);
       setAlerts(al);
     } catch {
@@ -34,7 +37,7 @@ export default function FieldMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user?.company_id]);
 
   useEffect(() => { load(); }, [load]);
 
