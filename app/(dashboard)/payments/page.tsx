@@ -18,6 +18,7 @@ import {
 import type { NormalizedPayment, PaymentMethod, PaymentStatus } from '@/lib/db/types';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export default function PaymentsPage() {
   const { user } = useAuth();
@@ -144,6 +145,10 @@ export default function PaymentsPage() {
     } finally {
       setDeleting(null);
     }
+  };
+
+  const handleDelete = (id: string) => {
+    setDeleting(id);
   };
 
   return (
@@ -611,6 +616,17 @@ export default function PaymentsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={!!deleting}
+        onOpenChange={(open) => {
+          if (!open) setDeleting(null);
+        }}
+        title="Delete Payment"
+        description="Are you sure you want to permanently delete this payment? This action cannot be undone."
+        onConfirm={confirmDelete}
+        onCancel={() => setDeleting(null)}
+      />
     </div>
   );
 }
