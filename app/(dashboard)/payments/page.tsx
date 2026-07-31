@@ -4,7 +4,8 @@ import React, { useState, useMemo } from 'react';
 import { 
   CreditCard, Plus, Search, 
   Wallet, Receipt, TrendingUp, AlertCircle, CheckCircle2,
-  Clock, X, ArrowUpRight, Banknote, Smartphone
+  Clock, X, ArrowUpRight, Banknote, Smartphone,
+  MoreHorizontal, Eye, Pencil, Trash
 } from 'lucide-react';
 
 type PaymentMethod = 'UPI' | 'NEFT' | 'Cheque' | 'Pending';
@@ -324,6 +325,7 @@ export default function PaymentsPage() {
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Date</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Method</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Status</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap text-right"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
@@ -348,11 +350,29 @@ export default function PaymentsPage() {
                       {txn.status}
                     </span>
                   </td>
+                  <td className="px-4 py-3 text-right">
+                    <div className="relative group inline-block">
+                      <button className="p-1.5 hover:bg-muted rounded-md text-muted-foreground transition-colors">
+                        <MoreHorizontal className="w-4 h-4" />
+                      </button>
+                      <div className="absolute right-0 top-full mt-1 w-32 bg-background border shadow-lg rounded-md overflow-hidden opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-10 flex flex-col">
+                        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-foreground transition-colors text-left">
+                          <Eye className="w-4 h-4" /> View
+                        </button>
+                        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-foreground transition-colors text-left">
+                          <Pencil className="w-4 h-4" /> Edit
+                        </button>
+                        <button className="w-full flex items-center gap-2 px-3 py-2 text-sm hover:bg-muted text-red-600 transition-colors text-left">
+                          <Trash className="w-4 h-4" /> Delete
+                        </button>
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               ))}
               {filteredPayments.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-12 text-center text-muted-foreground">
                     No transactions match your filters.
                   </td>
                 </tr>
