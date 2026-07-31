@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { getLeads, getInvoices, getActivityLogs, getAutomationRules, getEmailCampaigns } from '@/lib/firebase/database';
+import { useAuth } from '@/lib/firebase/auth-context';
 import type { Lead, Invoice, ActivityLog, AutomationRule, EmailCampaign } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';
 
@@ -29,6 +30,7 @@ const priorityColors: Record<string, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -38,13 +40,14 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
+      if (!user?.company_id) return;
       try {
         const [leadData, invoiceData, activityData, ruleData, emailData] = await Promise.all([
-          getLeads(),
-          getInvoices(),
-          getActivityLogs(10),
-          getAutomationRules(),
-          getEmailCampaigns(),
+          getLeads(user.company_id),
+          getInvoices(user.company_id),
+          getActivityLogs(user.company_id, 10),
+          getAutomationRules(user.company_id),
+          getEmailCampaigns(user.company_id),
         ]);
         setLeads(leadData);
         setInvoices(invoiceData);

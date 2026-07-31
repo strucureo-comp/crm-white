@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { getInvoices, deleteInvoice } from '@/lib/firebase/database';
+import { useAuth } from '@/lib/firebase/auth-context';
 import type { Invoice } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
@@ -38,6 +39,7 @@ const statusStyles: Record<string, string> = {
 
 export default function InvoicesPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -45,11 +47,12 @@ export default function InvoicesPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   const load = useCallback(async () => {
+    if (!user?.company_id) return;
     setLoading(true);
-    const data = await getInvoices();
+    const data = await getInvoices(user.company_id);
     setInvoices(data);
     setLoading(false);
-  }, []);
+  }, [user?.company_id]);
 
   useEffect(() => { load(); }, [load]);
 

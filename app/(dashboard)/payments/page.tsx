@@ -17,10 +17,10 @@ import {
 } from '@/components/ui/dropdown-menu';
 import type { NormalizedPayment, PaymentMethod, PaymentStatus } from '@/lib/db/types';
 import { toast } from 'sonner';
-
-const WORKSPACE_ID = 'default';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 export default function PaymentsPage() {
+  const { user } = useAuth();
   const [payments, setPayments] = useState<NormalizedPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -32,13 +32,14 @@ export default function PaymentsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    const unsubscribe = subscribeToPayments(WORKSPACE_ID, (data) => {
+    if (!user?.company_id) return;
+    const unsubscribe = subscribeToPayments(user.company_id, (data) => {
       data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPayments(data);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [user?.company_id]);
 
   // Form State
   const [form, setForm] = useState<{
@@ -99,31 +100,28 @@ export default function PaymentsPage() {
     if (!form.client || !form.invoiceId || !form.amount) return;
 
     try {
+      if (!user?.company_id) throw new Error("No company ID found");
+      const paymentData = {
+        company_id: form.client,
+        invoice_id: form.invoiceId,
+        amount: parseFloat(form.amount),
+        method: form.method,
+        status: form.status,
+        date: new Date().toISOString(),
+        currency: 'INR',
+        contact_id: '',
+        quote_id: '',
+        deal_id: '',
+        reference: '',
+        notes: ''
+      };
+
       if (editingPaymentId) {
-        await updatePayment(WORKSPACE_ID, editingPaymentId, {
-          company_id: form.client,
-          invoice_id: form.invoiceId,
-          amount: parseFloat(form.amount),
-          method: form.method,
-          status: form.status,
-        });
-        toast.success('Payment updated');
+        await updatePayment(user.company_id, editingPaymentId, paymentData);
+        toast.success('Payment updated successfully');
       } else {
-        await createPayment(WORKSPACE_ID, {
-          company_id: form.client,
-          contact_id: '',
-          invoice_id: form.invoiceId,
-          quote_id: '',
-          deal_id: '',
-          amount: parseFloat(form.amount),
-          currency: 'INR',
-          method: form.method,
-          reference: '',
-          status: form.status,
-          date: new Date().toISOString(),
-          notes: ''
-        });
-        toast.success('Payment recorded');
+        await createPayment(user.company_id, paymentData);
+        toast.success('Payment recorded successfully');
       }
       setModalOpen(false);
       setEditingPaymentId(null);
@@ -133,13 +131,12 @@ export default function PaymentsPage() {
     }
   };
 
-  const handleDelete = async (paymentId: string) => {
-    if (!confirm('Are you sure you want to delete this payment?')) return;
-    setDeleting(paymentId);
+  const confirmDelete = async () => {
+    if (!deleting || !user?.company_id) return;
     try {
-      await deletePayment(WORKSPACE_ID, paymentId);
-      toast.success('Payment deleted');
-    } catch {
+      await deletePayment(user.company_id, deleting);
+      toast.success('Payment deleted successfully');
+    } catch (error) {
       toast.error('Failed to delete payment');
     } finally {
       setDeleting(null);

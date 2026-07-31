@@ -25,6 +25,7 @@ import {
   getCampaigns,
   getContentItems,
 } from '@/lib/firebase/database';
+import { useAuth } from '@/lib/firebase/auth-context';
 import type { Lead, Invoice, Project, User, ActivityLog, Campaign, ContentItem } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';
 
@@ -44,6 +45,7 @@ const stageColors: Record<string, string> = {
 
 export default function OverviewPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -54,14 +56,15 @@ export default function OverviewPage() {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
 
   useEffect(() => {
+    if (!user?.company_id) return;
     Promise.all([
-      getLeads(),
-      getInvoices(),
-      getProjects(),
-      getUsers(),
-      getActivityLogs(10),
-      getCampaigns(),
-      getContentItems(),
+      getLeads(user.company_id),
+      getInvoices(user.company_id),
+      getProjects(user.company_id),
+      getUsers(user.company_id),
+      getActivityLogs(user.company_id, 10),
+      getCampaigns(user.company_id),
+      getContentItems(user.company_id),
     ])
       .then(([l, i, p, u, a, c, ci]) => {
         setLeads(l);

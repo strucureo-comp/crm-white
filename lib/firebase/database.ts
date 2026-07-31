@@ -61,10 +61,12 @@ function cleanData(data: any) {
   return cleaned;
 }
 
-export async function getProjects(clientId?: string): Promise<Project[]> {
+export async function getProjects(companyId: string, clientId?: string): Promise<Project[]> {
   try {
+    if (!companyId) return [];
     const projectsRef = ref(database, 'projects');
-    const snapshot = await get(projectsRef);
+    const queryRef = query(projectsRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -173,10 +175,12 @@ export async function updateProject(projectId: string, updates: Partial<Project>
   }
 }
 
-export async function getInvoices(clientId?: string): Promise<Invoice[]> {
+export async function getInvoices(companyId: string, clientId?: string): Promise<Invoice[]> {
   try {
+    if (!companyId) return [];
     const invoicesRef = ref(database, 'invoices');
-    const snapshot = await get(invoicesRef);
+    const queryRef = query(invoicesRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -291,10 +295,12 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
   }
 }
 
-export async function getSupportRequests(clientId?: string): Promise<SupportRequest[]> {
+export async function getSupportRequests(companyId: string, clientId?: string): Promise<SupportRequest[]> {
   try {
+    if (!companyId) return [];
     const supportRef = ref(database, 'support_requests');
-    const snapshot = await get(supportRef);
+    const queryRef = query(supportRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -389,10 +395,12 @@ export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 
   }
 }
 
-export async function getUsers(): Promise<User[]> {
+export async function getUsers(companyId: string): Promise<User[]> {
   try {
+    if (!companyId) return [];
     const usersRef = ref(database, 'users');
-    const snapshot = await get(usersRef);
+    const queryRef = query(usersRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -653,10 +661,12 @@ export async function updateMeeting(meetingId: string, updates: Partial<MeetingR
 }
 
 
-export async function getTransactions(): Promise<Transaction[]> {
+export async function getTransactions(companyId: string): Promise<Transaction[]> {
   try {
+    if (!companyId) return [];
     const transactionsRef = ref(database, 'transactions');
-    const snapshot = await get(transactionsRef);
+    const queryRef = query(transactionsRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -798,10 +808,12 @@ export async function deletePlanningNote(noteId: string): Promise<boolean> {
   }
 }
 
-export async function getQuotations(clientId?: string): Promise<Quotation[]> {
+export async function getQuotations(companyId: string, clientId?: string): Promise<Quotation[]> {
   try {
-    const quotationsRef = ref(database, 'quotations');
-    const snapshot = await get(quotationsRef);
+    if (!companyId) return [];
+    const quotRef = ref(database, 'quotations');
+    const queryRef = query(quotRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -962,10 +974,12 @@ export async function deleteQuotation(quotationId: string): Promise<boolean> {
 // ENQUIRY FUNCTIONS
 // ----------------------------------------------------
 
-export async function getEnquiries(): Promise<Enquiry[]> {
+export async function getEnquiries(companyId: string): Promise<Enquiry[]> {
   try {
-    const refPath = ref(database, 'enquiries');
-    const snapshot = await get(refPath);
+    if (!companyId) return [];
+    const enqRef = ref(database, 'enquiries');
+    const queryRef = query(enqRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -1018,10 +1032,12 @@ export async function updateEnquiry(id: string, updates: Partial<Enquiry>): Prom
 // TASK FUNCTIONS
 // ----------------------------------------------------
 
-export async function getTasks(): Promise<TaskItem[]> {
+export async function getTasks(companyId: string): Promise<TaskItem[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'tasks');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 
@@ -1232,10 +1248,12 @@ export async function deleteLead(id: string): Promise<boolean> {
 // FIELD AGENT FUNCTIONS
 // ----------------------------------------------------
 
-export async function getFieldAgents(): Promise<FieldAgent[]> {
+export async function getFieldAgents(companyId: string): Promise<FieldAgent[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'field_agents');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: FieldAgent[] = [];
     snapshot.forEach((child) => {
@@ -1277,10 +1295,12 @@ export async function deleteFieldAgent(id: string): Promise<boolean> {
   }
 }
 
-export async function getFieldAlerts(): Promise<FieldAlert[]> {
+export async function getFieldAlerts(companyId: string): Promise<FieldAlert[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'field_alerts');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: FieldAlert[] = [];
     snapshot.forEach((child) => {
@@ -1307,10 +1327,12 @@ export async function createFieldAlert(data: Omit<FieldAlert, 'id' | 'field_aler
 // CONTENT ITEM FUNCTIONS
 // ----------------------------------------------------
 
-export async function getContentItems(): Promise<ContentItem[]> {
+export async function getContentItems(companyId: string): Promise<ContentItem[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'content_items');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: ContentItem[] = [];
     snapshot.forEach((child) => {
@@ -1357,10 +1379,12 @@ export async function deleteContentItem(id: string): Promise<boolean> {
 // MEDIA ITEM FUNCTIONS
 // ----------------------------------------------------
 
-export async function getMediaItems(): Promise<MediaItem[]> {
+export async function getMediaItems(companyId: string): Promise<MediaItem[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'media_items');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: MediaItem[] = [];
     snapshot.forEach((child) => {
@@ -1492,10 +1516,12 @@ export async function deleteIntegration(id: string): Promise<boolean> {
   }
 }
 
-export async function getAutomationRules(): Promise<AutomationRule[]> {
+export async function getAutomationRules(companyId: string): Promise<AutomationRule[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'automation_rules');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: AutomationRule[] = [];
     snapshot.forEach((child) => {
@@ -1893,10 +1919,12 @@ export async function deletePayment(id: string): Promise<boolean> {
 // CAMPAIGN FUNCTIONS
 // ----------------------------------------------------
 
-export async function getCampaigns(): Promise<Campaign[]> {
+export async function getCampaigns(companyId: string): Promise<Campaign[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'campaigns');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: Campaign[] = [];
     snapshot.forEach((child) => {
@@ -2019,10 +2047,12 @@ export async function deleteDelivery(id: string): Promise<boolean> {
 // ACTIVITY LOG FUNCTIONS
 // ----------------------------------------------------
 
-export async function getActivityLogs(limitCount: number = 50): Promise<ActivityLog[]> {
+export async function getActivityLogs(companyId: string, limitCount: number = 50): Promise<ActivityLog[]> {
   try {
-    const refPath = ref(database, 'activity_logs');
-    const snapshot = await get(refPath);
+    if (!companyId) return [];
+    const logsRef = ref(database, 'activity_logs');
+    const queryRef = query(logsRef, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: ActivityLog[] = [];
     snapshot.forEach((child) => {
@@ -2085,10 +2115,12 @@ export async function deleteEmailTemplate(id: string): Promise<boolean> {
 // EMAIL CAMPAIGN FUNCTIONS
 // ----------------------------------------------------
 
-export async function getEmailCampaigns(): Promise<EmailCampaign[]> {
+export async function getEmailCampaigns(companyId: string): Promise<EmailCampaign[]> {
   try {
+    if (!companyId) return [];
     const refPath = ref(database, 'email_campaigns');
-    const snapshot = await get(refPath);
+    const queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+    const snapshot = await get(queryRef);
     if (!snapshot.exists()) return [];
     const items: EmailCampaign[] = [];
     snapshot.forEach((child) => {

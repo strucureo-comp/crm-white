@@ -30,7 +30,6 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
 
-const WORKSPACE_ID = "default";
 
 function isRecentlyAdded(contact: Contact): boolean {
   if (!contact.created_at) return false;
@@ -51,6 +50,7 @@ function formatDate(dateStr: string | undefined | null): string {
 }
 
 export default function ContactsPage() {
+  const { user } = useAuth();
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -63,8 +63,9 @@ export default function ContactsPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
+    if (!user?.company_id) return;
     try {
-      const data = await getContacts(WORKSPACE_ID);
+      const data = await getContacts(user.company_id);
       setContacts(data);
     } catch {
       // ignore
@@ -73,7 +74,7 @@ export default function ContactsPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.company_id]);
 
   const filtered = useMemo(() => {
     return contacts.filter((c) => {
@@ -106,12 +107,12 @@ export default function ContactsPage() {
   }
 
   async function onDeleteConfirm() {
-    if (!confirmState.id) return;
+    if (!confirmState.id || !user?.company_id) return;
     setDeleting(confirmState.id);
     setConfirmState((prev) => ({ ...prev, loading: true }));
     try {
-      await deleteContact(WORKSPACE_ID, confirmState.id);
-      toast.success('Contact deleted');
+      await deleteContact(user.company_id, confirmState.id);
+      toast.success('Contact deleted successfully');
       load();
       setConfirmState({ open: false, loading: false });
     } catch {
@@ -368,7 +369,7 @@ export default function ContactsPage() {
         onOpenChange={setDialogOpen}
         onSaved={load}
         contact={editingContact}
-        workspaceId={WORKSPACE_ID}
+        workspaceId={user?.company_id || ''}
       />
 
       {/* Delete Confirm */}

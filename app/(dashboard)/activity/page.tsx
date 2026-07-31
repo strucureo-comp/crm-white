@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import { getActivityLogs, getTasks, createActivityLog } from '@/lib/firebase/database';
+import { useAuth } from '@/lib/firebase/auth-context';
 import type { ActivityLog, TaskItem, ActivityAction } from '@/lib/db/types';
 import { toast } from 'sonner';
 import {
@@ -117,6 +118,7 @@ function getMotivationLabel(pct: number): { label: string; icon: React.ElementTy
 }
 
 export default function ActivityPage() {
+  const { user } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [rawTasks, setRawTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -160,10 +162,11 @@ export default function ActivityPage() {
   }
 
   async function load() {
+    if (!user?.company_id) return;
     try {
       const [activityLogs, tasks] = await Promise.all([
-        getActivityLogs(100),
-        getTasks(),
+        getActivityLogs(user.company_id, 100),
+        getTasks(user.company_id),
       ]);
       setLogs(activityLogs);
       setRawTasks(tasks);
@@ -174,7 +177,7 @@ export default function ActivityPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.company_id]);
 
   const allActivities = useMemo(() => {
     const fromTasks = rawTasks

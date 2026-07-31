@@ -28,6 +28,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { generateQuotationPdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 const statusStyles: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
@@ -39,6 +40,7 @@ const statusStyles: Record<string, string> = {
 
 export default function QuotesPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -46,9 +48,10 @@ export default function QuotesPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   async function load() {
+    if (!user?.company_id) return;
     setLoading(true);
     try {
-      const data = await getQuotations();
+      const data = await getQuotations(user.company_id);
       setQuotations(data);
     } catch {
       toast.error('Failed to load quotes');
@@ -57,7 +60,7 @@ export default function QuotesPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [user?.company_id]);
 
   const filtered = quotations.filter((q) => {
     if (statusFilter !== 'all' && q.status !== statusFilter) return false;
