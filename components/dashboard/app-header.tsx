@@ -48,7 +48,7 @@ const breadcrumbs: Record<string, string> = {
   '/field-monitoring': 'Field Monitoring',
   '/quotes': 'Quotes',
   '/invoices': 'Invoices',
-  '/proposals': 'Proposals',
+  '/contracts': 'Contracts',
   '/content-hub': 'Content Hub',
   '/marketing-calendar': 'Marketing Calendar',
   '/projects': 'Projects',

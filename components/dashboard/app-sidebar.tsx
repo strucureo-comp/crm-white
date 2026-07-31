@@ -89,7 +89,7 @@ function getNavConfig(leadCount: number): NavConfig {
         items: [
           { title: 'Quotations', href: '/quotes', icon: FileText },
           { title: 'Invoices', href: '/invoices', icon: Receipt },
-          { title: 'Contracts', href: '/proposals', icon: FileSpreadsheet },
+          { title: 'Contracts', href: '/contracts', icon: FileSpreadsheet },
           { title: 'Payments', href: '/payments', icon: Wallet },
         ],
       },

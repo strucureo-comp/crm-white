@@ -49,6 +49,7 @@ import type {
   EmailLog,
   Pipeline,
   PipelineStage,
+  Contract,
 } from '@/lib/db/types';
 
 function cleanData(data: any) {
@@ -2258,3 +2259,85 @@ export async function deletePipeline(id: string): Promise<boolean> {
     return true;
   } catch { return false; }
 }
+
+export async function getContracts(companyId: string): Promise<Contract[]> {
+  try {
+    if (!companyId) return [];
+    const contractsRef = ref(database, 'contracts');
+    const snapshot = await get(contractsRef);
+
+    if (!snapshot.exists()) return [];
+
+    const contracts: Contract[] = [];
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        contracts.push({ id: key, ...val } as Contract);
+      }
+    }
+
+    return contracts.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  } catch (error) {
+    console.error('Error getting contracts:', error);
+    return [];
+  }
+}
+
+export async function getContract(contractId: string): Promise<Contract | null> {
+  try {
+    const contractRef = ref(database, `contracts/${contractId}`);
+    const snapshot = await get(contractRef);
+
+    if (!snapshot.exists()) return null;
+
+    return { id: snapshot.key, ...snapshot.val() } as Contract;
+  } catch (error) {
+    console.error('Error getting contract:', error);
+    return null;
+  }
+}
+
+export async function createContract(contract: Omit<Contract, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+  try {
+    const contractsRef = ref(database, 'contracts');
+    const newContractRef = push(contractsRef);
+
+    const contractData = cleanData({
+      ...contract,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    });
+
+    await set(newContractRef, contractData);
+    return newContractRef.key;
+  } catch (error) {
+    console.error('Error creating contract:', error);
+    return null;
+  }
+}
+
+export async function updateContract(contractId: string, updates: Partial<Contract>): Promise<boolean> {
+  try {
+    const contractRef = ref(database, `contracts/${contractId}`);
+    await update(contractRef, cleanData({
+      ...updates,
+      updated_at: new Date().toISOString(),
+    }));
+    return true;
+  } catch (error) {
+    console.error('Error updating contract:', error);
+    return false;
+  }
+}
+
+export async function deleteContract(contractId: string): Promise<boolean> {
+  try {
+    const contractRef = ref(database, `contracts/${contractId}`);
+    await remove(contractRef);
+    return true;
+  } catch (error) {
+    console.error('Error deleting contract:', error);
+    return false;
+  }
+}
+

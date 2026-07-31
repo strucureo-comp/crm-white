@@ -22,7 +22,6 @@ const staticItems: SearchResult[] = [
   { label: 'Deals', href: '/deals', icon: DollarSign, category: 'CRM' },
   { label: 'Quotes', href: '/quotes', icon: FileText, category: 'Revenue' },
   { label: 'Invoices', href: '/invoices', icon: FileText, category: 'Revenue' },
-  { label: 'Proposals', href: '/proposals', icon: FileText, category: 'Revenue' },
   { label: 'Contracts', href: '/contracts', icon: FileText, category: 'Revenue' },
   { label: 'Projects', href: '/projects', icon: Briefcase, category: 'Collaboration' },
   { label: 'Tasks', href: '/tasks', icon: FileText, category: 'Collaboration' },

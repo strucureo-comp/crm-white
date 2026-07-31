@@ -54,7 +54,11 @@ export type MeetingStatus = 'pending' | 'accepted' | 'declined' | 'completed';
 
 export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
 
+export type ContractTemplateType = 'employment' | 'nda' | 'service' | 'subscription' | 'vendor';
+export type ContractStatus = 'draft' | 'sent' | 'active' | 'expiring' | 'terminated';
+
 export type MemberStatus = 'active' | 'inactive';
+
 
 export type NotificationType = 'project' | 'payment' | 'support' | 'meeting' | 'system';
 
@@ -250,6 +254,27 @@ export interface Invoice {
   created_at: string;
   updated_at: string;
 }
+
+export interface Contract {
+  id: string;
+  contract_number: string;
+  template_type: ContractTemplateType;
+  client_id?: string;
+  client_name: string;
+  client_email: string;
+  client_address?: string;
+  value?: number;
+  currency?: string;
+  start_date?: string;
+  end_date?: string;
+  status: ContractStatus;
+  variables: Record<string, any>;
+  content?: string;
+  company_id: string;
+  created_at: string;
+  updated_at: string;
+}
+
 
 export interface Payment {
   id: string;

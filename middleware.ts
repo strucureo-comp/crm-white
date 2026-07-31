@@ -4,6 +4,8 @@ import type { NextRequest } from 'next/server';
 const publicPaths = ['/login', '/register', '/forgot-password', '/setup'];
 const publicApiPaths = ['/api/enquiries', '/api/auth/session'];
 
+
+
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
