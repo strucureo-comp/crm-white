@@ -213,6 +213,7 @@ export default function PipelinePage() {
         await createLead({
           name: dealFormName,
           company: dealFormCompany,
+          company_id: '',
           estimated_value: dealFormValue === '' ? 0 : Number(dealFormValue),
           status: dealFormStage,
           email: 'placeholder@example.com',
