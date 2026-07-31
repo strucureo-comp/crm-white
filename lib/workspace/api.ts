@@ -65,16 +65,27 @@ export async function getWorkspace(workspaceId: string): Promise<Workspace | nul
 
 export async function getUserWorkspace(userId: string): Promise<Workspace | null> {
   try {
-    // Find workspace where user is a member
-    const memberSnapshot = await get(ref(database, WORKSPACE_MEMBERS_PATH));
+    // Find workspace where user is a member using a targeted query
+    const memberQuery = query(
+      ref(database, WORKSPACE_MEMBERS_PATH), 
+      orderByChild('user_id'), 
+      equalTo(userId)
+    );
+    const memberSnapshot = await get(memberQuery);
+    
     if (!memberSnapshot.exists()) return null;
 
-    const members = memberSnapshot.val() as Record<string, WorkspaceMember>;
-    const userMembership = Object.values(members).find(m => m.user_id === userId);
+    // The snapshot will contain one or more matches, we take the first one
+    let targetWorkspaceId = '';
+    memberSnapshot.forEach((child) => {
+      if (!targetWorkspaceId) {
+        targetWorkspaceId = child.val().workspace_id;
+      }
+    });
 
-    if (!userMembership) return null;
+    if (!targetWorkspaceId) return null;
 
-    return getWorkspace(userMembership.workspace_id);
+    return getWorkspace(targetWorkspaceId);
   } catch (error) {
     console.error('Error fetching user workspace:', error);
     return null;
