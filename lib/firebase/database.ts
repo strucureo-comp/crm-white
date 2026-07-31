@@ -1108,10 +1108,17 @@ export async function saveTaskColumns(columns: string[]): Promise<boolean> {
 // LEAD FUNCTIONS
 // ----------------------------------------------------
 
-export async function getLeads(): Promise<Lead[]> {
+export async function getLeads(companyId?: string): Promise<Lead[]> {
   try {
+    if (!companyId) return []; // Prevent fetching all leads if companyId is missing/undefined
+
     const refPath = ref(database, 'leads');
-    const snapshot = await get(refPath);
+    
+    // Natively filter in Firebase using company_id if provided
+    let queryRef = query(refPath, orderByChild('company_id'), equalTo(companyId)) as any;
+
+    
+    const snapshot = await get(queryRef);
 
     if (!snapshot.exists()) return [];
 

@@ -70,7 +70,10 @@ const stageTabs = [
   { value: 'lost', label: 'Lost' },
 ] as const;
 
+import { useAuth } from '@/lib/firebase/auth-context';
+
 export default function LeadsPage() {
+  const { user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -91,7 +94,8 @@ export default function LeadsPage() {
 
   async function load() {
     try {
-      const data = await getLeads();
+      // Pass the logged-in user's company_id to securely filter leads
+      const data = await getLeads(user?.company_id);
       setLeads(data);
     } catch (err) {
       console.error('Failed to load leads:', err);
@@ -100,7 +104,11 @@ export default function LeadsPage() {
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    if (user?.company_id) {
+      load();
+    }
+  }, [user?.company_id]);
 
   const kpis = useMemo(() => {
     const total = leads.length;

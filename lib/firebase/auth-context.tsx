@@ -240,6 +240,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       };
 
       await createUser(newUser.uid, userData);
+      
+      // Fix the race condition: fetch the fresh data now that DB writes are done
+      await refreshUser();
+      if (resolvedWorkspaceId) {
+        await fetchWorkspace(newUser.uid);
+      }
 
       return { error: null };
     } catch (error) {
