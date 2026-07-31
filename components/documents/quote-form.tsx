@@ -13,6 +13,7 @@ import { NotesSection } from './notes-section';
 import { LivePreview } from './live-preview';
 import { DocumentLayout } from './document-layout';
 import { useWorkspace } from '@/lib/settings/workspace-context';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { createQuotation, updateQuotation } from '@/lib/firebase/database';
 import type { Quotation, QuotationStatus } from '@/lib/db/types';
 import type {
@@ -32,6 +33,7 @@ interface QuoteFormProps {
 export function QuoteForm({ existingQuote }: QuoteFormProps) {
   const router = useRouter();
   const { settings } = useWorkspace();
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -133,6 +135,7 @@ export function QuoteForm({ existingQuote }: QuoteFormProps) {
           status: status,
           description: '',
           notes: notes.notes,
+          company_id: user?.company_id || '',
           items: items.map((item) => ({
             description: item.name,
             quantity: item.quantity,
