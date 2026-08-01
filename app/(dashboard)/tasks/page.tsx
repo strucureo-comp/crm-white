@@ -22,6 +22,7 @@ import {
   TaskPriority, ViewType, TasksData,
   subscribeToTasksData, createTask, updateTask, deleteTask, saveTaskColumns 
 } from '@/lib/db/tasks/api';
+import { subscribeToProjectsData, createMember, Member } from '@/lib/db/projects/api';
 
 export interface DashboardWidget {
   id: string;
@@ -32,11 +33,6 @@ export interface DashboardWidget {
 }
 
 // --- Mock Data ---
-const MOCK_ASSIGNEES: Assignee[] = [
-  { id: 'a1', name: 'Alex Rivera', avatar: 'AR', email: 'alex@acme.com' },
-  { id: 'a2', name: 'Sarah Jones', avatar: 'SJ', email: 'sarah@acme.com' },
-];
-
 const MOCK_TASKS: Task[] = [];
 
 const PriorityStyle = (priority: TaskPriority) => {
@@ -59,14 +55,21 @@ export default function TaskManagerPage() {
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
 
   useEffect(() => {
     if (!user?.company_id) return;
-    const unsubscribe = subscribeToTasksData(user.company_id, (data: TasksData) => {
+    const unsubscribeTasks = subscribeToTasksData(user.company_id, (data) => {
       setTasks(data.tasks);
       setColumns(data.columns);
     });
-    return () => unsubscribe();
+    const unsubscribeProjects = subscribeToProjectsData(user.company_id, (data) => {
+      setMembers(data.members);
+    });
+    return () => {
+      unsubscribeTasks();
+      unsubscribeProjects();
+    };
   }, [user?.company_id]);
   const [view, setView] = useState<ViewType>('Kanban');
   const [search, setSearch] = useState('');
@@ -93,8 +96,9 @@ export default function TaskManagerPage() {
   const [formStatus, setFormStatus] = useState('To Do');
   const [formPriority, setFormPriority] = useState<TaskPriority>('Medium');
   const [formDate, setFormDate] = useState('');
-  const [formAssigneeId, setFormAssigneeId] = useState(MOCK_ASSIGNEES[0].id);
+  const [formAssigneeId, setFormAssigneeId] = useState('');
   const [formDescription, setFormDescription] = useState('');
+  const [newMemberName, setNewMemberName] = useState('');
 
   // Filters
   const [filterOwner, setFilterOwner] = useState('All');
@@ -114,7 +118,8 @@ export default function TaskManagerPage() {
   const handleCreateTask = async () => {
     if (!user?.company_id) return;
     if (!formTitle.trim()) return toast.error('Task title is required');
-    const assignee = MOCK_ASSIGNEES.find(a => a.id === formAssigneeId) || MOCK_ASSIGNEES[0];
+    const assigneeMember = members.find(a => a.id === formAssigneeId) || members[0] || { id: 'unassigned', name: 'Unassigned', avatar: 'U' };
+    const assignee = { ...assigneeMember, email: '' };
     
     const newTask = {
       title: formTitle,
@@ -210,16 +215,37 @@ export default function TaskManagerPage() {
     }
   };
 
-  const handleBulkStatusChange = async (status: string) => {
+  const handleBulkStatusChange = async (newStatus: string) => {
     if (!user?.company_id) return;
     try {
-      const promises = Array.from(selectedTaskIds).map(id => updateTask(user.company_id!, id, { status }));
-      await Promise.all(promises);
-      toast.success(`Tasks moved to ${status}`);
+      await Promise.all(
+        Array.from(selectedTaskIds).map(id => updateTask(user.company_id!, id, { status: newStatus }))
+      );
+      toast.success(`${selectedTaskIds.size} tasks moved to ${newStatus}`);
+      setSelectedTaskIds(new Set());
     } catch (e) {
-      toast.error('Failed to update task statuses');
+      toast.error('Failed to update tasks');
     }
-    setSelectedTaskIds(new Set());
+  };
+
+  const handleAddNewMember = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!user?.company_id) return;
+    if (!newMemberName.trim()) return;
+    
+    const newMemb = {
+      name: newMemberName,
+      avatar: newMemberName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'U'
+    };
+    
+    try {
+      const newId = await createMember(user.company_id, newMemb);
+      if (newId) setFormAssigneeId(newId);
+      setNewMemberName('');
+    } catch (err) {
+      toast.error('Failed to add member');
+    }
   };
 
   const handleAddSubtask = async () => {
@@ -265,9 +291,8 @@ export default function TaskManagerPage() {
   };
 
   const getCalendarDays = () => {
-    // Very basic mock calendar grid generation for the current view
     return Array.from({length: 35}, (_, i) => {
-      const date = new Date(2026, 7, i - 3); // Approx Aug 2026
+      const date = new Date(2026, 7, i - 3);
       return { 
         date, 
         dateStr: date.toISOString().split('T')[0],
@@ -331,9 +356,11 @@ export default function TaskManagerPage() {
               <Select value={filterOwner} onValueChange={setFilterOwner}>
                 <SelectTrigger className="h-8 text-xs w-[140px] bg-background"><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="All">All Members</SelectItem>
-                  {MOCK_ASSIGNEES.map(a => <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>)}
-                </SelectContent>
+                <SelectItem value="All">All Members</SelectItem>
+                {members.map(a => (
+                  <SelectItem key={a.id} value={a.name}>{a.name}</SelectItem>
+                ))}
+              </SelectContent>
               </Select>
             </div>
             <div className="space-y-1">
@@ -395,17 +422,25 @@ export default function TaskManagerPage() {
             <div className="flex gap-4 h-full overflow-x-auto items-start pb-4">
               {columns.map((col, idx) => {
                 const colTasks = filteredTasks.filter(t => t.status === col);
-                const borderColors = ['border-t-blue-500', 'border-t-purple-500', 'border-t-amber-500', 'border-t-emerald-500'];
-                const bColor = borderColors[idx % borderColors.length];
+                const themeColors = [
+                  { bg: 'bg-blue-500/10', text: 'text-blue-500', border: 'border-blue-500/30' },
+                  { bg: 'bg-purple-500/10', text: 'text-purple-500', border: 'border-purple-500/30' },
+                  { bg: 'bg-amber-500/10', text: 'text-amber-500', border: 'border-amber-500/30' },
+                  { bg: 'bg-emerald-500/10', text: 'text-emerald-500', border: 'border-emerald-500/30' }
+                ];
+                const theme = themeColors[idx % themeColors.length];
 
                 return (
-                  <div key={col} className={`flex-shrink-0 w-[320px] flex flex-col max-h-full bg-muted/30 rounded-xl border-t-4 border-x border-b ${bColor}`}>
-                    <div className="flex items-center justify-between p-3 shrink-0 border-b bg-background/50 rounded-t-lg">
+                  <div key={col} className="flex-shrink-0 w-[340px] flex flex-col max-h-full">
+                    <div className="flex items-center justify-between mb-4 px-1 shrink-0">
                       <div className="flex items-center gap-2">
-                        <h3 className="font-bold text-sm">{col}</h3>
-                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-muted">{colTasks.length}</Badge>
+                        <div className={`w-2.5 h-2.5 rounded-full ${theme.bg} ${theme.text} ring-4 ring-background shadow-sm`} style={{ backgroundColor: 'currentColor' }} />
+                        <h3 className="font-bold text-sm uppercase tracking-wider">{col}</h3>
+                        <Badge variant="secondary" className="text-[10px] px-1.5 py-0 bg-muted/80 ml-1">
+                          {colTasks.length}
+                        </Badge>
                       </div>
-                      <Button variant="ghost" size="icon" className="w-6 h-6 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteColumn(col)}><X className="w-3 h-3" /></Button>
+                      <Button variant="ghost" size="icon" className="w-6 h-6 text-muted-foreground hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/30 rounded-full" onClick={() => handleDeleteColumn(col)}><X className="w-3 h-3" /></Button>
                     </div>
                     
                     <Droppable droppableId={col}>
@@ -413,52 +448,69 @@ export default function TaskManagerPage() {
                         <div
                           ref={provided.innerRef}
                           {...provided.droppableProps}
-                          className={`flex-1 overflow-y-auto p-3 space-y-3 transition-colors ${snapshot.isDraggingOver ? 'bg-primary/5' : ''}`}
+                          className={`flex-1 overflow-y-auto p-2 space-y-3 rounded-2xl transition-all duration-300 ${snapshot.isDraggingOver ? 'bg-primary/5 ring-1 ring-primary/20' : 'bg-muted/30 border border-border/50'}`}
                         >
                           {colTasks.map((task, index) => (
                             <Draggable key={task.id} draggableId={task.id} index={index}>
-                              {(provided, snapshot) => (
-                                <Card
-                                  ref={provided.innerRef}
-                                  {...provided.draggableProps}
-                                  {...provided.dragHandleProps}
-                                  onClick={() => setViewingTask(task)}
-                                  className={`cursor-pointer transition-shadow border bg-background hover:border-primary/50
-                                    ${snapshot.isDragging ? 'shadow-2xl rotate-2 ring-1 ring-primary' : 'shadow-sm'}
-                                  `}
-                                >
-                                  <CardContent className="p-4 space-y-3">
-                                    <div className="flex gap-1 flex-wrap">
-                                      {task.labels?.map(l => <Badge key={l} variant="secondary" className="text-[9px] px-1.5 py-0 bg-muted/80">{l}</Badge>)}
-                                    </div>
-                                    <h4 className="font-bold text-sm leading-tight text-foreground">{task.title}</h4>
-                                    <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{task.description}</p>
-                                    
-                                    {((task.subtasks?.length || 0) > 0 || (task.comments?.length || 0) > 0 || (task.attachments?.length || 0) > 0) && (
-                                      <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium pt-1">
-                                        {(task.subtasks?.length || 0) > 0 && <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {task.subtasks!.filter(s=>s.completed).length}/{task.subtasks!.length}</span>}
-                                        {(task.comments?.length || 0) > 0 && <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {task.comments!.length}</span>}
-                                        {(task.attachments?.length || 0) > 0 && <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" /> {task.attachments!.length}</span>}
-                                      </div>
-                                    )}
+                              {(provided, snapshot) => {
+                                const priorityColors = {
+                                  Low: 'bg-blue-500',
+                                  Medium: 'bg-amber-500',
+                                  High: 'bg-rose-500',
+                                  Urgent: 'bg-red-600 animate-pulse'
+                                };
+                                const pColor = priorityColors[task.priority as keyof typeof priorityColors] || 'bg-slate-500';
 
-                                    <div className="flex items-center justify-between pt-3 border-t border-border/50">
-                                      <div className="flex flex-col">
-                                        <span className={`text-[10px] ${PriorityStyle(task.priority)}`}>{task.priority} Priority</span>
-                                        <span className="text-[10px] font-semibold text-muted-foreground">{task.dueDate}</span>
+                                return (
+                                  <Card
+                                    ref={provided.innerRef}
+                                    {...provided.draggableProps}
+                                    {...provided.dragHandleProps}
+                                    onClick={() => setViewingTask(task)}
+                                    className={`cursor-pointer transition-all duration-200 border-l-4 bg-background group overflow-hidden
+                                      ${snapshot.isDragging ? 'shadow-2xl rotate-3 ring-2 ring-primary/30' : 'shadow-sm hover:shadow-md hover:border-primary/40'}
+                                    `}
+                                    style={{
+                                      ...provided.draggableProps.style,
+                                      borderLeftColor: 'transparent'
+                                    }}
+                                  >
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${pColor} opacity-80 group-hover:opacity-100 transition-opacity`} />
+                                    <CardContent className="p-4 pl-5 space-y-3 relative">
+                                      <div className="flex gap-1 flex-wrap">
+                                        {task.labels?.map(l => <Badge key={l} variant="outline" className="text-[9px] px-2 py-0 border-primary/20 text-primary bg-primary/5">{l}</Badge>)}
                                       </div>
-                                      <Avatar className="h-6 w-6 border-2 border-background shadow-sm" title={task.assignee.name}>
-                                        <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{task.assignee.avatar}</AvatarFallback>
-                                      </Avatar>
-                                    </div>
-                                  </CardContent>
-                                </Card>
-                              )}
+                                      <h4 className="font-bold text-[15px] leading-snug text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
+                                      {task.description && (
+                                        <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{task.description}</p>
+                                      )}
+                                      
+                                      {((task.subtasks?.length || 0) > 0 || (task.comments?.length || 0) > 0 || (task.attachments?.length || 0) > 0) && (
+                                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground font-medium pt-2">
+                                          {(task.subtasks?.length || 0) > 0 && <span className={`flex items-center gap-1 ${task.subtasks!.filter(s=>s.completed).length === task.subtasks!.length ? 'text-emerald-600' : ''}`}><CheckCircle2 className="w-3.5 h-3.5" /> {task.subtasks!.filter(s=>s.completed).length}/{task.subtasks!.length}</span>}
+                                          {(task.comments?.length || 0) > 0 && <span className="flex items-center gap-1"><MessageSquare className="w-3.5 h-3.5" /> {task.comments!.length}</span>}
+                                          {(task.attachments?.length || 0) > 0 && <span className="flex items-center gap-1"><Paperclip className="w-3.5 h-3.5" /> {task.attachments!.length}</span>}
+                                        </div>
+                                      )}
+
+                                      <div className="flex items-center justify-between pt-3 mt-3 border-t border-border/40">
+                                        <div className="flex flex-col gap-0.5">
+                                          <span className={`text-[10px] font-bold uppercase tracking-wider ${PriorityStyle(task.priority)}`}>{task.priority}</span>
+                                          <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1"><CalendarIcon className="w-3 h-3"/>{task.dueDate}</span>
+                                        </div>
+                                        <Avatar className="h-7 w-7 border-2 border-background shadow-sm ring-1 ring-border/50" title={task.assignee.name}>
+                                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{task.assignee.avatar}</AvatarFallback>
+                                        </Avatar>
+                                      </div>
+                                    </CardContent>
+                                  </Card>
+                                );
+                              }}
                             </Draggable>
                           ))}
                           {provided.placeholder}
-                          <Button variant="ghost" className="w-full text-muted-foreground text-xs font-bold border border-dashed border-muted-foreground/30 hover:border-foreground/30 h-10" onClick={() => setIsNewTaskOpen(true)}>
-                            <Plus className="w-3 h-3 mr-2" /> Add Task
+                          <Button variant="ghost" className="w-full text-muted-foreground text-xs font-bold border border-dashed border-muted-foreground/30 hover:border-foreground/30 hover:bg-foreground/5 h-12 rounded-xl mt-2 transition-colors" onClick={() => setIsNewTaskOpen(true)}>
+                            <Plus className="w-4 h-4 mr-2" /> Add Task
                           </Button>
                         </div>
                       )}
@@ -710,8 +762,26 @@ export default function TaskManagerPage() {
               <div className="space-y-2">
                 <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Assignee</Label>
                 <Select value={formAssigneeId} onValueChange={setFormAssigneeId}>
-                  <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500"><SelectValue/></SelectTrigger>
-                  <SelectContent>{MOCK_ASSIGNEES.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}</SelectContent>
+                  <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500">
+                    <SelectValue placeholder="Select Assignee" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border border-purple-100 dark:border-slate-700 shadow-xl">
+                    {members.map(a => (
+                      <SelectItem key={a.id} value={a.id} className="font-bold cursor-pointer rounded-lg hover:bg-purple-50 dark:hover:bg-slate-800 focus:bg-purple-50 dark:focus:bg-slate-800">
+                        {a.name}
+                      </SelectItem>
+                    ))}
+                    <div className="flex items-center gap-2 p-2 border-t border-purple-100 dark:border-slate-700 mt-1">
+                      <Input 
+                        placeholder="Add new member..." 
+                        value={newMemberName}
+                        onChange={e => setNewMemberName(e.target.value)}
+                        onKeyDown={e => e.stopPropagation()}
+                        className="h-8 text-xs bg-transparent border-purple-200 dark:border-slate-600"
+                      />
+                      <Button size="sm" onClick={handleAddNewMember} className="h-8 bg-purple-600 hover:bg-purple-700 text-white">Add</Button>
+                    </div>
+                  </SelectContent>
                 </Select>
               </div>
             </div>
@@ -731,65 +801,73 @@ export default function TaskManagerPage() {
 
       {/* Task Details Modal */}
       <Dialog open={!!viewingTask} onOpenChange={(open) => { if(!open) setViewingTask(null); }}>
-        <DialogContent className="max-w-[90vw] md:max-w-[70vw] h-[85vh] p-0 bg-background shadow-2xl border-border/60 flex flex-col">
+        <DialogContent className="max-w-[90vw] md:max-w-[70vw] h-[85vh] p-0 bg-background shadow-2xl border-border/60 flex flex-col overflow-hidden rounded-2xl">
           {viewingTask && (
             <>
-              <DialogHeader className="p-6 border-b shrink-0 flex flex-row items-start justify-between">
-                <div className="space-y-2">
-                  <div className="flex gap-2 mb-1">
-                    <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200 uppercase tracking-wider text-[9px] font-bold">{viewingTask.status}</Badge>
-                    <Badge variant="outline" className="bg-muted uppercase tracking-wider text-[9px] font-bold border-dashed">{viewingTask.priority} Priority</Badge>
+              <DialogHeader className="p-8 border-b shrink-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 flex flex-col items-start justify-center relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
+                <div className="space-y-4 relative z-10 w-full">
+                  <div className="flex gap-2">
+                    <Badge variant="secondary" className="bg-background/80 backdrop-blur text-foreground border-border uppercase tracking-widest text-[10px] font-bold px-3 py-1 shadow-sm">{viewingTask.status}</Badge>
+                    <Badge variant="secondary" className={`uppercase tracking-widest text-[10px] font-bold px-3 py-1 shadow-sm border ${PriorityStyle(viewingTask.priority)} bg-background/80 backdrop-blur`}>{viewingTask.priority} Priority</Badge>
                   </div>
-                  <DialogTitle className="text-2xl font-bold leading-tight">{viewingTask.title}</DialogTitle>
+                  <DialogTitle className="text-3xl font-black leading-tight tracking-tight text-foreground">{viewingTask.title}</DialogTitle>
                 </div>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-8 bg-muted/5">
-                <div className="flex-1 space-y-8">
-                  <div className="space-y-2">
-                    <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description</h4>
-                    <div className="bg-card border rounded-lg p-4 text-sm leading-relaxed shadow-sm">
-                      {viewingTask.description}
+              <div className="flex-1 overflow-y-auto p-8 flex flex-col md:flex-row gap-8 bg-muted/10">
+                <div className="flex-1 space-y-10">
+                  {viewingTask.description && (
+                    <div className="space-y-3">
+                      <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><LayoutList className="w-4 h-4"/> Description</h4>
+                      <div className="bg-card border border-border/50 rounded-xl p-5 text-[15px] leading-relaxed shadow-sm">
+                        {viewingTask.description}
+                      </div>
                     </div>
-                  </div>
+                  )}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subtasks</h4>
-                      <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setIsAddingSubtask(true)}>
+                      <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> Subtasks</h4>
+                      <Button variant="outline" size="sm" className="h-7 text-[11px] rounded-full px-4 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary" onClick={() => setIsAddingSubtask(true)}>
                         <Plus className="w-3 h-3 mr-1"/> Add Subtask
                       </Button>
                     </div>
-                    <div className="bg-card border rounded-lg shadow-sm divide-y">
+                    <div className="bg-card border border-border/50 rounded-xl shadow-sm overflow-hidden">
                       {(viewingTask.subtasks?.length || 0) === 0 && !isAddingSubtask ? (
-                        <p className="p-4 text-sm text-muted-foreground italic">No subtasks created.</p>
+                        <div className="p-8 flex flex-col items-center justify-center text-center">
+                          <CheckCircle2 className="w-10 h-10 text-muted-foreground/30 mb-2" />
+                          <p className="text-sm text-muted-foreground font-medium">Break this task down into smaller steps.</p>
+                        </div>
                       ) : (
-                        viewingTask.subtasks?.map(s => (
-                          <div key={s.id} className="p-3 flex items-center gap-3">
-                            <input 
-                              type="checkbox" 
-                              checked={s.completed} 
-                              onChange={() => toggleSubtaskCompletion(s.id)}
-                              className="rounded border-muted-foreground text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer" 
-                            />
-                            <span className={`text-sm font-medium ${s.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{s.title}</span>
-                          </div>
-                        ))
+                        <div className="divide-y divide-border/50">
+                          {viewingTask.subtasks?.map(s => (
+                            <div key={s.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors group">
+                              <input 
+                                type="checkbox" 
+                                checked={s.completed} 
+                                onChange={() => toggleSubtaskCompletion(s.id)}
+                                className="rounded border-muted-foreground/50 text-primary focus:ring-primary w-5 h-5 cursor-pointer shadow-sm" 
+                              />
+                              <span className={`text-[15px] font-medium transition-all ${s.completed ? 'line-through text-muted-foreground opacity-70' : 'text-foreground'}`}>{s.title}</span>
+                            </div>
+                          ))}
+                        </div>
                       )}
                       {isAddingSubtask && (
-                        <div className="p-3 flex items-center gap-3 bg-muted/20">
-                          <input type="checkbox" disabled className="rounded border-muted-foreground/30 w-4 h-4" />
+                        <div className="p-4 flex items-center gap-4 bg-primary/5 border-t border-primary/10">
+                          <input type="checkbox" disabled className="rounded border-primary/30 w-5 h-5 bg-background" />
                           <Input 
                             autoFocus 
                             value={newSubtaskTitle} 
                             onChange={e => setNewSubtaskTitle(e.target.value)} 
                             placeholder="What needs to be done?"
-                            className="h-8 text-sm bg-transparent border-none focus-visible:ring-0 shadow-none p-0 px-1 flex-1"
+                            className="h-10 text-[15px] bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 flex-1 rounded-lg"
                             onKeyDown={e => {
                               if (e.key === 'Enter') handleAddSubtask();
                               if (e.key === 'Escape') { setIsAddingSubtask(false); setNewSubtaskTitle(''); }
                             }}
                           />
-                          <Button size="sm" variant="ghost" onClick={handleAddSubtask} className="h-7 w-7 p-0 text-primary">
-                            <Check className="w-4 h-4" />
+                          <Button size="icon" onClick={handleAddSubtask} className="h-10 w-10 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl">
+                            <Check className="w-5 h-5" />
                           </Button>
                         </div>
                       )}
@@ -797,11 +875,34 @@ export default function TaskManagerPage() {
                   </div>
                 </div>
                 <div className="w-full md:w-[320px] shrink-0 space-y-6">
-                  <div className="bg-card border rounded-xl p-4 shadow-sm space-y-4">
-                    <div className="flex items-center justify-between"><span className="text-xs font-bold text-muted-foreground">Assignee</span><div className="flex items-center gap-2"><Avatar className="w-6 h-6"><AvatarFallback className="text-[10px] bg-primary/10 text-primary">{viewingTask.assignee.avatar}</AvatarFallback></Avatar><span className="text-sm font-bold">{viewingTask.assignee.name}</span></div></div>
-                    <div className="flex items-center justify-between"><span className="text-xs font-bold text-muted-foreground">Due Date</span><span className="text-sm font-bold">{viewingTask.dueDate}</span></div>
+                  <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm space-y-6 sticky top-0">
+                    <div className="space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Assignee</span>
+                      <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border/50">
+                        <Avatar className="w-10 h-10 border-2 border-background shadow-sm ring-1 ring-border/50">
+                          <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/60 text-white font-bold">{viewingTask.assignee.avatar}</AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <span className="text-sm font-bold block leading-tight">{viewingTask.assignee.name}</span>
+                          <span className="text-[10px] text-muted-foreground font-medium">Task Owner</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="space-y-2 pt-4 border-t border-border/50">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Due Date</span>
+                      <div className="flex items-center gap-3 text-sm font-bold bg-muted/40 p-3 rounded-xl border border-border/50">
+                        <CalendarIcon className="w-5 h-5 text-primary" />
+                        {viewingTask.dueDate}
+                      </div>
+                    </div>
                     {viewingTask.dealReference && (
-                      <div className="pt-3 border-t"><span className="text-xs font-bold text-muted-foreground block mb-2">Linked Deal</span><div className="bg-blue-50 border border-blue-200 rounded-lg p-2 text-blue-700 text-xs font-bold">{viewingTask.dealReference.name}</div></div>
+                      <div className="space-y-2 pt-4 border-t border-border/50">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Linked Deal</span>
+                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-primary text-sm font-bold flex items-center gap-2">
+                          <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+                          {viewingTask.dealReference.name}
+                        </div>
+                      </div>
                     )}
                   </div>
                 </div>
