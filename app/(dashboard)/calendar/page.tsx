@@ -348,43 +348,43 @@ export default function CalendarAgendaPage() {
       
       {/* Event Detail Popup */}
       <Dialog open={!!viewingEvent} onOpenChange={(open) => { if (!open) setViewingEvent(null); }}>
-        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden rounded-[1.5rem] border-0 shadow-2xl bg-white" hideCloseIcon>
+        <DialogContent className="sm:max-w-[425px] p-0 overflow-hidden rounded-[1.5rem] border-0 shadow-2xl bg-white dark:bg-card" hideCloseIcon>
           {viewingEvent && (
             <>
               <div className="h-2 w-full" style={{ backgroundColor: viewingEvent.color }} />
               <div className="p-6 pb-4 flex items-start justify-between">
                 <div className="flex flex-col gap-3">
                   <div className="flex flex-wrap items-center gap-2">
-                    <Badge variant="outline" className="bg-slate-50 uppercase text-[9px] font-black tracking-widest text-slate-500">Event</Badge>
-                    {viewingEvent.linkedRecord && <Badge variant="outline" className="bg-blue-50 border-blue-200 uppercase text-[9px] font-black tracking-widest text-blue-600 flex items-center gap-1"><LinkIcon className="w-3 h-3" /> Project Link</Badge>}
+                    <Badge variant="outline" className="bg-slate-50 dark:bg-slate-900 uppercase text-[9px] font-black tracking-widest text-slate-500 dark:text-slate-400">Event</Badge>
+                    {viewingEvent.linkedRecord && <Badge variant="outline" className="bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 uppercase text-[9px] font-black tracking-widest text-blue-600 dark:text-blue-400 flex items-center gap-1"><LinkIcon className="w-3 h-3" /> Project Link</Badge>}
                   </div>
-                  <DialogTitle className="text-2xl font-black text-[#1e1a4f] leading-tight">{viewingEvent.title}</DialogTitle>
+                  <DialogTitle className="text-2xl font-black text-[#1e1a4f] dark:text-slate-100 leading-tight">{viewingEvent.title}</DialogTitle>
                 </div>
-                <button className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-slate-200 transition-colors shrink-0" onClick={() => setViewingEvent(null)}>
+                <button className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors shrink-0" onClick={() => setViewingEvent(null)}>
                   <X className="w-4 h-4" />
                 </button>
               </div>
               
-              <div className="px-6 py-4 space-y-4 bg-slate-50/50 border-y border-slate-100">
-                <div className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-                  <div className="w-8 h-8 rounded-full bg-white border shadow-sm flex items-center justify-center text-slate-400 shrink-0"><CalendarIcon className="w-4 h-4" /></div>
-                  <span className="text-slate-900">{new Date(viewingEvent.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
+              <div className="px-6 py-4 space-y-4 bg-slate-50/50 dark:bg-slate-900/50 border-y border-slate-100 dark:border-slate-800">
+                <div className="flex items-center gap-4 text-sm font-semibold text-slate-600 dark:text-slate-400">
+                  <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm flex items-center justify-center text-slate-400 dark:text-slate-500 shrink-0"><CalendarIcon className="w-4 h-4" /></div>
+                  <span className="text-slate-900 dark:text-slate-200">{new Date(viewingEvent.date).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })}</span>
                 </div>
-                <div className="flex items-center gap-4 text-sm font-semibold text-slate-600">
-                  <div className="w-8 h-8 rounded-full bg-white border shadow-sm flex items-center justify-center text-slate-400 shrink-0"><Clock className="w-4 h-4" /></div>
-                  <span className="text-slate-900">{viewingEvent.time}</span>
+                <div className="flex items-center gap-4 text-sm font-semibold text-slate-600 dark:text-slate-400">
+                  <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm flex items-center justify-center text-slate-400 dark:text-slate-500 shrink-0"><Clock className="w-4 h-4" /></div>
+                  <span className="text-slate-900 dark:text-slate-200">{viewingEvent.time}</span>
                 </div>
                 {viewingEvent.attendees.length > 0 && (
-                  <div className="pt-4 mt-4 border-t border-slate-200">
-                    <p className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-3">Attendees ({viewingEvent.attendees.length})</p>
+                  <div className="pt-4 mt-4 border-t border-slate-200 dark:border-slate-800">
+                    <p className="text-[10px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider mb-3">Attendees ({viewingEvent.attendees.length})</p>
                     <div className="space-y-3">
                       {viewingEvent.attendees.map(aId => {
                         const m = members.find(x => x.id === aId);
                         if(!m) return null;
                         return (
                           <div key={aId} className="flex items-center gap-3">
-                            <Avatar className="w-8 h-8 border"><AvatarFallback className="bg-slate-100 text-xs font-bold">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-                            <div className="flex flex-col"><span className="text-sm font-bold text-slate-900 leading-none mb-1">{m.name}</span><span className="text-[10px] font-semibold text-slate-500">{m.role}</span></div>
+                            <Avatar className="w-8 h-8 border dark:border-slate-700"><AvatarFallback className="bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-900 dark:text-slate-100">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                            <div className="flex flex-col"><span className="text-sm font-bold text-slate-900 dark:text-slate-200 leading-none mb-1">{m.name}</span><span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">{m.role}</span></div>
                           </div>
                         )
                       })}
@@ -393,11 +393,11 @@ export default function CalendarAgendaPage() {
                 )}
               </div>
               
-              <div className="p-4 bg-slate-50 flex items-center justify-between">
-                <Button variant="ghost" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 font-bold px-4 rounded-xl">Delete</Button>
+              <div className="p-4 bg-slate-50 dark:bg-slate-900/50 flex items-center justify-between">
+                <Button variant="ghost" className="text-rose-500 hover:text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-900/20 font-bold px-4 rounded-xl">Delete</Button>
                 <div className="flex items-center gap-2">
-                  <Button variant="outline" className="rounded-xl font-bold px-4" onClick={() => setViewingEvent(null)}>Close</Button>
-                  <Button className="rounded-xl font-bold bg-[#1e1a4f] text-white px-4 hover:bg-[#2d2770]">Reschedule</Button>
+                  <Button variant="outline" className="rounded-xl font-bold px-4 border-slate-200 dark:border-slate-700 dark:text-slate-300" onClick={() => setViewingEvent(null)}>Close</Button>
+                  <Button className="rounded-xl font-bold bg-[#1e1a4f] dark:bg-slate-100 text-white dark:text-[#1e1a4f] px-4 hover:bg-[#2d2770] dark:hover:bg-white">Reschedule</Button>
                 </div>
               </div>
             </>
