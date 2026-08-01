@@ -9,6 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 
+import { useAuth } from '@/lib/firebase/auth-context';
+import { subscribeToProjectsData, createMember, updateMember, deleteMember, Member as DBMember } from '@/lib/db/projects/api';
+
 // --- Data Schemas ---
 type PermissionType = 'v' | 'e' | 'd';
 
@@ -30,7 +33,7 @@ interface Role {
   };
 }
 
-interface Member {
+interface UIMember {
   id: string;
   name: string;
   email: string;
@@ -90,10 +93,20 @@ const MOCK_ROLES: Role[] = [
       workspace: { v: true, e: false, d: false },
       analytics: { v: true, e: false, d: false },
     }
+  },
+  {
+    id: 'r5', name: 'Member',
+    modules: {
+      contracts: { v: true, e: false, d: false },
+      payments: { v: true, e: false, d: false },
+      marketing: { v: true, e: false, d: false },
+      workspace: { v: true, e: false, d: false },
+      analytics: { v: true, e: false, d: false },
+    }
   }
 ];
 
-const MOCK_MEMBERS: Member[] = [];
+const MOCK_MEMBERS: UIMember[] = [];
 
 const MOCK_ACTIVITY: ActivityItem[] = [];
 
@@ -103,17 +116,45 @@ type ModuleKey = typeof MODULE_NAMES[number];
 export default function TeamPage() {
   const [activeTab, setActiveTab] = useState<'Members' | 'Roles' | 'Activity'>('Members');
   
-  // Invite Modal State
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
   const [inviteName, setInviteName] = useState('');
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState('Viewer');
   
+  // Edit Modal State
+  const [editingMember, setEditingMember] = useState<UIMember | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editEmail, setEditEmail] = useState('');
+  
   // Members Tab State
-  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
+  const [members, setMembers] = useState<UIMember[]>([]);
+  const { user } = useAuth();
+  
   const [searchMember, setSearchMember] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    const unsub = subscribeToProjectsData(user.company_id, (data) => {
+      const colors = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
+      const mapped: UIMember[] = (data.members || []).map((m, i) => {
+        const initials = m.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        return {
+          id: m.id,
+          name: m.name,
+          email: m.email || '',
+          role: m.role || 'Viewer',
+          status: 'Active', // Mocked for now
+          lastActive: 'Recently', // Mocked for now
+          initials,
+          color: colors[i % colors.length]
+        };
+      });
+      setMembers(mapped);
+    });
+    return () => unsub();
+  }, [user]);
 
   // Roles Tab State
   const [roles, setRoles] = useState<Role[]>(MOCK_ROLES);
@@ -131,12 +172,37 @@ export default function TeamPage() {
     setSaveState('idle');
   }, [selectedRoleId, roles]);
 
-  const handleRoleChange = (memberId: string, newRole: string) => {
-    setMembers(prev => prev.map(m => m.id === memberId ? { ...m, role: newRole } : m));
+  const handleRoleChange = async (memberId: string, newRole: string) => {
+    if (!user?.company_id) return;
+    try {
+      await updateMember(user.company_id, memberId, { role: newRole });
+    } catch(err) {
+      console.error(err);
+    }
   };
 
-  const handleRemoveMember = (memberId: string) => {
-    setMembers(prev => prev.filter(m => m.id !== memberId));
+  const handleRemoveMember = async (memberId: string) => {
+    if (!user?.company_id) return;
+    try {
+      await deleteMember(user.company_id, memberId);
+    } catch(err) {
+      console.error(err);
+    }
+  };
+
+  const handleEditSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingMember || !user?.company_id || !editName.trim()) return;
+    
+    try {
+      await updateMember(user.company_id, editingMember.id, {
+        name: editName.trim(),
+        email: editEmail.trim(),
+      });
+      setEditingMember(null);
+    } catch (err) {
+      console.error('Failed to update member:', err);
+    }
   };
 
   const togglePermission = (mod: ModuleKey, perm: PermissionType) => {
@@ -172,30 +238,26 @@ export default function TeamPage() {
 
   const filteredActivity = MOCK_ACTIVITY.filter(a => filterAction === 'All' || a.action.includes(filterAction));
 
-  const handleInvite = (e: React.FormEvent) => {
+  const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteName || !inviteEmail) return;
+    if (!inviteName || !inviteEmail || !user?.company_id) return;
     
-    const initials = inviteName.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-    const colors = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
-    const color = colors[Math.floor(Math.random() * colors.length)];
-    
-    const newMember: Member = {
-      id: 'm' + Date.now(),
-      name: inviteName,
-      email: inviteEmail,
-      role: inviteRole,
-      status: 'Invited',
-      lastActive: 'Never',
-      initials,
-      color,
-    };
-    
-    setMembers([newMember, ...members]);
-    setIsInviteModalOpen(false);
-    setInviteName('');
-    setInviteEmail('');
-    setInviteRole('Viewer');
+    try {
+      await createMember(user.company_id, {
+        name: inviteName,
+        email: inviteEmail,
+        role: inviteRole,
+        avatar: '',
+        projectIds: []
+      });
+      
+      setIsInviteModalOpen(false);
+      setInviteName('');
+      setInviteEmail('');
+      setInviteRole('Viewer');
+    } catch(err) {
+      console.error(err);
+    }
   };
 
   return (
@@ -310,8 +372,8 @@ export default function TeamPage() {
                           </td>
                           <td className="p-4">
                             <Select value={m.role} onValueChange={(val) => handleRoleChange(m.id, val)}>
-                              <SelectTrigger className="h-8 text-xs font-bold border-slate-200 shadow-none bg-transparent hover:bg-slate-100 w-[130px]">
-                                <SelectValue />
+                              <SelectTrigger className="h-8 text-xs font-bold border-slate-200 dark:border-slate-800 shadow-none bg-transparent hover:bg-slate-100 dark:hover:bg-slate-800 w-[130px]">
+                                <SelectValue placeholder="Select role" />
                               </SelectTrigger>
                               <SelectContent>
                                 {roles.map(r => <SelectItem key={r.id} value={r.name} className="text-xs font-bold">{r.name}</SelectItem>)}
@@ -329,7 +391,18 @@ export default function TeamPage() {
                           <td className="p-4 text-xs font-medium text-slate-500">{m.lastActive}</td>
                           <td className="p-4 text-right">
                             <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"><Edit2 className="w-4 h-4" /></Button>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-600 hover:bg-blue-50"
+                                onClick={() => {
+                                  setEditName(m.name);
+                                  setEditEmail(m.email);
+                                  setEditingMember(m);
+                                }}
+                              >
+                                <Edit2 className="w-4 h-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50" onClick={() => handleRemoveMember(m.id)}><X className="w-4 h-4" /></Button>
                             </div>
                           </td>
@@ -549,6 +622,59 @@ export default function TeamPage() {
                   className="bg-purple-600 hover:bg-purple-700 text-white font-bold px-6 shadow-sm"
                 >
                   Send Invite
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Member Modal */}
+      {editingMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setEditingMember(null)}></div>
+          <div className="bg-white dark:bg-card rounded-2xl border shadow-xl w-full max-w-md relative z-10 animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between p-5 border-b border-slate-100 dark:border-slate-800">
+              <h3 className="text-lg font-black tracking-tight">Edit Member</h3>
+              <button onClick={() => setEditingMember(null)} className="text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 p-1.5 rounded-lg transition-colors">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="p-5 space-y-4">
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Full Name</label>
+                <Input 
+                  required
+                  placeholder="e.g. John Doe" 
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="h-11 bg-slate-50 dark:bg-slate-900/50"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-black text-slate-500 uppercase tracking-wider mb-2">Email Address</label>
+                <Input 
+                  type="email"
+                  placeholder="e.g. john@example.com" 
+                  value={editEmail}
+                  onChange={(e) => setEditEmail(e.target.value)}
+                  className="h-11 bg-slate-50 dark:bg-slate-900/50"
+                />
+              </div>
+              <div className="flex justify-end gap-3 pt-4 mt-6">
+                <Button 
+                  type="button" 
+                  variant="ghost"
+                  onClick={() => setEditingMember(null)}
+                  className="font-bold"
+                >
+                  Cancel
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 shadow-sm"
+                >
+                  Save Changes
                 </Button>
               </div>
             </form>
