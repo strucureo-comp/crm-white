@@ -22,16 +22,10 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { createContentItem, updateContentItem, deleteContentItem, subscribeToContentHub, ContentItem, Comment, HistoryEntry } from '@/lib/db/content-hub/api';
 
 // --- Types ---
-type Comment = { id: string; author: string; avatar: string; text: string; date: string };
-type HistoryEntry = { date: string; action: string; user: string };
-type ContentItem = {
-  id: string; title: string; type: string; campaign: string;
-  funnelStage: string; persona: string; author: string; owner: string;
-  lastEdited: string; status: string; priority: string; dueDate: string;
-  description: string; comments: Comment[]; history: HistoryEntry[];
-};
 type StageInfo = { id: string; label: string; dotColor: string; order: number; };
 
 // --- Constants & Data Setup ---
@@ -58,18 +52,26 @@ const DEFAULT_STAGES: StageInfo[] = [
   { id: 'Archived', label: 'Archived', dotColor: 'bg-muted-foreground', order: 6 },
 ];
 
-const FUNNELS = ['Awareness', 'Consideration', 'Decision', 'Retention'];
 const PERSONAS = ['Founder', 'CEO', 'Marketing Manager', 'Sales Manager', 'Agency Owner', 'Developer', 'Customer'];
-const CAMPAIGNS = ['Summer Product Launch 2026', 'Inbound SEO Engine', 'Customer Success Highlights', 'SaaS Growth Playbook', 'Lead Gen Q2', 'Re-engagement Campaign'];
 
 const INITIAL_DATA: ContentItem[] = [];
 
 export default function ContentHubPage() {
+  const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
   // Global State
   const [items, setItems] = useState<ContentItem[]>(INITIAL_DATA);
+  
+  useEffect(() => {
+    if (!user?.company_id) return;
+    const unsubscribe = subscribeToContentHub(user.company_id, (data) => {
+      setItems(data);
+      setSelectedItem(prev => data.find(i => i.id === prev?.id) || null);
+    });
+    return () => unsubscribe();
+  }, [user?.company_id]);
   const [stages, setStages] = useState<StageInfo[]>(DEFAULT_STAGES);
   const [activeTab, setActiveTab] = useState('pipeline');
 
@@ -94,11 +96,10 @@ export default function ContentHubPage() {
   // Form State
   const [formTitle, setFormTitle] = useState('');
   const [formType, setFormType] = useState('Blog');
-  const [formCampaign, setFormCampaign] = useState(CAMPAIGNS[0]);
+  const [formCampaign, setFormCampaign] = useState('');
   const [formPriority, setFormPriority] = useState('Medium');
   const [formStage, setFormStage] = useState('Ideas');
   const [formDescription, setFormDescription] = useState('');
-  const [formFunnel, setFormFunnel] = useState(FUNNELS[0]);
   const [formPersona, setFormPersona] = useState(PERSONAS[0]);
   const [formDueDate, setFormDueDate] = useState('');
 
@@ -110,6 +111,7 @@ export default function ContentHubPage() {
   const [commentText, setCommentText] = useState('');
 
   // --- Derived Data ---
+  const uniqueCampaigns = useMemo(() => Array.from(new Set(items.map(i => i.campaign).filter(Boolean))), [items]);
   const inReviewCount = items.filter(i => i.status === 'In Review').length;
 
   const pipelineItems = useMemo(() => {
@@ -125,30 +127,30 @@ export default function ContentHubPage() {
       const matchesSearch = item.title.toLowerCase().includes(libSearch.toLowerCase());
       const matchesType = libType === 'all' || item.type === libType;
       const matchesStage = libStage === 'all' || item.status === libStage;
-      const matchesFunnel = libFunnel === 'all' || item.funnelStage === libFunnel;
       const matchesPersona = libPersona === 'all' || item.persona === libPersona;
-      return matchesSearch && matchesType && matchesStage && matchesFunnel && matchesPersona;
+      return matchesSearch && matchesType && matchesStage && matchesPersona;
     });
-  }, [items, libSearch, libType, libStage, libFunnel, libPersona]);
+  }, [items, libSearch, libType, libStage, libPersona]);
 
   const approvalItems = useMemo(() => {
     return items.filter(item => item.status === 'In Review');
   }, [items]);
 
   // --- Functions ---
-  const updateItemStatus = (id: string, newStatus: string, actionNote: string) => {
-    setItems(prev => prev.map(i => i.id === id ? {
-      ...i, 
-      status: newStatus,
-      history: [{ date: new Date().toISOString().split('T')[0], action: actionNote, user: 'Current User' }, ...i.history]
-    } : i));
+  const updateItemStatus = async (id: string, newStatus: string, actionNote: string) => {
+    if (!user?.company_id) return;
+    const item = items.find(i => i.id === id);
+    if (!item) return;
     
-    if (selectedItem?.id === id) {
-      setSelectedItem(prev => prev ? {
-        ...prev, 
+    const newHistory = [{ date: new Date().toISOString().split('T')[0], action: actionNote, user: 'Current User' }, ...(item.history || [])];
+    
+    try {
+      await updateContentItem(user.company_id, id, {
         status: newStatus,
-        history: [{ date: new Date().toISOString().split('T')[0], action: actionNote, user: 'Current User' }, ...prev.history]
-      } : null);
+        history: newHistory
+      });
+    } catch (e) {
+      toast.error('Failed to update status');
     }
   };
 
@@ -195,94 +197,85 @@ export default function ContentHubPage() {
       setFormPriority(item.priority);
       setFormStage(item.status);
       setFormDescription(item.description);
-      setFormFunnel(item.funnelStage);
       setFormPersona(item.persona);
       setFormDueDate(item.dueDate);
     } else {
       setEditingItem(null);
       setFormTitle('');
       setFormType('Blog');
-      setFormCampaign(CAMPAIGNS[0]);
+      setFormCampaign('');
       setFormPriority('Medium');
       setFormStage('Ideas');
       setFormDescription('');
-      setFormFunnel(FUNNELS[0]);
       setFormPersona(PERSONAS[0]);
       setFormDueDate('');
     }
     setIsCreateModalOpen(true);
   };
 
-  const saveContentItem = () => {
+  const saveContentItem = async () => {
+    if (!user?.company_id) return;
     if (!formTitle.trim()) {
       toast.error('Title is required');
       return;
     }
 
-    if (editingItem) {
-      setItems(prev => prev.map(i => i.id === editingItem.id ? {
-        ...i,
-        title: formTitle,
-        type: formType,
-        campaign: formCampaign,
-        priority: formPriority,
-        status: formStage,
-        description: formDescription,
-        funnelStage: formFunnel,
-        persona: formPersona,
-        dueDate: formDueDate,
-        lastEdited: new Date().toISOString().split('T')[0],
-        history: [{ date: new Date().toISOString().split('T')[0], action: 'Updated details', user: 'Current User' }, ...i.history]
-      } : i));
-      if (selectedItem && selectedItem.id === editingItem.id) {
-        setSelectedItem({
-          ...selectedItem,
+    try {
+      if (editingItem && editingItem.id) {
+        const newHistory = [{ date: new Date().toISOString().split('T')[0], action: 'Updated details', user: 'Current User' }, ...(editingItem.history || [])];
+        await updateContentItem(user.company_id, editingItem.id, {
           title: formTitle,
           type: formType,
           campaign: formCampaign,
           priority: formPriority,
           status: formStage,
           description: formDescription,
-          funnelStage: formFunnel,
           persona: formPersona,
           dueDate: formDueDate,
-          history: [{ date: new Date().toISOString().split('T')[0], action: 'Updated details', user: 'Current User' }, ...selectedItem.history]
+          lastEdited: new Date().toISOString().split('T')[0],
+          history: newHistory
         });
+        toast.success('Content updated');
+      } else {
+        const newItem = {
+          title: formTitle,
+          type: formType,
+          campaign: formCampaign,
+          priority: formPriority,
+          status: formStage,
+          description: formDescription,
+          persona: formPersona,
+          author: 'Current User',
+          owner: 'Current User',
+          lastEdited: new Date().toISOString().split('T')[0],
+          dueDate: formDueDate,
+          comments: [],
+          history: [{ date: new Date().toISOString().split('T')[0], action: 'Created item', user: 'Current User' }]
+        };
+        await createContentItem(user.company_id, newItem);
+        toast.success('Content created');
       }
-      toast.success('Content updated');
-    } else {
-      const newItem: ContentItem = {
-        id: Date.now().toString(),
-        title: formTitle,
-        type: formType,
-        campaign: formCampaign,
-        priority: formPriority,
-        status: formStage,
-        description: formDescription,
-        funnelStage: formFunnel,
-        persona: formPersona,
-        author: 'Current User',
-        owner: 'Current User',
-        lastEdited: new Date().toISOString().split('T')[0],
-        dueDate: formDueDate,
-        comments: [],
-        history: [{ date: new Date().toISOString().split('T')[0], action: 'Created item', user: 'Current User' }]
-      };
-      setItems(prev => [...prev, newItem]);
-      toast.success('Content created');
+      setIsCreateModalOpen(false);
+    } catch (e) {
+      toast.error('Failed to save content');
     }
-    setIsCreateModalOpen(false);
   };
 
-  const deleteItem = (id: string) => {
-    setItems(prev => prev.filter(i => i.id !== id));
-    toast.success('Content deleted');
-    if (selectedItem?.id === id) setIsDetailDrawerOpen(false);
-    if (editingItem?.id === id) setIsCreateModalOpen(false);
+  const deleteItem = async (id: string) => {
+    if (!user?.company_id) return;
+    try {
+      await deleteContentItem(user.company_id, id);
+      toast.success('Content deleted');
+      if (selectedItem?.id === id) setIsDetailDrawerOpen(false);
+      if (editingItem?.id === id) setIsCreateModalOpen(false);
+    } catch (e) {
+      toast.error('Failed to delete content');
+    }
   };
 
-  const addComment = () => {
-    if (!commentText.trim() || !selectedItem) return;
+  const addComment = async () => {
+    if (!user?.company_id || !commentText.trim() || !selectedItem || !selectedItem.id) return;
+    
     const newComment: Comment = {
       id: Date.now().toString(),
       author: 'Current User',
@@ -291,19 +284,19 @@ export default function ContentHubPage() {
       date: new Date().toISOString().split('T')[0]
     };
     
-    setItems(prev => prev.map(i => i.id === selectedItem.id ? {
-      ...i, 
-      comments: [...i.comments, newComment],
-      history: [{ date: new Date().toISOString().split('T')[0], action: 'Added comment', user: 'Current User' }, ...i.history]
-    } : i));
-    
-    setSelectedItem(prev => prev ? {
-      ...prev, 
-      comments: [...prev.comments, newComment],
-      history: [{ date: new Date().toISOString().split('T')[0], action: 'Added comment', user: 'Current User' }, ...prev.history]
-    } : null);
-    
-    setCommentText('');
+    try {
+      const newComments = [...(selectedItem.comments || []), newComment];
+      const newHistory = [{ date: new Date().toISOString().split('T')[0], action: 'Added comment', user: 'Current User' }, ...(selectedItem.history || [])];
+      
+      await updateContentItem(user.company_id, selectedItem.id, {
+        comments: newComments,
+        history: newHistory
+      });
+      
+      setCommentText('');
+    } catch (e) {
+      toast.error('Failed to add comment');
+    }
   };
 
   const approveAsset = (item: ContentItem) => {
@@ -326,7 +319,6 @@ export default function ContentHubPage() {
     setLibSearch('');
     setLibType('all');
     setLibStage('all');
-    setLibFunnel('all');
     setLibPersona('all');
   };
 
@@ -405,7 +397,7 @@ export default function ContentHubPage() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">All Campaigns</SelectItem>
-                  {CAMPAIGNS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {uniqueCampaigns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -461,7 +453,7 @@ export default function ContentHubPage() {
                                       className={`flex-1 overflow-y-auto space-y-3 min-h-[150px] transition-colors rounded-lg p-1 ${snapshot.isDraggingOver ? 'bg-primary/5' : ''}`}
                                     >
                                       {stageItems.map((item, itemIndex) => (
-                                        <Draggable key={item.id} draggableId={item.id} index={itemIndex}>
+                                        <Draggable key={item.id!} draggableId={item.id!} index={itemIndex}>
                                           {(provided, snapshot) => (
                                             <Card
                                               ref={provided.innerRef}
@@ -590,10 +582,6 @@ export default function ContentHubPage() {
                 <SelectTrigger className="w-[140px] h-9 bg-background"><SelectValue placeholder="All Stages" /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All Stages</SelectItem>{stages.map(s => <SelectItem key={s.id} value={s.id}>{s.label}</SelectItem>)}</SelectContent>
               </Select>
-              <Select value={libFunnel} onValueChange={setLibFunnel}>
-                <SelectTrigger className="w-[140px] h-9 bg-background"><SelectValue placeholder="All Funnels" /></SelectTrigger>
-                <SelectContent><SelectItem value="all">All Funnels</SelectItem>{FUNNELS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}</SelectContent>
-              </Select>
               <Select value={libPersona} onValueChange={setLibPersona}>
                 <SelectTrigger className="w-[140px] h-9 bg-background"><SelectValue placeholder="All Personas" /></SelectTrigger>
                 <SelectContent><SelectItem value="all">All Personas</SelectItem>{PERSONAS.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}</SelectContent>
@@ -620,7 +608,7 @@ export default function ContentHubPage() {
                     {libraryItems.map(item => {
                       const stageDef = stages.find(s => s.id === item.status);
                       return (
-                        <tr key={item.id} className="hover:bg-muted/30 transition-colors cursor-pointer group" onClick={() => { setSelectedItem(item); setIsDetailDrawerOpen(true); }}>
+                        <tr key={item.id!} className="hover:bg-muted/30 transition-colors cursor-pointer group" onClick={() => { setSelectedItem(item); setIsDetailDrawerOpen(true); }}>
                           <td className="px-4 py-3">
                             <p className="font-semibold text-foreground leading-tight group-hover:text-primary transition-colors">{item.title}</p>
                             <p className="text-xs text-muted-foreground font-mono mt-0.5 opacity-70">ID: {item.id}</p>
@@ -632,7 +620,7 @@ export default function ContentHubPage() {
                           </td>
                           <td className="px-4 py-3">
                             <p className="font-medium text-foreground text-sm leading-tight">{item.campaign}</p>
-                            <p className="text-[11px] text-muted-foreground mt-0.5">{item.funnelStage} &bull; {item.persona}</p>
+                            <p className="text-[11px] text-muted-foreground mt-0.5">{item.persona}</p>
                           </td>
                           <td className="px-4 py-3">
                             <div className="flex items-center gap-1.5">
@@ -654,7 +642,7 @@ export default function ContentHubPage() {
                               <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-primary" onClick={() => openCreateModal(item)}>
                                 <Pencil size={14} />
                               </Button>
-                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => deleteItem(item.id)}>
+                              <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-500" onClick={() => deleteItem(item.id!)}>
                                 <Trash2 size={14} />
                               </Button>
                             </div>
@@ -808,10 +796,6 @@ export default function ContentHubPage() {
                         <p className="text-sm font-semibold text-foreground">{selectedItem.persona}</p>
                       </div>
                       <div className="space-y-1.5 border-l-2 pl-3 border-muted hover:border-primary/50 transition-colors">
-                        <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Funnel Stage</span>
-                        <p className="text-sm font-semibold text-foreground">{selectedItem.funnelStage}</p>
-                      </div>
-                      <div className="space-y-1.5 border-l-2 pl-3 border-muted hover:border-primary/50 transition-colors">
                         <span className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Workflow Status</span>
                         <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
                           <span className={`w-2 h-2 rounded-full ${stages.find(s => s.id === selectedItem.status)?.dotColor}`}></span>
@@ -955,21 +939,7 @@ export default function ContentHubPage() {
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Campaign</Label>
-                <Select value={formCampaign} onValueChange={setFormCampaign}>
-                  <SelectTrigger className="bg-background focus:ring-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {CAMPAIGNS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Funnel Stage</Label>
-                <Select value={formFunnel} onValueChange={setFormFunnel}>
-                  <SelectTrigger className="bg-background focus:ring-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {FUNNELS.map(f => <SelectItem key={f} value={f}>{f}</SelectItem>)}
-                  </SelectContent>
-                </Select>
+                <Input value={formCampaign} onChange={(e) => setFormCampaign(e.target.value)} placeholder="e.g. Summer Launch" className="bg-background focus-visible:ring-1" />
               </div>
               <div className="space-y-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Persona</Label>
