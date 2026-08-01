@@ -12,13 +12,11 @@ import { Badge } from '@/components/ui/badge';
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import { subscribeToCalendarEvents, createCalendarEvent, CalendarEvent as DBCalendarEvent } from '@/lib/db/calendar/api';
-import { Task as DBTask, subscribeToTasksData } from '@/lib/db/tasks/api';
 import { Member, subscribeToProjectsData } from '@/lib/db/projects/api';
 
 // --- Data Schemas ---
 // We will use the DB types, but we'll export/re-map them for this page if needed.
 export type CalendarEvent = DBCalendarEvent;
-export type Task = DBTask;
 
 const EVENT_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
@@ -29,7 +27,6 @@ export default function CalendarAgendaPage() {
   const [view, setView] = useState<ViewType>('Month');
   
   const [events, setEvents] = useState<CalendarEvent[]>([]);
-  const [tasks, setTasks] = useState<Task[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
 
   // Subscriptions
@@ -37,14 +34,12 @@ export default function CalendarAgendaPage() {
     if (!user?.company_id) return;
     
     const unsubEvents = subscribeToCalendarEvents(user.company_id, setEvents);
-    const unsubTasks = subscribeToTasksData(user.company_id, (data) => setTasks(data.tasks));
     const unsubMembers = subscribeToProjectsData(user.company_id, (data) => {
       setMembers(data.members || []);
     });
 
     return () => {
       unsubEvents();
-      unsubTasks();
       unsubMembers();
     };
   }, [user]);
@@ -133,7 +128,6 @@ export default function CalendarAgendaPage() {
   }, [currentMonth, adjustedOffset, daysInCurrentMonth]);
 
   const selectedDayEvents = events.filter(e => e.date === selectedDate).sort((a,b) => a.time.localeCompare(b.time));
-  const selectedDayTasks = tasks.filter(t => t.dueDate === selectedDate);
   
   const upcoming7DaysEvents = useMemo(() => {
     const start = new Date(selectedDate);
@@ -225,8 +219,7 @@ export default function CalendarAgendaPage() {
                     
                     const isSelected = selectedDate === cell.dateStr;
                     const cellEvents = events.filter(e => e.date === cell.dateStr);
-                    const cellTasks = tasks.filter(t => t.dueDate === cell.dateStr);
-                    const allItems = [...cellEvents.map(e => ({...e, isTask: false})), ...cellTasks.map(t => ({...t, isTask: true}))];
+                    const allItems = [...cellEvents.map(e => ({...e, isTask: false}))];
                     const displayItems = allItems.slice(0, 3);
                     const hasMore = allItems.length > 3;
 
@@ -250,12 +243,6 @@ export default function CalendarAgendaPage() {
                         
                         <div className="flex-1 flex flex-col gap-1 overflow-hidden">
                           {displayItems.map((item, i) => (
-                            item.isTask ? (
-                              <div key={`t-${item.id}`} className="flex items-center gap-1.5 px-1.5 py-1 rounded bg-blue-50/50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/50 text-[9px] font-bold text-blue-800 dark:text-blue-300 truncate">
-                                <div className="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0" />
-                                <span className="truncate">{item.title}</span>
-                              </div>
-                            ) : (
                               <div 
                                 key={`e-${item.id}`} 
                                 className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:opacity-80 text-[9px] font-bold text-gray-800 dark:text-gray-200 truncate border"
@@ -266,7 +253,6 @@ export default function CalendarAgendaPage() {
                                 <span className="font-semibold text-muted-foreground shrink-0">{(item as CalendarEvent).time}</span>
                                 <span className="truncate" style={{ color: (item as CalendarEvent).color }}>{(item as CalendarEvent).title}</span>
                               </div>
-                            )
                           ))}
                           {hasMore && <div className="text-[9px] font-bold text-muted-foreground text-center mt-auto hover:text-foreground">{allItems.length - 3} More ▾</div>}
                         </div>
@@ -298,22 +284,10 @@ export default function CalendarAgendaPage() {
               <p className="text-xs font-bold text-purple-600 dark:text-purple-400 mt-1">{new Date(selectedDate).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric', year: 'numeric' })}</p>
             </CardHeader>
             <CardContent className="p-0 divide-y divide-border/50">
-              {selectedDayEvents.length === 0 && selectedDayTasks.length === 0 && (
+              {selectedDayEvents.length === 0 && (
                 <div className="p-6 text-center text-xs font-medium italic text-muted-foreground">No events scheduled.</div>
               )}
               
-              {selectedDayTasks.map(t => (
-                <div key={t.id} className="p-4 flex flex-col border-l-4 border-l-blue-500 hover:bg-muted/10 transition-colors">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="w-4 h-4 text-blue-500 shrink-0" />
-                      <span className="text-sm font-bold text-foreground leading-tight">{t.title}</span>
-                    </div>
-                  </div>
-                  <Badge variant="outline" className="w-fit mt-2 bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800 text-[9px] uppercase font-bold">Task Due</Badge>
-                </div>
-              ))}
-
               {selectedDayEvents.map(e => (
                 <div key={e.id} className="p-4 flex flex-col hover:bg-muted/10 transition-colors cursor-pointer group" style={{ borderLeft: `4px solid ${e.color}` }} onClick={() => setViewingEvent(e)}>
                   <div className="flex items-start justify-between gap-2">
