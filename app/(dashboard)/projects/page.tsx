@@ -19,41 +19,14 @@ import { toast } from 'sonner';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-// --- Data Schemas ---
-export type ProjectStatus = 'Kick-off' | 'Planning' | 'Implementation' | 'Review' | 'Closing';
-export type TaskStatus = 'To Do' | 'Done';
-export type TaskPriority = 'Normal' | 'High' | 'Urgent';
-
-export interface Project {
-  id: string;
-  name: string;
-  status: ProjectStatus;
-  color: string;
-  members: string[]; // Member IDs
-  linkedDeal: string | null;
-  emoji: string;
-  startDate: string;
-  endDate: string;
-  budget: { est: number; actual: number; };
-  progress: number;
-}
-
-export interface Member {
-  id: string;
-  name: string;
-  avatar: string; // 2-letter initials
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  projectId: string;
-  owner: string; // Member ID
-  status: TaskStatus;
-  priority: TaskPriority;
-  due: string;
-  phase: ProjectStatus;
-}
+import { useAuth } from '@/lib/firebase/auth-context';
+import { 
+  ProjectStatus, TaskStatus, TaskPriority, 
+  Project, Member, Task, ProjectsData,
+  subscribeToProjectsData, createProject, updateProject, deleteProject,
+  createTask, updateTask, deleteTask,
+  createMember, updateMember, deleteMember
+} from '@/lib/db/projects/api';
 
 const COLUMNS: ProjectStatus[] = ['Kick-off', 'Planning', 'Implementation', 'Review', 'Closing'];
 
@@ -99,19 +72,34 @@ const CircularProgress = ({ progress, color }: { progress: number, color: string
 };
 
 export default function ProjectsPage() {
+  const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
-  // State
-  const [projects, setProjects] = useState<Project[]>(MOCK_PROJECTS);
-  const [members, setMembers] = useState<Member[]>(MOCK_MEMBERS);
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+  const [tasks, setTasks] = useState<Task[]>([]);
   
   const [search, setSearch] = useState('');
   
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    const unsubscribe = subscribeToProjectsData(user.company_id, (data: ProjectsData) => {
+      setProjects(data.projects);
+      setMembers(data.members);
+      setTasks(data.tasks);
+      
+      // Update selected project if it exists so overlay stays current
+      if (selectedProject) {
+        setSelectedProject(prev => data.projects.find(p => p.id === prev?.id) || null);
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.company_id, selectedProject?.id]);
   
   // Overlay Tabs
   const [activeTab, setActiveTab] = useState<'Plan' | 'Files' | 'Notes' | 'Emails' | 'Documents'>('Plan');
@@ -134,24 +122,27 @@ export default function ProjectsPage() {
   const filteredProjects = projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
 
   // Handlers
-  const onDragEnd = (result: DropResult) => {
+  const onDragEnd = async (result: DropResult) => {
     const { source, destination, draggableId } = result;
     if (!destination) return;
     if (source.droppableId === destination.droppableId) return;
 
-    setProjects(prev => prev.map(p => 
-      p.id === draggableId ? { ...p, status: destination.droppableId as ProjectStatus } : p
-    ));
-    toast.success(`Moved to ${destination.droppableId}`);
+    if (!user?.company_id) return;
+    try {
+      await updateProject(user.company_id, draggableId, { status: destination.droppableId as ProjectStatus });
+      toast.success(`Moved to ${destination.droppableId}`);
+    } catch (e) {
+      toast.error('Failed to move project');
+    }
   };
 
-  const handleCreateProject = () => {
+  const handleCreateProject = async () => {
+    if (!user?.company_id) return;
     if (!formName.trim()) return toast.error('Project name is required');
     
-    const newProject: Project = {
-      id: Date.now().toString(),
+    const newProject = {
       name: formName,
-      status: 'Kick-off',
+      status: 'Kick-off' as ProjectStatus,
       color: formColor,
       members: formMembers,
       linkedDeal: null,
@@ -162,55 +153,67 @@ export default function ProjectsPage() {
       progress: 0
     };
     
-    setProjects(prev => [...prev, newProject]);
-    setIsCreateOpen(false);
-    toast.success('Project created successfully');
-    
-    // Reset
-    setFormName('');
-    setFormColor('#6366f1');
-    setFormBudget('10000');
-    setFormMembers([]);
+    try {
+      await createProject(user.company_id, newProject);
+      setIsCreateOpen(false);
+      toast.success('Project created successfully');
+      
+      // Reset
+      setFormName('');
+      setFormColor('#6366f1');
+      setFormBudget('10000');
+      setFormMembers([]);
+    } catch (e) {
+      toast.error('Failed to create project');
+    }
   };
 
-  const handleAddNewMember = (e: React.MouseEvent) => {
+  const handleAddNewMember = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (!user?.company_id) return;
     if (!newMemberName.trim()) return;
     
-    const newMemb: Member = {
-      id: `m${Date.now()}`,
+    const newMemb = {
       name: newMemberName,
       avatar: newMemberName.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase() || 'U'
     };
     
-    setMembers(prev => [...prev, newMemb]);
-    setFormMembers(prev => [...prev, newMemb.id]);
-    setNewMemberName('');
+    try {
+      const newId = await createMember(user.company_id, newMemb);
+      if (newId) setFormMembers(prev => [...prev, newId]);
+      setNewMemberName('');
+    } catch (err) {
+      toast.error('Failed to add member');
+    }
   };
 
-  const handleCreateTask = (phase: ProjectStatus) => {
+  const handleCreateTask = async (phase: ProjectStatus) => {
+    if (!user?.company_id) return;
     if (!taskFormTitle.trim()) return toast.error('Task title is required');
     if (!taskFormOwner) return toast.error('Assignee is required');
     
-    const newTask: Task = {
-      id: `t${Date.now()}`,
+    const newTask = {
       title: taskFormTitle,
       projectId: selectedProject!.id,
       owner: taskFormOwner,
-      status: 'To Do',
+      status: 'To Do' as TaskStatus,
       priority: taskFormPriority,
       due: taskFormDue || 'No due date',
       phase
     };
     
-    setTasks(prev => [...prev, newTask]);
-    setAddingTaskPhase(null);
-    setTaskFormTitle('');
-    setTaskFormOwner('');
-    setTaskFormDue('');
-    setTaskFormPriority('Normal');
-    toast.success('Task created successfully');
+    try {
+      await createTask(user.company_id, newTask);
+      setAddingTaskPhase(null);
+      setTaskFormTitle('');
+      setTaskFormOwner('');
+      setTaskFormDue('');
+      setTaskFormPriority('Normal');
+      toast.success('Task created successfully');
+    } catch (e) {
+      toast.error('Failed to create task');
+    }
   };
 
   const toggleFormMember = (id: string, e: React.MouseEvent) => {
