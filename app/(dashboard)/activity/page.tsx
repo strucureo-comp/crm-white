@@ -145,7 +145,6 @@ export default function ActivityPage() {
         entity_type: formState.type,
         user_id: user?.id || 'demo-user',
         user_name: user?.full_name || 'Demo User',
-        company_id: user?.company_id || '',
         title: formState.title,
         date: formState.date,
         time: formState.time,
