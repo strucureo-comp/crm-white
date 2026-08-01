@@ -9,10 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import { subscribeToCalendarEvents, createCalendarEvent, CalendarEvent as DBCalendarEvent } from '@/lib/db/calendar/api';
-import { Member, subscribeToProjectsData } from '@/lib/db/projects/api';
+import { Member, Project, subscribeToProjectsData, createMember } from '@/lib/db/projects/api';
 
 // --- Data Schemas ---
 // We will use the DB types, but we'll export/re-map them for this page if needed.
@@ -29,6 +32,8 @@ export default function CalendarAgendaPage() {
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
 
+  const [projects, setProjects] = useState<Project[]>([]);
+
   // Subscriptions
   React.useEffect(() => {
     if (!user?.company_id) return;
@@ -36,6 +41,7 @@ export default function CalendarAgendaPage() {
     const unsubEvents = subscribeToCalendarEvents(user.company_id, setEvents);
     const unsubMembers = subscribeToProjectsData(user.company_id, (data) => {
       setMembers(data.members || []);
+      setProjects(data.projects || []);
     });
 
     return () => {
@@ -58,8 +64,31 @@ export default function CalendarAgendaPage() {
   const [formTime, setFormTime] = useState('09:00');
   const [formColor, setFormColor] = useState(EVENT_COLORS[0]);
   const [formAttendees, setFormAttendees] = useState<string[]>([]);
+  const [formProject, setFormProject] = useState('');
+  const [attendeesPopoverOpen, setAttendeesPopoverOpen] = useState(false);
+  const [newMemberName, setNewMemberName] = useState('');
 
-  // Handlers
+  const handleAddMember = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!newMemberName.trim() || !user?.company_id) return;
+    try {
+      const newId = await createMember(user.company_id, {
+        name: newMemberName.trim(),
+        role: 'Member',
+        email: '',
+        avatar: '',
+        projectIds: []
+      });
+      if (newId) {
+        setFormAttendees(prev => [...prev, newId]);
+        setNewMemberName('');
+      }
+    } catch(err) {
+      console.error('Failed to create member:', err);
+    }
+  };
+
   const handleCreateEvent = async () => {
     if(!user?.company_id || !formTitle.trim()) return;
     
@@ -68,7 +97,8 @@ export default function CalendarAgendaPage() {
       date: formDate || new Date().toISOString().split('T')[0],
       time: formTime,
       color: formColor,
-      attendees: formAttendees.length > 0 ? formAttendees : (members.length > 0 ? [members[0].id] : [])
+      attendees: formAttendees.length > 0 ? formAttendees : (members.length > 0 ? [members[0].id] : []),
+      linkedRecord: formProject ? { type: 'project', id: formProject } : null
     };
     
     try {
@@ -81,6 +111,7 @@ export default function CalendarAgendaPage() {
       setFormTime('09:00');
       setFormColor(EVENT_COLORS[0]);
       setFormAttendees([]);
+      setFormProject('');
     } catch (e) {
       console.error("Failed to create event", e);
     }
@@ -434,10 +465,21 @@ export default function CalendarAgendaPage() {
 
             <div className="space-y-2">
               <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Link to Project (Optional)</label>
-              <Select>
-                <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-bold focus:ring-purple-500"><SelectValue placeholder="Select a project..." /></SelectTrigger>
-                <SelectContent><SelectItem value="Alpha">Alpha Redesign</SelectItem><SelectItem value="Beta">Beta Launch</SelectItem></SelectContent>
-              </Select>
+              <Input 
+                list="project-suggestions"
+                placeholder="Type or select a project..." 
+                className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-bold focus-visible:ring-purple-500" 
+                value={formProject} 
+                onChange={e => setFormProject(e.target.value)} 
+              />
+              <datalist id="project-suggestions">
+                {Array.from(new Set([
+                  ...projects.map(p => p.name),
+                  ...events.map(e => e.linkedRecord?.id).filter(Boolean) as string[]
+                ])).map(projName => (
+                  <option key={projName} value={projName} />
+                ))}
+              </datalist>
             </div>
 
             <div className="space-y-2 pt-1">
@@ -456,26 +498,72 @@ export default function CalendarAgendaPage() {
 
             <div className="space-y-3 pt-2">
               <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider block border-b border-purple-100 dark:border-slate-800 pb-2">Attendees</label>
-              <div className="max-h-40 overflow-y-auto space-y-1">
-                {members.map(m => (
-                  <label key={m.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-purple-50 dark:hover:bg-slate-800 cursor-pointer transition-colors">
-                    <input 
-                      type="checkbox" 
-                      className="rounded border-purple-300 text-purple-600 focus:ring-purple-500" 
-                      checked={formAttendees.includes(m.id)}
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setFormAttendees(prev => [...prev, m.id]);
-                        } else {
-                          setFormAttendees(prev => prev.filter(id => id !== m.id));
+              
+              <Popover open={attendeesPopoverOpen} onOpenChange={setAttendeesPopoverOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-bold focus-visible:ring-purple-500">
+                    {formAttendees.length > 0 ? (
+                      <div className="flex -space-x-2 mr-2">
+                        {formAttendees.slice(0, 3).map(id => {
+                          const m = members.find(x => x.id === id);
+                          if (!m) return null;
+                          return (
+                            <Avatar key={id} className="w-6 h-6 border-2 border-white dark:border-slate-800">
+                              <AvatarFallback className="bg-purple-100 dark:bg-slate-800 text-[9px] text-purple-700 dark:text-slate-300 font-bold">{m.avatar || m.name.substring(0,2).toUpperCase()}</AvatarFallback>
+                            </Avatar>
+                          )
+                        })}
+                        {formAttendees.length > 3 && (
+                          <div className="w-6 h-6 rounded-full bg-slate-100 dark:bg-slate-800 border-2 border-white dark:border-slate-800 flex items-center justify-center text-[9px] font-bold text-slate-500">+{formAttendees.length - 3}</div>
+                        )}
+                      </div>
+                    ) : (
+                      <Users className="w-4 h-4 mr-2 text-purple-400 dark:text-slate-500" />
+                    )}
+                    {formAttendees.length > 0 ? `${formAttendees.length} selected` : 'Select attendees...'}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-[300px] p-2 bg-[#121212] dark:bg-[#121212] border-slate-800 rounded-2xl shadow-xl flex flex-col gap-1" align="start">
+                  <div className="max-h-48 overflow-y-auto pr-1 space-y-1">
+                    {members.map(m => {
+                      const isSelected = formAttendees.includes(m.id);
+                      return (
+                        <div 
+                          key={m.id}
+                          className="flex items-center gap-3 p-2 rounded-xl hover:bg-white/5 cursor-pointer transition-colors"
+                          onClick={() => {
+                            if (isSelected) {
+                              setFormAttendees(prev => prev.filter(id => id !== m.id));
+                            } else {
+                              setFormAttendees(prev => [...prev, m.id]);
+                            }
+                          }}
+                        >
+                          <Avatar className="w-6 h-6 border-0"><AvatarFallback className="bg-slate-800 text-slate-300 text-[10px] font-bold">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                          <span className="text-sm font-bold text-white leading-none flex-1 truncate">{m.name}</span>
+                        </div>
+                      );
+                    })}
+                    {members.length === 0 && <div className="text-xs font-bold text-slate-500 p-2 text-center">No members found.</div>}
+                  </div>
+                  <div className="pt-2 mt-1 border-t border-slate-800 flex items-center gap-2">
+                    <Input 
+                      placeholder="New member name..." 
+                      className="h-8 bg-black/40 border-slate-800 text-xs text-white placeholder:text-slate-500 rounded-lg focus-visible:ring-purple-500 flex-1" 
+                      value={newMemberName} 
+                      onChange={e => setNewMemberName(e.target.value)} 
+                      onKeyDown={e => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddMember(e as any);
                         }
                       }}
                     />
-                    <Avatar className="w-7 h-7"><AvatarFallback className="bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-400 text-[10px] font-bold border border-purple-200 dark:border-slate-700">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
-                    <div className="flex flex-col"><span className="text-sm font-bold text-purple-950 dark:text-slate-200 leading-none mb-0.5">{m.name}</span><span className="text-[10px] font-semibold text-purple-600 dark:text-slate-400">{m.role || 'Member'}</span></div>
-                  </label>
-                ))}
-              </div>
+                    <Button size="sm" variant="secondary" className="h-8 text-xs font-bold bg-white text-black hover:bg-slate-200 rounded-lg shrink-0" onClick={handleAddMember}>Add</Button>
+                  </div>
+                </PopoverContent>
+              </Popover>
+
             </div>
           </div>
           
