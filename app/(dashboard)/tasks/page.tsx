@@ -5,7 +5,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { 
   Search, Plus, LayoutGrid, LayoutList, Kanban, Table as TableIcon, Calendar as CalendarIcon,
   CheckCircle2, AlertCircle, X, ChevronDown, MoreHorizontal, MessageSquare, Paperclip,
-  Trash2, Filter, Settings, Flag
+  Trash2, Filter, Settings, Flag, Check
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,32 +16,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { getTaskColumns, saveTaskColumns } from '@/lib/firebase/database';
-
-// --- Data Schemas ---
-export interface Assignee { id: string; name: string; avatar: string; email: string; }
-export interface SubTask { id: string; title: string; completed: boolean; }
-export interface Comment { id: string; author: string; avatar: string; text: string; timestamp: string; }
-export interface DealReference { name: string; value: string; stage: string; }
-export interface Attachment { id: string; name: string; size: string; type: string; }
-
-export type TaskPriority = 'Low' | 'Medium' | 'High' | 'Urgent';
-export type ViewType = 'Kanban' | 'Dashboard' | 'List' | 'Table' | 'Calendar';
-
-export interface Task {
-  id: string;
-  title: string;
-  description: string;
-  status: string; 
-  assignee: Assignee;
-  priority: TaskPriority;
-  dueDate: string; 
-  subtasks: SubTask[];
-  comments: Comment[];
-  labels: string[];
-  dealReference: DealReference | null;
-  attachments: Attachment[];
-}
+import { useAuth } from '@/lib/firebase/auth-context';
+import { 
+  Task, Assignee, SubTask, Comment, DealReference, Attachment, 
+  TaskPriority, ViewType, TasksData,
+  subscribeToTasksData, createTask, updateTask, deleteTask, saveTaskColumns 
+} from '@/lib/db/tasks/api';
 
 export interface DashboardWidget {
   id: string;
@@ -70,6 +50,7 @@ const PriorityStyle = (priority: TaskPriority) => {
 };
 
 export default function TaskManagerPage() {
+  const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
@@ -77,15 +58,16 @@ export default function TaskManagerPage() {
   const [columns, setColumns] = useState<string[]>(['To Do', 'In Progress', 'Review', 'Done']);
   const [isAddingColumn, setIsAddingColumn] = useState(false);
   const [newColumnName, setNewColumnName] = useState('');
-  const [tasks, setTasks] = useState<Task[]>(MOCK_TASKS);
+  const [tasks, setTasks] = useState<Task[]>([]);
 
   useEffect(() => {
-    async function loadColumns() {
-      const cols = await getTaskColumns();
-      if (cols && cols.length > 0) setColumns(cols);
-    }
-    loadColumns();
-  }, []);
+    if (!user?.company_id) return;
+    const unsubscribe = subscribeToTasksData(user.company_id, (data: TasksData) => {
+      setTasks(data.tasks);
+      setColumns(data.columns);
+    });
+    return () => unsubscribe();
+  }, [user?.company_id]);
   const [view, setView] = useState<ViewType>('Kanban');
   const [search, setSearch] = useState('');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -93,6 +75,18 @@ export default function TaskManagerPage() {
   // Modals
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
+
+  // Sync viewingTask with live updates
+  useEffect(() => {
+    if (viewingTask) {
+      const updated = tasks.find(t => t.id === viewingTask.id);
+      if (updated) setViewingTask(updated);
+    }
+  }, [tasks]);
+
+  // Subtask UI state
+  const [isAddingSubtask, setIsAddingSubtask] = useState(false);
+  const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
 
   // New Task Form State
   const [formTitle, setFormTitle] = useState('');
@@ -117,12 +111,12 @@ export default function TaskManagerPage() {
   }, [tasks, search, filterOwner, filterPriority]);
 
   // Handlers
-  const handleCreateTask = () => {
+  const handleCreateTask = async () => {
+    if (!user?.company_id) return;
     if (!formTitle.trim()) return toast.error('Task title is required');
     const assignee = MOCK_ASSIGNEES.find(a => a.id === formAssigneeId) || MOCK_ASSIGNEES[0];
     
-    const newTask: Task = {
-      id: `t${Date.now()}`,
+    const newTask = {
       title: formTitle,
       description: formDescription,
       status: formStatus,
@@ -136,52 +130,66 @@ export default function TaskManagerPage() {
       attachments: []
     };
     
-    setTasks(prev => [...prev, newTask]);
-    setIsNewTaskOpen(false);
-    toast.success('Task scheduled successfully');
-    
-    // Reset form
-    setFormTitle('');
-    setFormStatus('To Do');
-    setFormPriority('Medium');
-    setFormDate('');
-    setFormDescription('');
+    try {
+      await createTask(user.company_id, newTask);
+      setIsNewTaskOpen(false);
+      toast.success('Task scheduled successfully');
+      
+      // Reset form
+      setFormTitle('');
+      setFormStatus('To Do');
+      setFormPriority('Medium');
+      setFormDate('');
+      setFormDescription('');
+    } catch (e) {
+      toast.error('Failed to create task');
+    }
   };
 
   const handleSaveNewColumn = async () => {
+    if (!user?.company_id) return;
     const trimmed = newColumnName.trim();
     if (trimmed && !columns.includes(trimmed)) {
       const nextCols = [...columns, trimmed];
-      setColumns(nextCols);
-      setNewColumnName('');
-      setIsAddingColumn(false);
-      
-      const success = await saveTaskColumns(nextCols);
-      if (!success) toast.error('Failed to save column to backend');
-      else toast.success('Column added successfully');
+      const success = await saveTaskColumns(user.company_id, nextCols);
+      if (!success) {
+        toast.error('Failed to save column to backend');
+      } else {
+        toast.success('Column added successfully');
+        setNewColumnName('');
+        setIsAddingColumn(false);
+      }
     } else if (trimmed) {
       toast.error('Invalid or duplicate column name');
     }
   };
 
   const handleDeleteColumn = async (colToDelete: string) => {
+    if (!user?.company_id) return;
     const colTasks = tasks.filter(t => t.status === colToDelete);
     if (colTasks.length > 0) {
       if (!window.confirm(`There are ${colTasks.length} tasks in "${colToDelete}". Are you sure you want to delete this column?`)) return;
     }
     
     const nextCols = columns.filter(c => c !== colToDelete);
-    setColumns(nextCols);
-    const success = await saveTaskColumns(nextCols);
-    if (!success) toast.error('Failed to delete column from backend');
-    else toast.success(`Column "${colToDelete}" deleted`);
+    const success = await saveTaskColumns(user.company_id, nextCols);
+    if (!success) {
+      toast.error('Failed to delete column from backend');
+    } else {
+      toast.success(`Column "${colToDelete}" deleted`);
+    }
   };
 
-  const handleDragEnd = (result: DropResult) => {
+  const handleDragEnd = async (result: DropResult) => {
+    if (!user?.company_id) return;
     const { source, destination, draggableId } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
     
-    setTasks(prev => prev.map(t => t.id === draggableId ? { ...t, status: destination.droppableId } : t));
+    try {
+      await updateTask(user.company_id, draggableId, { status: destination.droppableId });
+    } catch (e) {
+      toast.error('Failed to move task');
+    }
   };
 
   const toggleTaskSelection = (id: string) => {
@@ -190,20 +198,70 @@ export default function TaskManagerPage() {
     setSelectedTaskIds(next);
   };
 
-  const handleBulkDelete = () => {
-    setTasks(prev => prev.filter(t => !selectedTaskIds.has(t.id)));
-    setSelectedTaskIds(new Set());
-    toast.success('Selected tasks deleted');
+  const handleBulkDelete = async () => {
+    if (!user?.company_id) return;
+    try {
+      const promises = Array.from(selectedTaskIds).map(id => deleteTask(user.company_id!, id));
+      await Promise.all(promises);
+      setSelectedTaskIds(new Set());
+      toast.success('Selected tasks deleted');
+    } catch (e) {
+      toast.error('Failed to delete tasks');
+    }
   };
 
-  const handleBulkStatusChange = (status: string) => {
-    setTasks(prev => prev.map(t => selectedTaskIds.has(t.id) ? { ...t, status } : t));
+  const handleBulkStatusChange = async (status: string) => {
+    if (!user?.company_id) return;
+    try {
+      const promises = Array.from(selectedTaskIds).map(id => updateTask(user.company_id!, id, { status }));
+      await Promise.all(promises);
+      toast.success(`Tasks moved to ${status}`);
+    } catch (e) {
+      toast.error('Failed to update task statuses');
+    }
     setSelectedTaskIds(new Set());
-    toast.success(`Tasks moved to ${status}`);
   };
 
-  const updateTaskField = (id: string, field: keyof Task, value: any) => {
-    setTasks(prev => prev.map(t => t.id === id ? { ...t, [field]: value } : t));
+  const handleAddSubtask = async () => {
+    if (!user?.company_id || !viewingTask) return;
+    if (!newSubtaskTitle.trim()) return;
+
+    const newSubtask = {
+      id: `st${Date.now()}`,
+      title: newSubtaskTitle.trim(),
+      completed: false
+    };
+
+    const nextSubtasks = [...(viewingTask.subtasks || []), newSubtask];
+    
+    try {
+      await updateTask(user.company_id, viewingTask.id, { subtasks: nextSubtasks });
+      setIsAddingSubtask(false);
+      setNewSubtaskTitle('');
+    } catch (e) {
+      toast.error('Failed to add subtask');
+    }
+  };
+
+  const toggleSubtaskCompletion = async (subtaskId: string) => {
+    if (!user?.company_id || !viewingTask) return;
+    const nextSubtasks = (viewingTask.subtasks || []).map(s => 
+      s.id === subtaskId ? { ...s, completed: !s.completed } : s
+    );
+    try {
+      await updateTask(user.company_id, viewingTask.id, { subtasks: nextSubtasks });
+    } catch (e) {
+      toast.error('Failed to update subtask');
+    }
+  };
+
+  const updateTaskField = async (id: string, field: keyof Task, value: any) => {
+    if (!user?.company_id) return;
+    try {
+      await updateTask(user.company_id, id, { [field]: value });
+    } catch (e) {
+      toast.error('Failed to update task');
+    }
   };
 
   const getCalendarDays = () => {
@@ -371,16 +429,16 @@ export default function TaskManagerPage() {
                                 >
                                   <CardContent className="p-4 space-y-3">
                                     <div className="flex gap-1 flex-wrap">
-                                      {task.labels.map(l => <Badge key={l} variant="secondary" className="text-[9px] px-1.5 py-0 bg-muted/80">{l}</Badge>)}
+                                      {task.labels?.map(l => <Badge key={l} variant="secondary" className="text-[9px] px-1.5 py-0 bg-muted/80">{l}</Badge>)}
                                     </div>
                                     <h4 className="font-bold text-sm leading-tight text-foreground">{task.title}</h4>
                                     <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{task.description}</p>
                                     
-                                    {(task.subtasks.length > 0 || task.comments.length > 0 || task.attachments.length > 0) && (
+                                    {((task.subtasks?.length || 0) > 0 || (task.comments?.length || 0) > 0 || (task.attachments?.length || 0) > 0) && (
                                       <div className="flex items-center gap-3 text-xs text-muted-foreground font-medium pt-1">
-                                        {task.subtasks.length > 0 && <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {task.subtasks.filter(s=>s.completed).length}/{task.subtasks.length}</span>}
-                                        {task.comments.length > 0 && <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {task.comments.length}</span>}
-                                        {task.attachments.length > 0 && <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" /> {task.attachments.length}</span>}
+                                        {(task.subtasks?.length || 0) > 0 && <span className="flex items-center gap-1"><CheckCircle2 className="w-3 h-3" /> {task.subtasks!.filter(s=>s.completed).length}/{task.subtasks!.length}</span>}
+                                        {(task.comments?.length || 0) > 0 && <span className="flex items-center gap-1"><MessageSquare className="w-3 h-3" /> {task.comments!.length}</span>}
+                                        {(task.attachments?.length || 0) > 0 && <span className="flex items-center gap-1"><Paperclip className="w-3 h-3" /> {task.attachments!.length}</span>}
                                       </div>
                                     )}
 
@@ -694,14 +752,47 @@ export default function TaskManagerPage() {
                     </div>
                   </div>
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between"><h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subtasks</h4><Button variant="ghost" size="sm" className="h-6 text-[10px]"><Plus className="w-3 h-3 mr-1"/> Add Subtask</Button></div>
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Subtasks</h4>
+                      <Button variant="ghost" size="sm" className="h-6 text-[10px]" onClick={() => setIsAddingSubtask(true)}>
+                        <Plus className="w-3 h-3 mr-1"/> Add Subtask
+                      </Button>
+                    </div>
                     <div className="bg-card border rounded-lg shadow-sm divide-y">
-                      {viewingTask.subtasks.length === 0 ? <p className="p-4 text-sm text-muted-foreground italic">No subtasks created.</p> : viewingTask.subtasks.map(s => (
-                        <div key={s.id} className="p-3 flex items-center gap-3">
-                          <input type="checkbox" checked={s.completed} readOnly className="rounded border-muted-foreground text-purple-600 focus:ring-purple-500 w-4 h-4" />
-                          <span className={`text-sm font-medium ${s.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{s.title}</span>
+                      {(viewingTask.subtasks?.length || 0) === 0 && !isAddingSubtask ? (
+                        <p className="p-4 text-sm text-muted-foreground italic">No subtasks created.</p>
+                      ) : (
+                        viewingTask.subtasks?.map(s => (
+                          <div key={s.id} className="p-3 flex items-center gap-3">
+                            <input 
+                              type="checkbox" 
+                              checked={s.completed} 
+                              onChange={() => toggleSubtaskCompletion(s.id)}
+                              className="rounded border-muted-foreground text-purple-600 focus:ring-purple-500 w-4 h-4 cursor-pointer" 
+                            />
+                            <span className={`text-sm font-medium ${s.completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{s.title}</span>
+                          </div>
+                        ))
+                      )}
+                      {isAddingSubtask && (
+                        <div className="p-3 flex items-center gap-3 bg-muted/20">
+                          <input type="checkbox" disabled className="rounded border-muted-foreground/30 w-4 h-4" />
+                          <Input 
+                            autoFocus 
+                            value={newSubtaskTitle} 
+                            onChange={e => setNewSubtaskTitle(e.target.value)} 
+                            placeholder="What needs to be done?"
+                            className="h-8 text-sm bg-transparent border-none focus-visible:ring-0 shadow-none p-0 px-1 flex-1"
+                            onKeyDown={e => {
+                              if (e.key === 'Enter') handleAddSubtask();
+                              if (e.key === 'Escape') { setIsAddingSubtask(false); setNewSubtaskTitle(''); }
+                            }}
+                          />
+                          <Button size="sm" variant="ghost" onClick={handleAddSubtask} className="h-7 w-7 p-0 text-primary">
+                            <Check className="w-4 h-4" />
+                          </Button>
                         </div>
-                      ))}
+                      )}
                     </div>
                   </div>
                 </div>

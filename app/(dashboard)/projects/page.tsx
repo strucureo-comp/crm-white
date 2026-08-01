@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { 
-  Search, Plus, X, UploadCloud, FileText, Mail, FileIcon, MessageSquare, 
+import {
+  Search, Plus, X, UploadCloud, FileText, Mail, FileIcon, MessageSquare,
   CheckCircle2, AlertCircle, Cloud, MoreHorizontal, Calendar, FolderOpen,
   Check
 } from 'lucide-react';
@@ -20,8 +20,8 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/compon
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 import { useAuth } from '@/lib/firebase/auth-context';
-import { 
-  ProjectStatus, TaskStatus, TaskPriority, 
+import {
+  ProjectStatus, TaskStatus, TaskPriority,
   Project, Member, Task, ProjectsData,
   subscribeToProjectsData, createProject, updateProject, deleteProject,
   createTask, updateTask, deleteTask,
@@ -79,9 +79,9 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
-  
+
   const [search, setSearch] = useState('');
-  
+
   // Modals
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
@@ -92,7 +92,7 @@ export default function ProjectsPage() {
       setProjects(data.projects);
       setMembers(data.members);
       setTasks(data.tasks);
-      
+
       // Update selected project if it exists so overlay stays current
       if (selectedProject) {
         setSelectedProject(prev => data.projects.find(p => p.id === prev?.id) || null);
@@ -100,7 +100,7 @@ export default function ProjectsPage() {
     });
     return () => unsubscribe();
   }, [user?.company_id, selectedProject?.id]);
-  
+
   // Overlay Tabs
   const [activeTab, setActiveTab] = useState<'Plan' | 'Files' | 'Notes' | 'Emails' | 'Documents'>('Plan');
 
@@ -139,7 +139,7 @@ export default function ProjectsPage() {
   const handleCreateProject = async () => {
     if (!user?.company_id) return;
     if (!formName.trim()) return toast.error('Project name is required');
-    
+
     const newProject = {
       name: formName,
       status: 'Kick-off' as ProjectStatus,
@@ -152,12 +152,12 @@ export default function ProjectsPage() {
       budget: { est: Number(formBudget) || 0, actual: 0 },
       progress: 0
     };
-    
+
     try {
       await createProject(user.company_id, newProject);
       setIsCreateOpen(false);
       toast.success('Project created successfully');
-      
+
       // Reset
       setFormName('');
       setFormColor('#6366f1');
@@ -173,12 +173,12 @@ export default function ProjectsPage() {
     e.stopPropagation();
     if (!user?.company_id) return;
     if (!newMemberName.trim()) return;
-    
+
     const newMemb = {
       name: newMemberName,
-      avatar: newMemberName.split(' ').map(w => w[0]).join('').substring(0,2).toUpperCase() || 'U'
+      avatar: newMemberName.split(' ').map(w => w[0]).join('').substring(0, 2).toUpperCase() || 'U'
     };
-    
+
     try {
       const newId = await createMember(user.company_id, newMemb);
       if (newId) setFormMembers(prev => [...prev, newId]);
@@ -192,7 +192,7 @@ export default function ProjectsPage() {
     if (!user?.company_id) return;
     if (!taskFormTitle.trim()) return toast.error('Task title is required');
     if (!taskFormOwner) return toast.error('Assignee is required');
-    
+
     const newTask = {
       title: taskFormTitle,
       projectId: selectedProject!.id,
@@ -202,7 +202,7 @@ export default function ProjectsPage() {
       due: taskFormDue || 'No due date',
       phase
     };
-    
+
     try {
       await createTask(user.company_id, newTask);
       setAddingTaskPhase(null);
@@ -226,7 +226,7 @@ export default function ProjectsPage() {
 
   return (
     <div className="space-y-6 flex flex-col h-[calc(100vh-100px)]">
-      
+
       {/* 2. Global Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
         <div>
@@ -236,11 +236,11 @@ export default function ProjectsPage() {
         <div className="flex items-center gap-3">
           <div className="relative w-64">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input 
-              placeholder="Search projects..." 
-              value={search} 
-              onChange={(e) => setSearch(e.target.value)} 
-              className="pl-9 bg-background focus-visible:ring-1" 
+            <Input
+              placeholder="Search projects..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="pl-9 bg-background focus-visible:ring-1"
             />
           </div>
           <Button variant="outline" onClick={() => setIsCreateOpen(true)} className="shadow-sm">
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
           <div className="flex gap-5 overflow-x-auto h-full pb-4 items-start">
             {COLUMNS.map(col => {
               const colProjects = filteredProjects.filter(p => p.status === col);
-              
+
               return (
                 <div key={col} className="flex-shrink-0 w-[300px] flex flex-col max-h-full">
                   <div className="flex items-center gap-2 mb-4 px-1 shrink-0">
@@ -265,7 +265,7 @@ export default function ProjectsPage() {
                       {colProjects.length}
                     </Badge>
                   </div>
-                  
+
                   <Droppable droppableId={col}>
                     {(provided, snapshot) => (
                       <div
@@ -284,7 +284,7 @@ export default function ProjectsPage() {
                                 className={`cursor-pointer transition-all border shadow-sm hover:shadow-md bg-background group
                                   ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/20 rotate-2' : 'hover:border-primary/30'}
                                 `}
-                                style={{...provided.draggableProps.style}}
+                                style={{ ...provided.draggableProps.style }}
                               >
                                 <CardContent className="p-4 space-y-4">
                                   <div className="flex items-start justify-between gap-2">
@@ -294,10 +294,10 @@ export default function ProjectsPage() {
                                     </div>
                                     <CircularProgress progress={project.progress} color={project.color} />
                                   </div>
-                                  
+
                                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
                                     <span className="font-medium">{project.endDate ? `Due ${new Date(project.endDate).toLocaleDateString()}` : 'No due date'}</span>
-                                    
+
                                     <div className="flex -space-x-2">
                                       {project.members.map(mid => {
                                         const mem = members.find(m => m.id === mid);
@@ -337,7 +337,7 @@ export default function ProjectsPage() {
               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Project Name</Label>
               <Input placeholder="E.g. Q4 Website Redesign" value={formName} onChange={e => setFormName(e.target.value)} />
             </div>
-            
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Color Theme</Label>
@@ -363,8 +363,8 @@ export default function ProjectsPage() {
                 <DropdownMenuContent align="start" className="w-[450px] p-0" onClick={e => e.stopPropagation()}>
                   <div className="max-h-[200px] overflow-y-auto p-1">
                     {members.map(m => (
-                      <div 
-                        key={m.id} 
+                      <div
+                        key={m.id}
                         onClick={(e) => toggleFormMember(m.id, e)}
                         className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded-md cursor-pointer transition-colors"
                       >
@@ -392,7 +392,7 @@ export default function ProjectsPage() {
       </Dialog>
 
       {/* 5. Project Detail Overlay (Full-Screen Modal) */}
-      <Dialog open={!!selectedProject} onOpenChange={(open) => { if(!open) setSelectedProject(null); }}>
+      <Dialog open={!!selectedProject} onOpenChange={(open) => { if (!open) setSelectedProject(null); }}>
         <DialogContent className="max-w-[90vw] h-[90vh] p-0 overflow-hidden flex bg-background shadow-2xl border-border/60">
           {selectedProject && (
             <>
@@ -478,7 +478,7 @@ export default function ProjectsPage() {
                 </div>
 
                 <div className="flex-1 overflow-y-auto p-6 bg-muted/5">
-                  
+
                   {/* PLAN TAB */}
                   {activeTab === 'Plan' && (
                     <div className="space-y-8">
@@ -490,7 +490,7 @@ export default function ProjectsPage() {
                               <h3 className="text-lg font-bold">{phase}</h3>
                               <Badge variant="secondary" className="text-xs px-1.5 py-0">{phaseTasks.length}</Badge>
                             </div>
-                            
+
                             <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
                               <table className="w-full text-sm text-left">
                                 <tbody className="divide-y divide-border">
