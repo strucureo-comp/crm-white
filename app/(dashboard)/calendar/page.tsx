@@ -10,48 +10,48 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 
+import { useAuth } from '@/lib/firebase/auth-context';
+import { subscribeToCalendarEvents, createCalendarEvent, CalendarEvent as DBCalendarEvent } from '@/lib/db/calendar/api';
+import { Task as DBTask, subscribeToTasksData } from '@/lib/db/tasks/api';
+import { Member, subscribeToProjectsData } from '@/lib/db/projects/api';
+
 // --- Data Schemas ---
-export interface CalendarEvent {
-  id: string;
-  title: string;
-  date: string; // Format: YYYY-MM-DD
-  time: string; // Format: HH:MM
-  color: string; // Hex color code
-  attendees: string[]; // Array of member IDs
-  linkedRecord?: { type: 'project', id: string } | null;
-}
-
-export interface Task {
-  id: string;
-  title: string;
-  dueDate: string; // Format: YYYY-MM-DD
-}
-
-// Mock Members
-const MEMBERS = [
-  { id: 'm1', name: 'Alex Rivera', avatar: 'AR', role: 'Lead Designer' },
-  { id: 'm2', name: 'Sarah Jones', avatar: 'SJ', role: 'Project Manager' },
-  { id: 'm3', name: 'Mike Chen', avatar: 'MC', role: 'Developer' },
-];
-
-
-
+// We will use the DB types, but we'll export/re-map them for this page if needed.
+export type CalendarEvent = DBCalendarEvent;
+export type Task = DBTask;
 
 const EVENT_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
 type ViewType = 'Day' | 'Week' | 'Month';
 
 export default function CalendarAgendaPage() {
+  const { user } = useAuth();
   const [view, setView] = useState<ViewType>('Month');
   
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [members, setMembers] = useState<Member[]>([]);
+
+  // Subscriptions
+  React.useEffect(() => {
+    if (!user?.company_id) return;
+    
+    const unsubEvents = subscribeToCalendarEvents(user.company_id, setEvents);
+    const unsubTasks = subscribeToTasksData(user.company_id, (data) => setTasks(data.tasks));
+    const unsubMembers = subscribeToProjectsData(user.company_id, (data) => {
+      setMembers(data.members || []);
+    });
+
+    return () => {
+      unsubEvents();
+      unsubTasks();
+      unsubMembers();
+    };
+  }, [user]);
   
-  const MOCK_EVENTS = events;
-  const MOCK_TASKS = tasks;
   // Base date for rendering (approx July 2026)
-  const [currentMonth, setCurrentMonth] = useState(new Date(2026, 6, 1));
-  const [selectedDate, setSelectedDate] = useState('2026-07-15');
+  const [currentMonth, setCurrentMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   
   // Modals
   const [viewingEvent, setViewingEvent] = useState<CalendarEvent | null>(null);
@@ -62,28 +62,33 @@ export default function CalendarAgendaPage() {
   const [formDate, setFormDate] = useState('');
   const [formTime, setFormTime] = useState('09:00');
   const [formColor, setFormColor] = useState(EVENT_COLORS[0]);
+  const [formAttendees, setFormAttendees] = useState<string[]>([]);
 
   // Handlers
-  const handleCreateEvent = () => {
-    if(!formTitle.trim()) return;
+  const handleCreateEvent = async () => {
+    if(!user?.company_id || !formTitle.trim()) return;
     
-    const newEvent: CalendarEvent = {
-      id: `e-${Date.now()}`,
+    const newEvent: Omit<CalendarEvent, 'id'> = {
       title: formTitle,
       date: formDate || new Date().toISOString().split('T')[0],
       time: formTime,
       color: formColor,
-      attendees: ['m1'] // Mock selection for now
+      attendees: formAttendees.length > 0 ? formAttendees : (members.length > 0 ? [members[0].id] : [])
     };
     
-    setEvents(prev => [...prev, newEvent]);
-    setIsScheduleOpen(false);
-    
-    // Reset form
-    setFormTitle('');
-    setFormDate('');
-    setFormTime('09:00');
-    setFormColor(EVENT_COLORS[0]);
+    try {
+      await createCalendarEvent(user.company_id, newEvent);
+      setIsScheduleOpen(false);
+      
+      // Reset form
+      setFormTitle('');
+      setFormDate('');
+      setFormTime('09:00');
+      setFormColor(EVENT_COLORS[0]);
+      setFormAttendees([]);
+    } catch (e) {
+      console.error("Failed to create event", e);
+    }
   };
 
   // Derived
@@ -127,22 +132,22 @@ export default function CalendarAgendaPage() {
     return cells;
   }, [currentMonth, adjustedOffset, daysInCurrentMonth]);
 
-  const selectedDayEvents = MOCK_EVENTS.filter(e => e.date === selectedDate).sort((a,b) => a.time.localeCompare(b.time));
-  const selectedDayTasks = MOCK_TASKS.filter(t => t.dueDate === selectedDate);
+  const selectedDayEvents = events.filter(e => e.date === selectedDate).sort((a,b) => a.time.localeCompare(b.time));
+  const selectedDayTasks = tasks.filter(t => t.dueDate === selectedDate);
   
   const upcoming7DaysEvents = useMemo(() => {
     const start = new Date(selectedDate);
     const end = new Date(start);
     end.setDate(end.getDate() + 7);
     
-    return MOCK_EVENTS.filter(e => {
+    return events.filter(e => {
       const d = new Date(e.date);
       return d >= start && d <= end;
     }).sort((a, b) => {
       if (a.date === b.date) return a.time.localeCompare(b.time);
       return a.date.localeCompare(b.date);
     });
-  }, [selectedDate]);
+  }, [selectedDate, events]);
 
   const handlePrevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   const handleNextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
@@ -219,8 +224,8 @@ export default function CalendarAgendaPage() {
                     if (cell.empty) return <div key={idx} className="border-b border-r bg-muted/5 min-h-[100px]" />;
                     
                     const isSelected = selectedDate === cell.dateStr;
-                    const cellEvents = MOCK_EVENTS.filter(e => e.date === cell.dateStr);
-                    const cellTasks = MOCK_TASKS.filter(t => t.dueDate === cell.dateStr);
+                    const cellEvents = events.filter(e => e.date === cell.dateStr);
+                    const cellTasks = tasks.filter(t => t.dueDate === cell.dateStr);
                     const allItems = [...cellEvents.map(e => ({...e, isTask: false})), ...cellTasks.map(t => ({...t, isTask: true}))];
                     const displayItems = allItems.slice(0, 3);
                     const hasMore = allItems.length > 3;
@@ -321,11 +326,11 @@ export default function CalendarAgendaPage() {
                     <div className="flex items-center mt-3 pt-3 border-t border-border/50">
                       <div className="flex -space-x-2">
                         {e.attendees.map(aId => {
-                          const member = MEMBERS.find(m => m.id === aId);
+                          const member = members.find(m => m.id === aId);
                           if(!member) return null;
                           return (
                             <Avatar key={aId} className="w-6 h-6 border-2 border-white shadow-sm">
-                              <AvatarFallback className="bg-muted text-[9px] font-bold">{member.avatar}</AvatarFallback>
+                              <AvatarFallback className="bg-muted text-[9px] font-bold">{member.avatar || member.name.substring(0, 2).toUpperCase()}</AvatarFallback>
                             </Avatar>
                           )
                         })}
@@ -400,11 +405,11 @@ export default function CalendarAgendaPage() {
                     <p className="text-[10px] font-black uppercase text-slate-500 tracking-wider mb-3">Attendees ({viewingEvent.attendees.length})</p>
                     <div className="space-y-3">
                       {viewingEvent.attendees.map(aId => {
-                        const m = MEMBERS.find(x => x.id === aId);
+                        const m = members.find(x => x.id === aId);
                         if(!m) return null;
                         return (
                           <div key={aId} className="flex items-center gap-3">
-                            <Avatar className="w-8 h-8 border"><AvatarFallback className="bg-slate-100 text-xs font-bold">{m.avatar}</AvatarFallback></Avatar>
+                            <Avatar className="w-8 h-8 border"><AvatarFallback className="bg-slate-100 text-xs font-bold">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
                             <div className="flex flex-col"><span className="text-sm font-bold text-slate-900 leading-none mb-1">{m.name}</span><span className="text-[10px] font-semibold text-slate-500">{m.role}</span></div>
                           </div>
                         )
@@ -478,11 +483,22 @@ export default function CalendarAgendaPage() {
             <div className="space-y-3 pt-2">
               <label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider block border-b border-purple-100 dark:border-slate-800 pb-2">Attendees</label>
               <div className="max-h-40 overflow-y-auto space-y-1">
-                {MEMBERS.map(m => (
+                {members.map(m => (
                   <label key={m.id} className="flex items-center gap-3 p-2 rounded-xl hover:bg-purple-50 dark:hover:bg-slate-800 cursor-pointer transition-colors">
-                    <input type="checkbox" className="rounded border-purple-300 text-purple-600 focus:ring-purple-500" defaultChecked />
-                    <Avatar className="w-7 h-7"><AvatarFallback className="bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-400 text-[10px] font-bold border border-purple-200 dark:border-slate-700">{m.avatar}</AvatarFallback></Avatar>
-                    <div className="flex flex-col"><span className="text-sm font-bold text-purple-950 dark:text-slate-200 leading-none mb-0.5">{m.name}</span><span className="text-[10px] font-semibold text-purple-600 dark:text-slate-400">{m.role}</span></div>
+                    <input 
+                      type="checkbox" 
+                      className="rounded border-purple-300 text-purple-600 focus:ring-purple-500" 
+                      checked={formAttendees.includes(m.id)}
+                      onChange={(e) => {
+                        if (e.target.checked) {
+                          setFormAttendees(prev => [...prev, m.id]);
+                        } else {
+                          setFormAttendees(prev => prev.filter(id => id !== m.id));
+                        }
+                      }}
+                    />
+                    <Avatar className="w-7 h-7"><AvatarFallback className="bg-white dark:bg-slate-900 text-purple-700 dark:text-purple-400 text-[10px] font-bold border border-purple-200 dark:border-slate-700">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                    <div className="flex flex-col"><span className="text-sm font-bold text-purple-950 dark:text-slate-200 leading-none mb-0.5">{m.name}</span><span className="text-[10px] font-semibold text-purple-600 dark:text-slate-400">{m.role || 'Member'}</span></div>
                   </label>
                 ))}
               </div>
