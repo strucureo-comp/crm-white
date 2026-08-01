@@ -17,29 +17,8 @@ import {
   Calendar,
   DollarSign
 } from "lucide-react";
-
-type SpendEntry = {
-  id: string;
-  date: string;
-  amount: number;
-};
-
-type Campaign = {
-  id: string;
-  name: string;
-  source: string; // 'internal', 'meta', 'google'
-  status: string; // 'Active', 'Paused', 'Draft'
-  budget: number;
-  spent: number;
-  impressions: number;
-  clicks: number;
-  lastSynced: string | null;
-  channel?: string; // Legacy API support
-  startDate?: string;
-  endDate?: string;
-  currency?: string;
-  spendHistory?: SpendEntry[];
-};
+import { useAuth } from '@/lib/firebase/auth-context';
+import { createCampaign, updateCampaign, deleteCampaign, subscribeToCampaigns, Campaign, SpendEntry } from '@/lib/db/campaigns/api';
 
 const MetaIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -56,72 +35,19 @@ const GoogleIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   </svg>
 );
 
-const MOCK_INTERNAL_CAMPAIGNS: Campaign[] = [
-  {
-    id: "INT-001",
-    name: "Summer Sale 2026",
-    source: "internal",
-    status: "Active",
-    budget: 5000,
-    spent: 2450,
-    impressions: 125000,
-    clicks: 4500,
-    lastSynced: new Date().toISOString(),
-    startDate: "2026-06-01",
-    endDate: "2026-08-31",
-    currency: "USD",
-    spendHistory: [
-      { id: "SPEND-1", date: "2026-06-15", amount: 1000 },
-      { id: "SPEND-2", date: "2026-07-01", amount: 1450 }
-    ]
-  },
-  {
-    id: "INT-002",
-    name: "Q3 B2B Lead Gen",
-    source: "internal",
-    status: "Draft",
-    budget: 10000,
-    spent: 0,
-    impressions: 0,
-    clicks: 0,
-    lastSynced: new Date().toISOString(),
-    startDate: "2026-07-01",
-    endDate: "2026-09-30",
-    currency: "USD",
-    spendHistory: []
-  },
-];
-
-const MOCK_EXTERNAL_CAMPAIGNS: Campaign[] = [
-  {
-    id: "META-001",
-    name: "Retargeting - Product A",
-    source: "meta",
-    status: "Active",
-    budget: 3000,
-    spent: 1200,
-    impressions: 80000,
-    clicks: 3200,
-    lastSynced: new Date().toISOString(),
-    currency: "USD",
-  },
-  {
-    id: "GOOG-001",
-    name: "Search - Brand Keywords",
-    source: "google",
-    status: "Active",
-    budget: 8000,
-    spent: 4500,
-    impressions: 250000,
-    clicks: 12500,
-    lastSynced: new Date().toISOString(),
-    currency: "USD",
-  },
-];
-
 export default function CampaignsPage() {
-  const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>(MOCK_INTERNAL_CAMPAIGNS);
+  const { user } = useAuth();
+  const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
   const [externalCampaigns, setExternalCampaigns] = useState<Campaign[]>([]);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    const unsubscribe = subscribeToCampaigns(user.company_id, (data) => {
+      setInternalCampaigns(data.filter(c => c.source === 'internal'));
+      setExternalCampaigns(data.filter(c => c.source !== 'internal'));
+    });
+    return () => unsubscribe();
+  }, [user?.company_id]);
   
   const [metaConnected, setMetaConnected] = useState(false);
   const [googleConnected, setGoogleConnected] = useState(false);
@@ -151,76 +77,117 @@ export default function CampaignsPage() {
     }, 3000);
   };
 
-  const handleConnectMeta = () => {
-    setMetaConnected(true);
-    setExternalCampaigns((prev) => [...prev, ...MOCK_EXTERNAL_CAMPAIGNS.filter(c => c.source === 'meta')]);
-    addToast("Meta Ads connected successfully!");
+  const handleConnectMeta = async () => {
+    if (!user?.company_id) return;
+    try {
+      await createCampaign(user.company_id, {
+        name: "Retargeting - Product A",
+        source: "meta",
+        status: "Active",
+        budget: 3000,
+        spent: 1200,
+        impressions: 80000,
+        clicks: 3200,
+        lastSynced: new Date().toISOString(),
+        currency: "USD",
+      });
+      setMetaConnected(true);
+      addToast("Meta Ads connected successfully!");
+    } catch {
+      addToast("Failed to connect Meta Ads", "error");
+    }
   };
 
-  const handleConnectGoogle = () => {
-    setGoogleConnected(true);
-    setExternalCampaigns((prev) => [...prev, ...MOCK_EXTERNAL_CAMPAIGNS.filter(c => c.source === 'google')]);
-    addToast("Google Ads connected successfully!");
+  const handleConnectGoogle = async () => {
+    if (!user?.company_id) return;
+    try {
+      await createCampaign(user.company_id, {
+        name: "Search - Brand Keywords",
+        source: "google",
+        status: "Active",
+        budget: 8000,
+        spent: 4500,
+        impressions: 250000,
+        clicks: 12500,
+        lastSynced: new Date().toISOString(),
+        currency: "USD",
+      });
+      setGoogleConnected(true);
+      addToast("Google Ads connected successfully!");
+    } catch {
+      addToast("Failed to connect Google Ads", "error");
+    }
   };
 
-  const handleSyncData = () => {
+  const handleSyncData = async () => {
+    if (!user?.company_id) return;
     if (!metaConnected && !googleConnected) {
       addToast("Connect an external provider to sync data.", "error");
       return;
     }
     setSyncing(true);
-    setTimeout(() => {
-      setExternalCampaigns((prev) =>
-        prev.map((c) => ({
-          ...c,
+    
+    try {
+      const updates = externalCampaigns.map(c => {
+        return updateCampaign(user.company_id!, c.id!, {
           spent: c.spent + Math.floor(Math.random() * 100),
           clicks: c.clicks + Math.floor(Math.random() * 50),
           impressions: c.impressions + Math.floor(Math.random() * 1000),
           lastSynced: new Date().toISOString(),
-        }))
-      );
-      setSyncing(false);
+        });
+      });
+      await Promise.all(updates);
       addToast("Data synced successfully!");
-    }, 1200);
-  };
-
-  const handleSaveCampaign = () => {
-    if (!formData.name || !formData.budget) return;
-    
-    if (editingCampaign) {
-      setInternalCampaigns((prev) =>
-        prev.map((c) => (c.id === editingCampaign.id ? { ...c, ...formData } as Campaign : c))
-      );
-      addToast("Campaign updated!");
-    } else {
-      const newCampaign: Campaign = {
-        id: `INT-${Math.floor(Math.random() * 1000).toString().padStart(3, '0')}`,
-        name: formData.name || "",
-        source: "internal",
-        status: formData.status || "Draft",
-        budget: Number(formData.budget) || 0,
-        spent: Number(formData.spent) || 0,
-        impressions: 0,
-        clicks: 0,
-        lastSynced: new Date().toISOString(),
-        startDate: formData.startDate,
-        endDate: formData.endDate,
-        currency: formData.currency || "USD",
-        spendHistory: formData.spendHistory || [],
-        ...formData
-      };
-      setInternalCampaigns((prev) => [newCampaign, ...prev]);
-      addToast("Campaign created!");
+    } catch (e) {
+      addToast("Failed to sync data", "error");
+    } finally {
+      setSyncing(false);
     }
-    setIsModalOpen(false);
-    setEditingCampaign(null);
-    setFormData({});
   };
 
-  const handleDeleteCampaign = (id: string) => {
+  const handleSaveCampaign = async () => {
+    if (!user?.company_id || !formData.name || !formData.budget) return;
+    
+    try {
+      if (editingCampaign && editingCampaign.id) {
+        await updateCampaign(user.company_id, editingCampaign.id, formData);
+        addToast("Campaign updated!");
+      } else {
+        const newCampaign = {
+          name: formData.name || "",
+          source: "internal",
+          status: formData.status || "Draft",
+          budget: Number(formData.budget) || 0,
+          spent: Number(formData.spent) || 0,
+          impressions: 0,
+          clicks: 0,
+          lastSynced: new Date().toISOString(),
+          startDate: formData.startDate,
+          endDate: formData.endDate,
+          currency: formData.currency || "USD",
+          spendHistory: formData.spendHistory || [],
+          ...formData
+        };
+        await createCampaign(user.company_id, newCampaign);
+        addToast("Campaign created!");
+      }
+      setIsModalOpen(false);
+      setEditingCampaign(null);
+      setFormData({});
+    } catch (e) {
+      addToast("Failed to save campaign", "error");
+    }
+  };
+
+  const handleDeleteCampaign = async (id: string) => {
+    if (!user?.company_id) return;
     if (confirm("Are you sure you want to delete this campaign?")) {
-      setInternalCampaigns((prev) => prev.filter((c) => c.id !== id));
-      addToast("Campaign deleted!");
+      try {
+        await deleteCampaign(user.company_id, id);
+        addToast("Campaign deleted!");
+      } catch (e) {
+        addToast("Failed to delete campaign", "error");
+      }
     }
   };
 
@@ -278,7 +245,7 @@ export default function CampaignsPage() {
 
   const filteredCampaigns = useMemo(() => {
     return allCampaigns.filter((c) => {
-      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || c.id.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.id || "").toLowerCase().includes(searchQuery.toLowerCase());
       const matchesChannel = filterChannel === "All" || c.source.toLowerCase() === filterChannel.toLowerCase();
       const matchesStatus = filterStatus === "All" || c.status.toLowerCase() === filterStatus.toLowerCase();
       return matchesSearch && matchesChannel && matchesStatus;
@@ -547,7 +514,7 @@ export default function CampaignsPage() {
                                 <Edit2 className="w-4 h-4" />
                               </button>
                               <button 
-                                onClick={() => handleDeleteCampaign(campaign.id)}
+                                onClick={() => handleDeleteCampaign(campaign.id!)}
                                 className="p-1.5 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
                               >
                                 <Trash2 className="w-4 h-4" />

@@ -101,7 +101,7 @@ export default function PaymentsPage() {
 
   const handleRecordPayment = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.client || !form.invoiceId || !form.amount) return;
+    if (!form.client || !form.amount) return;
 
     try {
       if (!user?.company_id) throw new Error("No company ID found");
@@ -489,7 +489,6 @@ export default function PaymentsPage() {
                 <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Invoice ID</label>
                 <input 
                   type="text" 
-                  required
                   placeholder="e.g. INV-2091" 
                   className="w-full border rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary/20 bg-background"
                   value={form.invoiceId}
