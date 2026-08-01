@@ -14,6 +14,7 @@ import { NotesSection } from './notes-section';
 import { LivePreview } from './live-preview';
 import { DocumentLayout } from './document-layout';
 import { useWorkspace } from '@/lib/settings/workspace-context';
+import { useAuth } from '@/lib/firebase/auth-context';
 import { createInvoice, updateInvoice } from '@/lib/firebase/database';
 import type { Invoice, InvoiceStatus } from '@/lib/db/types';
 import type {
@@ -34,6 +35,7 @@ interface InvoiceFormProps {
 export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
   const router = useRouter();
   const { settings } = useWorkspace();
+  const { user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
@@ -131,11 +133,16 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
           invoice_number: meta.document_number,
           project_id: '',
           client_id: '',
+          client_name: client.contact_person,
+          client_email: client.email,
+          client_company: client.company,
+          client_address: client.address,
           amount: pricing.grand_total,
           due_date: meta.due_date || '',
           status: status,
           description: items[0]?.name || '',
           notes: notes.notes,
+          company_id: user?.company_id || '',
         };
 
         if (existingInvoice) {

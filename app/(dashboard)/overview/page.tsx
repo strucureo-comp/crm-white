@@ -22,9 +22,9 @@ import {
   getProjects,
   getUsers,
   getActivityLogs,
-  getCampaigns,
   getContentItems,
 } from '@/lib/firebase/database';
+import { getCampaigns } from '@/lib/db/campaigns/api';
 import { useAuth } from '@/lib/firebase/auth-context';
 import type { Lead, Invoice, Project, User, ActivityLog, Campaign, ContentItem } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';

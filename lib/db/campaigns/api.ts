@@ -50,6 +50,13 @@ export async function updateCampaign(workspaceId: string, campaignId: string, da
   await update(campaignRef(workspaceId, campaignId), data);
 }
 
+export async function getCampaigns(workspaceId: string): Promise<Campaign[]> {
+  const snapshot = await get(campaignsRef(workspaceId));
+  if (!snapshot.exists()) return [];
+  const data = snapshot.val();
+  return Object.values(data) as Campaign[];
+}
+
 export async function deleteCampaign(workspaceId: string, campaignId: string): Promise<void> {
   await remove(campaignRef(workspaceId, campaignId));
 }

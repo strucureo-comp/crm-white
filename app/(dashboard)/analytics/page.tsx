@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 import { 
   BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, 
@@ -15,6 +15,12 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/ui/dialog';
+
+import { useAuth } from '@/lib/firebase/auth-context';
+import { subscribeToLeads } from '@/lib/firebase/database';
+import { subscribeToCampaigns, Campaign } from '@/lib/db/campaigns/api';
+import { subscribeToProjectsData } from '@/lib/db/projects/api';
+import { Deal } from '@/lib/db/types';
 
 // --- Data Schemas ---
 type WidgetType = 'kpi' | 'bar' | 'donut' | 'line' | 'funnel' | 'area';
@@ -151,10 +157,9 @@ const THEME_COLORS: Record<string, string[]> = {
 
 // --- Components ---
 
-const WidgetRenderer = ({ widget }: { widget: Widget }) => {
+const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
   const color = widget.config.colorTheme || '#8b5cf6';
   const palette = THEME_COLORS[color] || THEME_COLORS['#8b5cf6'];
-  const data = MOCK_DATA[widget.config.metricId];
 
   if (!data) return <div className="flex items-center justify-center h-full text-slate-400">No data</div>;
 
@@ -282,6 +287,141 @@ export default function AnalyticsDashboard() {
     owner: 'all',
     tag: 'all'
   });
+
+  const { user } = useAuth();
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [members, setMembers] = useState<any[]>([]);
+  const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+
+  useEffect(() => {
+    if (!user?.company_id) return;
+    
+    const unsubDeals = subscribeToLeads(user.company_id, setDeals);
+    const unsubMembers = subscribeToProjectsData(user.company_id, (data) => setMembers(data.members || []));
+    const unsubCampaigns = subscribeToCampaigns(user.company_id, setCampaigns);
+    
+    return () => {
+      unsubDeals();
+      unsubMembers();
+      unsubCampaigns();
+    };
+  }, [user]);
+
+  const dashboardData = useMemo(() => {
+    // Remove mock data fallback: calculate zeroed/empty structures instead if no deals exist.
+    const openDeals = deals.filter(d => d.status !== 'won' && d.status !== 'lost');
+    const wonDeals = deals.filter(d => d.status === 'won');
+    const lostDeals = deals.filter(d => d.status === 'lost');
+    const resolvedDeals = wonDeals.length + lostDeals.length;
+
+    const totalPipeline = openDeals.reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+    const totalRevenue = wonDeals.reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+    const winRate = resolvedDeals > 0 ? Math.round((wonDeals.length / resolvedDeals) * 100) : 0;
+    const avgDealSize = wonDeals.length > 0 ? Math.round(totalRevenue / wonDeals.length) : 0;
+
+    const pipelineByStage = [
+      { name: 'Lead', value: openDeals.filter(d => d.status === 'new' || d.status === 'contacted').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) },
+      { name: 'Qualified', value: openDeals.filter(d => d.status === 'qualified').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) },
+      { name: 'Proposal', value: openDeals.filter(d => d.status === 'proposal').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) },
+      { name: 'Negotiation', value: openDeals.filter(d => d.status === 'negotiation').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) }
+    ];
+
+    const revenueByOwnerMap: Record<string, number> = {};
+    wonDeals.forEach(d => {
+      const ownerId = (d as any).owner_id || (d as any).assigned_to;
+      if (ownerId) {
+        revenueByOwnerMap[ownerId] = (revenueByOwnerMap[ownerId] || 0) + ((d as any).estimated_value || 0);
+      }
+    });
+    
+    const revenueByOwner = Object.entries(revenueByOwnerMap).map(([ownerId, value]) => {
+      const member = members.find(m => m.id === ownerId);
+      return { name: member ? member.name.split(' ')[0] : 'Unknown', value };
+    }).sort((a, b) => b.value - a.value);
+
+    const salesFunnel = [
+      { name: 'Total Deals', value: deals.length },
+      { name: 'Qualified', value: deals.filter(d => d.status === 'qualified' || d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
+      { name: 'Proposals', value: deals.filter(d => d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
+      { name: 'Negotiation', value: deals.filter(d => d.status === 'negotiation' || d.status === 'won').length },
+      { name: 'Closed Won', value: wonDeals.length }
+    ];
+
+    const dealStatusDist = [
+      { name: 'Open', value: openDeals.length },
+      { name: 'Won', value: wonDeals.length },
+      { name: 'Lost', value: lostDeals.length }
+    ];
+
+    const campaignRoi = campaigns.map(c => ({
+      name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
+      budget: c.budget || 0,
+      spent: c.spent || 0
+    }));
+
+    // Generate basic historical timeseries data (grouping by month)
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const currentMonth = new Date().getMonth();
+    const last6Months = Array.from({ length: 6 }).map((_, i) => {
+      const d = new Date();
+      d.setMonth(currentMonth - (5 - i));
+      return { monthIndex: d.getMonth(), year: d.getFullYear(), name: months[d.getMonth()] };
+    });
+
+    const revenueGrowth = last6Months.map(m => {
+      const revInMonth = wonDeals.filter(d => {
+        const closedAt = (d as any).closed_at || d.updated_at;
+        if (!closedAt) return false;
+        const closedDate = new Date(closedAt);
+        return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
+      }).reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+      return { name: m.name, value: revInMonth };
+    });
+    
+    // Cumulative revenue growth logic
+    let runningTotal = 0;
+    const cumulativeRevenueGrowth = revenueGrowth.map(item => {
+      runningTotal += item.value;
+      return { name: item.name, value: runningTotal };
+    });
+
+    const activePipelineVolume = last6Months.map(m => {
+      // Find open deals that were created on or before this month
+      const vol = deals.filter(d => {
+        if (!d.created_at || d.status === 'won' || d.status === 'lost') return false;
+        const createdDate = new Date(d.created_at);
+        return (createdDate.getFullYear() < m.year) || (createdDate.getFullYear() === m.year && createdDate.getMonth() <= m.monthIndex);
+      }).reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+      return { name: m.name, value: vol };
+    });
+
+    const winRateTrend = last6Months.map(m => {
+      const resolvedInMonth = deals.filter(d => {
+        const closedAt = (d as any).closed_at || d.updated_at;
+        if (!closedAt || (d.status !== 'won' && d.status !== 'lost')) return false;
+        const closedDate = new Date(closedAt);
+        return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
+      });
+      const wonInMonth = resolvedInMonth.filter(d => d.status === 'won');
+      const wr = resolvedInMonth.length > 0 ? Math.round((wonInMonth.length / resolvedInMonth.length) * 100) : 0;
+      return { name: m.name, value: wr };
+    });
+
+    return {
+      total_pipeline_value: { value: `$${totalPipeline.toLocaleString()}`, change: '+0%', trend: 'up' },
+      total_revenue: { value: `$${totalRevenue.toLocaleString()}`, change: '+0%', trend: 'up' },
+      win_rate: { value: `${winRate}%`, change: '+0%', trend: 'up' },
+      avg_deal_size: { value: `$${avgDealSize.toLocaleString()}`, change: '+0%', trend: 'up' },
+      pipeline_by_stage: pipelineByStage,
+      revenue_by_owner: revenueByOwner,
+      sales_funnel: salesFunnel,
+      deal_status_breakdown: dealStatusDist,
+      campaign_roi: campaignRoi,
+      revenue_growth: cumulativeRevenueGrowth,
+      active_pipeline_volume: activePipelineVolume,
+      win_rate_trend: winRateTrend
+    };
+  }, [deals, members, campaigns]);
 
   // Modals
   const [isAddOpen, setIsAddOpen] = useState(false);
@@ -430,17 +570,17 @@ export default function AnalyticsDashboard() {
                               `}
                               onClick={() => { if(isEditMode) setSelectedWidgetId(w.id); }}
                             >
-                              <div className="p-5 border-b border-slate-100 dark:border-slate-800/50 shrink-0 flex items-center justify-between">
-                                <h3 className="font-bold text-slate-800 dark:text-slate-200">{w.title}</h3>
+                              <div className="flex items-center justify-between p-4 px-5">
+                                <h3 className="font-bold text-slate-900 dark:text-white tracking-tight">{w.title}</h3>
                                 {isEditMode && (
-                                  <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-lg p-1 shadow-sm border border-slate-100 dark:border-slate-800 absolute top-3 right-3">
-                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800"><Settings className="w-4 h-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20" onClick={(e) => removeWidget(w.id, e)}><Trash2 className="w-4 h-4" /></Button>
+                                  <div className="flex gap-2">
+                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => setWidgets(widgets.filter(x => x.id !== w.id))}><Trash2 className="w-4 h-4" /></Button>
+                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50" onClick={() => setSelectedWidgetId(w.id)}><Settings className="w-4 h-4" /></Button>
                                   </div>
                                 )}
                               </div>
-                              <div className="flex-1 p-5 min-h-0 relative">
-                                <WidgetRenderer widget={w} />
+                              <div className="flex-1 p-5 pt-0 min-h-0 relative">
+                                <WidgetRenderer widget={w} data={dashboardData[w.config.metricId]} />
                                 {isEditMode && <div className="absolute inset-0 bg-transparent" />}
                               </div>
                             </div>

@@ -1,8 +1,13 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { SearchableSelect } from '@/components/ui/searchable-select';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { getLeads } from '@/lib/firebase/database';
+import type { Lead } from '@/lib/db/types';
 import type { DocumentClient } from './types';
 
 interface ClientSectionProps {
@@ -11,6 +16,40 @@ interface ClientSectionProps {
 }
 
 export function ClientSection({ client, onClientChange }: ClientSectionProps) {
+  const { user } = useAuth();
+  const [leads, setLeads] = useState<Lead[]>([]);
+
+  useEffect(() => {
+    if (user?.company_id) {
+      getLeads(user.company_id).then(setLeads);
+    }
+  }, [user?.company_id]);
+
+  const options = Array.from(
+    new Map(
+      leads
+        .filter((l) => l.company_name || l.name)
+        .map((l) => {
+          const val = l.company_name || l.name;
+          return [val, { label: val, value: val, group: 'Saved Clients' }];
+        })
+    ).values()
+  );
+
+  const handleCompanySelect = (val: string) => {
+    const lead = leads.find((l) => l.company_name === val || l.name === val);
+    if (lead) {
+      onClientChange({
+        company: val,
+        contact_person: lead.name || '',
+        email: lead.email || '',
+        phone: lead.phone || '',
+      });
+    } else {
+      onClientChange({ company: val });
+    }
+  };
+
   return (
     <div className="space-y-4">
       <div>
@@ -21,10 +60,13 @@ export function ClientSection({ client, onClientChange }: ClientSectionProps) {
       <div className="grid grid-cols-2 gap-4">
         <div className="space-y-2">
           <Label>Company Name *</Label>
-          <Input
+          <SearchableSelect
+            options={options}
             value={client.company}
-            onChange={(e) => onClientChange({ company: e.target.value })}
-            placeholder="Client Company Pvt Ltd"
+            onValueChange={handleCompanySelect}
+            placeholder="Select or type new..."
+            searchPlaceholder="Search clients..."
+            allowCustom={true}
           />
         </div>
         <div className="space-y-2">

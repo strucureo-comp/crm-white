@@ -1,4 +1,4 @@
-import { ref, get, set, update, push, remove, query, orderByChild, equalTo, limitToLast } from 'firebase/database';
+import { ref, get, set, update, push, remove, query, orderByChild, equalTo, limitToLast, onValue, off } from 'firebase/database';
 import { database } from './config';
 import {
   sendWelcomeEmail,
@@ -1166,6 +1166,25 @@ export async function getLeads(companyId?: string): Promise<Lead[]> {
     console.error('Error getting leads:', error);
     return [];
   }
+}
+
+export function subscribeToLeads(companyId: string, callback: (leads: Lead[]) => void): () => void {
+  const refPath = ref(database, 'leads');
+  const unsubscribe = onValue(refPath, (snapshot) => {
+    if (snapshot.exists()) {
+      const data = snapshot.val();
+      const leads: Lead[] = [];
+      for (const [key, val] of Object.entries(data)) {
+        if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+          leads.push({ id: key, ...(val as object) } as Lead);
+        }
+      }
+      callback(leads.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()));
+    } else {
+      callback([]);
+    }
+  });
+  return () => off(refPath, 'value', unsubscribe);
 }
 
 export async function updateUser(userId: string, updates: Partial<User>): Promise<boolean> {

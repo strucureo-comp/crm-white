@@ -14,13 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { SearchableSelect } from '@/components/ui/searchable-select';
 import { ArrowLeft, Save, Download, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { DocumentLayout } from './document-layout';
 import { useWorkspace } from '@/lib/settings/workspace-context';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { createContract, updateContract } from '@/lib/firebase/database';
-import type { Contract, ContractTemplateType, ContractStatus } from '@/lib/db/types';
+import { createContract, updateContract, getLeads } from '@/lib/firebase/database';
+import type { Contract, ContractTemplateType, ContractStatus, Lead } from '@/lib/db/types';
 import { CONTRACT_TEMPLATES, interpolateContractTemplate } from './contract-templates';
 import jsPDF from 'jspdf';
 
@@ -54,6 +55,33 @@ export function ContractForm({ existingContract }: ContractFormProps) {
   );
   const [endDate, setEndDate] = useState(existingContract?.end_date || '');
 
+  const [leads, setLeads] = useState<Lead[]>([]);
+
+  useEffect(() => {
+    if (user?.company_id) {
+      getLeads(user.company_id).then(setLeads);
+    }
+  }, [user?.company_id]);
+
+  const clientOptions = Array.from(
+    new Map(
+      leads
+        .filter((l) => l.company_name || l.name)
+        .map((l) => {
+          const val = l.company_name || l.name;
+          return [val, { label: val, value: val, group: 'Saved Clients' }];
+        })
+    ).values()
+  );
+
+  const handleClientSelect = (val: string) => {
+    setClientName(val);
+    const lead = leads.find((l) => l.company_name === val || l.name === val);
+    if (lead) {
+      if (lead.email) setClientEmail(lead.email);
+    }
+  };
+
   // Template variables state
   const [variables, setVariables] = useState<Record<string, any>>({});
 
@@ -71,13 +99,13 @@ export function ContractForm({ existingContract }: ContractFormProps) {
   useEffect(() => {
     setVariables((prev) => ({
       ...prev,
-      employeeName: templateType === 'employment' ? clientName : prev.employeeName,
-      counterpartyName: ['nda', 'service'].includes(templateType) ? clientName : prev.counterpartyName,
-      subscriberName: templateType === 'subscription' ? clientName : prev.subscriberName,
-      vendorName: templateType === 'vendor' ? clientName : prev.vendorName,
-      startDate: startDate,
-      contractValue: value,
-      subscriptionFee: value,
+      employeeName: templateType === 'employment' ? clientName : (prev.employeeName || ''),
+      counterpartyName: ['nda', 'service'].includes(templateType) ? clientName : (prev.counterpartyName || ''),
+      subscriberName: templateType === 'subscription' ? clientName : (prev.subscriberName || ''),
+      vendorName: templateType === 'vendor' ? clientName : (prev.vendorName || ''),
+      startDate: startDate || '',
+      contractValue: value || '',
+      subscriptionFee: value || '',
     }));
   }, [clientName, startDate, value, templateType]);
 
@@ -116,6 +144,12 @@ export function ContractForm({ existingContract }: ContractFormProps) {
     }
 
     setSaving(true);
+    
+    // Firebase crashes on undefined, so we strip any undefined values from variables
+    const safeVariables = Object.fromEntries(
+      Object.entries(variables).filter(([_, v]) => v !== undefined)
+    );
+
     const contractData: Omit<Contract, 'id' | 'created_at' | 'updated_at'> = {
       contract_number: contractNumber,
       template_type: templateType,
@@ -127,7 +161,7 @@ export function ContractForm({ existingContract }: ContractFormProps) {
       start_date: startDate,
       end_date: endDate || undefined,
       status,
-      variables,
+      variables: safeVariables,
       content: renderedContent,
       company_id: user.company_id,
     };
@@ -244,11 +278,13 @@ export function ContractForm({ existingContract }: ContractFormProps) {
             <Label htmlFor="clientName">
               {templateType === 'employment' ? 'Employee Name' : 'Counterparty / Client Name'}
             </Label>
-            <Input
-              id="clientName"
-              placeholder="e.g. Harry"
+            <SearchableSelect
+              options={clientOptions}
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              onValueChange={handleClientSelect}
+              placeholder="Select or type new..."
+              searchPlaceholder="Search clients..."
+              allowCustom={true}
             />
           </div>
 
