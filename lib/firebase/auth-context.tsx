@@ -118,6 +118,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setWorkspaceLoading(true);
       let ws = await getUserWorkspace(userId);
       
+      // Auto-heal broken users who have a workspace but no company_id (from older sign-up race conditions)
+      if (ws && (!companyId || companyId === '')) {
+        const { getCompanies } = await import('@/lib/db/companies/api');
+        const companies = await getCompanies(ws.id);
+        if (companies && companies.length > 0) {
+          const trueCompanyId = companies[0].company_id;
+          
+          // Heal the user state globally
+          setUser(prev => prev ? { ...prev, company_id: trueCompanyId } : null);
+          
+          // Heal the user record in Firebase
+          const userRef = ref(database, `users/${userId}`);
+          try {
+            await import('firebase/database').then(({ update }) => {
+              update(userRef, { company_id: trueCompanyId });
+            });
+          } catch (e) {
+            console.error('Failed to auto-heal user company_id in DB', e);
+          }
+        }
+      }
+      
       if (!ws && companyId) {
         const { findCompanyById } = await import('@/lib/workspace/api');
         const companyInfo = await findCompanyById(companyId);
@@ -229,9 +251,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (existingCompany) {
           resolvedWorkspaceId = existingCompany.workspaceId;
           resolvedCompanyId = existingCompany.companyId;
-          finalRole = 'client';
+          finalRole = 'admin'; // Changed from 'client' to 'admin' so they share full data access
           // Add user to workspace first so they have permission to read companies
-          await createWorkspaceMember(resolvedWorkspaceId, newUser.uid, 'client');
+          await createWorkspaceMember(resolvedWorkspaceId, newUser.uid, 'admin');
         }
       }
 

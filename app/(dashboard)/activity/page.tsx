@@ -143,8 +143,9 @@ export default function ActivityPage() {
         action: 'task_created',
         description: formState.title,
         entity_type: formState.type,
-        user_id: 'demo-user',
-        user_name: 'Demo User',
+        user_id: user?.id || 'demo-user',
+        user_name: user?.full_name || 'Demo User',
+        company_id: user?.company_id || '',
         title: formState.title,
         date: formState.date,
         time: formState.time,
@@ -301,6 +302,7 @@ export default function ActivityPage() {
                 <CalendarIcon size={16} />
                 <span className="font-semibold">TODAY&apos;S SCHEDULE</span>
                 <span className="text-muted-foreground">({format(date, 'MMM d, yyyy')})</span>
+                <span className="text-xs ml-2 text-red-500">Debug Company ID: {user?.company_id || 'EMPTY'}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">
