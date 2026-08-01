@@ -3,7 +3,7 @@ import { database as db } from '@/lib/firebase/config';
 
 // --- Types ---
 export interface Assignee { id: string; name: string; avatar: string; email: string; }
-export interface SubTask { id: string; title: string; completed: boolean; dueDate?: string; description?: string; }
+export interface SubTask { id: string; title: string; completed: boolean; dueDate?: string; description?: string; assignees?: Assignee[]; }
 export interface Comment { id: string; author: string; avatar: string; text: string; timestamp: string; }
 export interface DealReference { name: string; value: string; stage: string; }
 export interface Attachment { id: string; name: string; size: string; type: string; }
@@ -16,7 +16,8 @@ export interface Task {
   title: string;
   description: string;
   status: string; 
-  assignee: Assignee;
+  assignees?: Assignee[];
+  assignee?: Assignee; // Legacy fallback
   priority: TaskPriority;
   dueDate: string; 
   subtasks: SubTask[];

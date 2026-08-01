@@ -13,6 +13,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
@@ -92,6 +93,7 @@ export default function TaskManagerPage() {
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
   const [newSubtaskDueDate, setNewSubtaskDueDate] = useState('');
   const [newSubtaskDescription, setNewSubtaskDescription] = useState('');
+  const [newSubtaskAssigneeIds, setNewSubtaskAssigneeIds] = useState<string[]>([]);
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
 
   // New Task Form State
@@ -99,7 +101,7 @@ export default function TaskManagerPage() {
   const [formStatus, setFormStatus] = useState('To Do');
   const [formPriority, setFormPriority] = useState<TaskPriority>('Medium');
   const [formDate, setFormDate] = useState('');
-  const [formAssigneeId, setFormAssigneeId] = useState('');
+  const [formAssigneeIds, setFormAssigneeIds] = useState<string[]>([]);
   const [formDescription, setFormDescription] = useState('');
   const [newMemberName, setNewMemberName] = useState('');
 
@@ -111,7 +113,8 @@ export default function TaskManagerPage() {
   const filteredTasks = useMemo(() => {
     return tasks.filter(t => {
       const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase());
-      const matchesOwner = filterOwner === 'All' || t.assignee.name === filterOwner;
+      const taskAssignees = t.assignees || (t.assignee ? [t.assignee] : []);
+      const matchesOwner = filterOwner === 'All' || taskAssignees.some(a => a.name === filterOwner);
       const matchesPriority = filterPriority === 'All' || t.priority === filterPriority;
       return matchesSearch && matchesOwner && matchesPriority;
     });
@@ -121,14 +124,20 @@ export default function TaskManagerPage() {
   const handleCreateTask = async () => {
     if (!user?.company_id) return;
     if (!formTitle.trim()) return toast.error('Task title is required');
-    const assigneeMember = members.find(a => a.id === formAssigneeId) || members[0] || { id: 'unassigned', name: 'Unassigned', avatar: 'U' };
-    const assignee = { ...assigneeMember, email: '' };
+    
+    const assignees = members
+      .filter(m => formAssigneeIds.includes(m.id))
+      .map(m => ({ ...m, email: '' }));
+      
+    if (assignees.length === 0 && members.length > 0) {
+      assignees.push({ ...members[0], email: '' });
+    }
     
     const newTask = {
       title: formTitle,
       description: formDescription,
       status: formStatus,
-      assignee,
+      assignees,
       priority: formPriority,
       dueDate: formDate || new Date().toISOString().split('T')[0],
       subtasks: [],
@@ -148,6 +157,7 @@ export default function TaskManagerPage() {
       setFormStatus('To Do');
       setFormPriority('Medium');
       setFormDate('');
+      setFormAssigneeIds([]);
       setFormDescription('');
     } catch (e) {
       toast.error('Failed to create task');
@@ -231,7 +241,7 @@ export default function TaskManagerPage() {
     }
   };
 
-  const handleAddNewMember = async (e: React.MouseEvent) => {
+  const handleAddNewMember = async (e: React.MouseEvent, target: 'task' | 'subtask') => {
     e.preventDefault();
     e.stopPropagation();
     if (!user?.company_id) return;
@@ -244,7 +254,13 @@ export default function TaskManagerPage() {
     
     try {
       const newId = await createMember(user.company_id, newMemb);
-      if (newId) setFormAssigneeId(newId);
+      if (newId) {
+        if (target === 'task') {
+          setFormAssigneeIds(prev => [...prev, newId]);
+        } else {
+          setNewSubtaskAssigneeIds(prev => [...prev, newId]);
+        }
+      }
       setNewMemberName('');
     } catch (err) {
       toast.error('Failed to add member');
@@ -254,13 +270,18 @@ export default function TaskManagerPage() {
   const handleAddSubtask = async () => {
     if (!user?.company_id || !viewingTask) return;
     if (!newSubtaskTitle.trim()) return;
+    
+    const assignees = members
+      .filter(m => newSubtaskAssigneeIds.includes(m.id))
+      .map(m => ({ ...m, email: '' }));
 
     const newSubtask = {
       id: `st${Date.now()}`,
       title: newSubtaskTitle.trim(),
       completed: false,
       dueDate: newSubtaskDueDate || undefined,
-      description: newSubtaskDescription.trim() || undefined
+      description: newSubtaskDescription.trim() || undefined,
+      assignees: assignees.length > 0 ? assignees : undefined
     };
 
     const nextSubtasks = [...(viewingTask.subtasks || []), newSubtask];
@@ -271,6 +292,7 @@ export default function TaskManagerPage() {
       setNewSubtaskTitle('');
       setNewSubtaskDueDate('');
       setNewSubtaskDescription('');
+      setNewSubtaskAssigneeIds([]);
     } catch (e) {
       toast.error('Failed to add subtask');
     }
@@ -514,9 +536,18 @@ export default function TaskManagerPage() {
                                           <span className={`text-[10px] font-bold uppercase tracking-wider ${PriorityStyle(task.priority)}`}>{task.priority}</span>
                                           <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1"><CalendarIcon className="w-3 h-3"/>{task.dueDate}</span>
                                         </div>
-                                        <Avatar className="h-7 w-7 border-2 border-background shadow-sm ring-1 ring-border/50" title={task.assignee.name}>
-                                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{task.assignee.avatar}</AvatarFallback>
-                                        </Avatar>
+                                        <div className="flex -space-x-2 overflow-hidden">
+                                          {(task.assignees || (task.assignee ? [task.assignee] : [])).slice(0, 3).map((a, i) => (
+                                            <Avatar key={a.id || i} className="h-7 w-7 border-2 border-background shadow-sm ring-1 ring-border/50" title={a.name}>
+                                              <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{a.avatar}</AvatarFallback>
+                                            </Avatar>
+                                          ))}
+                                          {(task.assignees?.length || 0) > 3 && (
+                                            <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] font-bold text-muted-foreground ring-1 ring-border/50">
+                                              +{(task.assignees?.length || 0) - 3}
+                                            </div>
+                                          )}
+                                        </div>
                                       </div>
                                     </CardContent>
                                   </Card>
@@ -776,29 +807,60 @@ export default function TaskManagerPage() {
                 <Input type="date" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-medium focus-visible:ring-purple-500" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Assignee</Label>
-                <Select value={formAssigneeId} onValueChange={setFormAssigneeId}>
-                  <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500">
-                    <SelectValue placeholder="Select Assignee" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border border-purple-100 dark:border-slate-700 shadow-xl">
-                    {members.map(a => (
-                      <SelectItem key={a.id} value={a.id} className="font-bold cursor-pointer rounded-lg hover:bg-purple-50 dark:hover:bg-slate-800 focus:bg-purple-50 dark:focus:bg-slate-800">
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                    <div className="flex items-center gap-2 p-2 border-t border-purple-100 dark:border-slate-700 mt-1">
+                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Assignees</Label>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="w-full justify-between h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium hover:bg-purple-100/50 dark:hover:bg-slate-800 focus:ring-purple-500">
+                      <div className="flex items-center gap-2 truncate">
+                        {formAssigneeIds.length > 0 ? (
+                          <div className="flex -space-x-2">
+                            {members.filter(m => formAssigneeIds.includes(m.id)).slice(0, 3).map(m => (
+                              <Avatar key={m.id} className="h-6 w-6 border-2 border-background">
+                                <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{m.avatar}</AvatarFallback>
+                              </Avatar>
+                            ))}
+                            {formAssigneeIds.length > 3 && (
+                              <div className="h-6 w-6 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[8px] font-bold">
+                                +{formAssigneeIds.length - 3}
+                              </div>
+                            )}
+                          </div>
+                        ) : "Select Assignees"}
+                        {formAssigneeIds.length > 0 && <span className="ml-2">{formAssigneeIds.length} Selected</span>}
+                      </div>
+                      <ChevronDown className="w-4 h-4 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-64 p-2 rounded-xl shadow-xl border-border/50">
+                    <div className="max-h-48 overflow-y-auto space-y-1 mb-2">
+                      {members.map(member => (
+                        <div 
+                          key={member.id}
+                          className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                          onClick={() => setFormAssigneeIds(prev => prev.includes(member.id) ? prev.filter(id => id !== member.id) : [...prev, member.id])}
+                        >
+                          <div className="flex items-center gap-2">
+                            <Avatar className="h-6 w-6">
+                              <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{member.avatar}</AvatarFallback>
+                            </Avatar>
+                            <span className="text-sm font-medium">{member.name}</span>
+                          </div>
+                          {formAssigneeIds.includes(member.id) && <Check className="w-4 h-4 text-primary" />}
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2 p-1 border-t border-border/50 mt-1 pt-2">
                       <Input 
-                        placeholder="Add new member..." 
+                        placeholder="New member name..." 
                         value={newMemberName}
                         onChange={e => setNewMemberName(e.target.value)}
                         onKeyDown={e => e.stopPropagation()}
-                        className="h-8 text-xs bg-transparent border-purple-200 dark:border-slate-600"
+                        className="h-8 text-xs bg-muted/50 border-0 focus-visible:ring-1"
                       />
-                      <Button size="sm" onClick={handleAddNewMember} className="h-8 bg-purple-600 hover:bg-purple-700 text-white">Add</Button>
+                      <Button size="sm" onClick={(e) => handleAddNewMember(e, 'task')} className="h-8 shrink-0 bg-primary/90 text-white">Add</Button>
                     </div>
-                  </SelectContent>
-                </Select>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
             </div>
             
@@ -869,7 +931,18 @@ export default function TaskManagerPage() {
                                     />
                                     <div className="flex flex-col">
                                       <span className={`text-[15px] font-medium transition-all ${s.completed ? 'line-through text-muted-foreground opacity-70' : 'text-foreground'}`}>{s.title}</span>
-                                      {s.dueDate && !isExpanded && <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{s.dueDate}</span>}
+                                      <div className="flex items-center gap-2 mt-1">
+                                        {s.dueDate && !isExpanded && <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{s.dueDate}</span>}
+                                        {s.assignees && s.assignees.length > 0 && !isExpanded && (
+                                          <div className="flex -space-x-1.5 overflow-hidden">
+                                            {s.assignees.slice(0, 3).map((a, i) => (
+                                              <Avatar key={a.id || i} className="h-4 w-4 border border-background" title={a.name}>
+                                                <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-bold">{a.avatar}</AvatarFallback>
+                                              </Avatar>
+                                            ))}
+                                          </div>
+                                        )}
+                                      </div>
                                     </div>
                                   </div>
                                   <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
@@ -878,11 +951,25 @@ export default function TaskManagerPage() {
                                 </div>
                                 {isExpanded && (
                                   <div className="px-12 pb-4 pt-1 space-y-3 animate-in slide-in-from-top-2">
-                                    {s.dueDate && (
-                                      <div className="flex items-center gap-2 text-xs font-semibold text-primary/80 bg-primary/10 w-fit px-2 py-1 rounded-md">
-                                        <CalendarIcon className="w-3 h-3" /> Due: {s.dueDate}
-                                      </div>
-                                    )}
+                                    <div className="flex items-center gap-4 flex-wrap">
+                                      {s.dueDate && (
+                                        <div className="flex items-center gap-2 text-xs font-semibold text-primary/80 bg-primary/10 w-fit px-2 py-1 rounded-md">
+                                          <CalendarIcon className="w-3 h-3" /> Due: {s.dueDate}
+                                        </div>
+                                      )}
+                                      {s.assignees && s.assignees.length > 0 && (
+                                        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground bg-muted/40 w-fit px-2 py-1 rounded-md">
+                                          <div className="flex -space-x-1.5 overflow-hidden">
+                                            {s.assignees.map((a, i) => (
+                                              <Avatar key={a.id || i} className="h-4 w-4 border border-background" title={a.name}>
+                                                <AvatarFallback className="text-[7px] bg-primary/10 text-primary font-bold">{a.avatar}</AvatarFallback>
+                                              </Avatar>
+                                            ))}
+                                          </div>
+                                          <span>{s.assignees.map(a => a.name).join(', ')}</span>
+                                        </div>
+                                      )}
+                                    </div>
                                     {s.description && (
                                       <div className="text-[13px] text-muted-foreground leading-relaxed bg-muted/20 p-3 rounded-lg border border-border/30">
                                         {s.description}
@@ -915,6 +1002,52 @@ export default function TaskManagerPage() {
                               onChange={e => setNewSubtaskDueDate(e.target.value)}
                               className="h-10 text-xs bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 w-[140px] rounded-lg shrink-0"
                             />
+                            
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="outline" className="h-10 border-primary/20 bg-background text-[11px] font-bold px-3 rounded-lg shadow-inner shrink-0">
+                                  {newSubtaskAssigneeIds.length > 0 ? (
+                                    <div className="flex -space-x-2 mr-2">
+                                      {members.filter(m => newSubtaskAssigneeIds.includes(m.id)).slice(0, 3).map(m => (
+                                        <Avatar key={m.id} className="h-5 w-5 border-2 border-background">
+                                          <AvatarFallback className="text-[8px]">{m.avatar}</AvatarFallback>
+                                        </Avatar>
+                                      ))}
+                                    </div>
+                                  ) : "Assign"}
+                                  {newSubtaskAssigneeIds.length > 0 ? `${newSubtaskAssigneeIds.length} Assigned` : "+ Assign"}
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56 p-2 rounded-xl shadow-xl border-border/50">
+                                <div className="space-y-1 mb-2">
+                                  {members.map(member => (
+                                    <div 
+                                      key={member.id}
+                                      className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                      onClick={() => setNewSubtaskAssigneeIds(prev => prev.includes(member.id) ? prev.filter(id => id !== member.id) : [...prev, member.id])}
+                                    >
+                                      <div className="flex items-center gap-2">
+                                        <Avatar className="h-6 w-6">
+                                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{member.avatar}</AvatarFallback>
+                                        </Avatar>
+                                        <span className="text-sm font-medium">{member.name}</span>
+                                      </div>
+                                      {newSubtaskAssigneeIds.includes(member.id) && <Check className="w-4 h-4 text-primary" />}
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="flex items-center gap-2 p-1 border-t border-border/50 mt-1 pt-2">
+                                  <Input 
+                                    placeholder="New member..." 
+                                    value={newMemberName}
+                                    onChange={e => setNewMemberName(e.target.value)}
+                                    onKeyDown={e => e.stopPropagation()}
+                                    className="h-8 text-xs bg-muted/50 border-0 focus-visible:ring-1"
+                                  />
+                                  <Button size="sm" onClick={(e) => handleAddNewMember(e, 'subtask')} className="h-8 shrink-0 bg-primary/90">Add</Button>
+                                </div>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                           <div className="pl-9 flex gap-3 items-end">
                             <textarea
@@ -935,15 +1068,19 @@ export default function TaskManagerPage() {
                 <div className="w-full md:w-[320px] shrink-0 space-y-6">
                   <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm space-y-6 sticky top-0">
                     <div className="space-y-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Assignee</span>
-                      <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-xl border border-border/50">
-                        <Avatar className="w-10 h-10 border-2 border-background shadow-sm ring-1 ring-border/50">
-                          <AvatarFallback className="text-xs bg-gradient-to-br from-primary to-primary/60 text-white font-bold">{viewingTask.assignee.avatar}</AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <span className="text-sm font-bold block leading-tight">{viewingTask.assignee.name}</span>
-                          <span className="text-[10px] text-muted-foreground font-medium">Task Owner</span>
-                        </div>
+                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Assignees</span>
+                      <div className="flex flex-col gap-2 bg-muted/40 p-3 rounded-xl border border-border/50 max-h-48 overflow-y-auto">
+                        {(viewingTask.assignees || (viewingTask.assignee ? [viewingTask.assignee] : [])).map(assignee => (
+                          <div key={assignee.id} className="flex items-center gap-3">
+                            <Avatar className="w-8 h-8 border-2 border-background shadow-sm ring-1 ring-border/50">
+                              <AvatarFallback className="text-[10px] bg-gradient-to-br from-primary to-primary/60 text-white font-bold">{assignee.avatar}</AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <span className="text-[13px] font-bold block leading-tight">{assignee.name}</span>
+                              <span className="text-[9px] text-muted-foreground font-medium">Assignee</span>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
                     <div className="space-y-2 pt-4 border-t border-border/50">
