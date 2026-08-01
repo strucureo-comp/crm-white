@@ -90,6 +90,9 @@ export default function TaskManagerPage() {
   // Subtask UI state
   const [isAddingSubtask, setIsAddingSubtask] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState('');
+  const [newSubtaskDueDate, setNewSubtaskDueDate] = useState('');
+  const [newSubtaskDescription, setNewSubtaskDescription] = useState('');
+  const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
 
   // New Task Form State
   const [formTitle, setFormTitle] = useState('');
@@ -255,7 +258,9 @@ export default function TaskManagerPage() {
     const newSubtask = {
       id: `st${Date.now()}`,
       title: newSubtaskTitle.trim(),
-      completed: false
+      completed: false,
+      dueDate: newSubtaskDueDate || undefined,
+      description: newSubtaskDescription.trim() || undefined
     };
 
     const nextSubtasks = [...(viewingTask.subtasks || []), newSubtask];
@@ -264,9 +269,20 @@ export default function TaskManagerPage() {
       await updateTask(user.company_id, viewingTask.id, { subtasks: nextSubtasks });
       setIsAddingSubtask(false);
       setNewSubtaskTitle('');
+      setNewSubtaskDueDate('');
+      setNewSubtaskDescription('');
     } catch (e) {
       toast.error('Failed to add subtask');
     }
+  };
+
+  const toggleSubtaskExpansion = (id: string) => {
+    setExpandedSubtasks(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
   };
 
   const toggleSubtaskCompletion = async (subtaskId: string) => {
@@ -839,36 +855,78 @@ export default function TaskManagerPage() {
                         </div>
                       ) : (
                         <div className="divide-y divide-border/50">
-                          {viewingTask.subtasks?.map(s => (
-                            <div key={s.id} className="p-4 flex items-center gap-4 hover:bg-muted/30 transition-colors group">
-                              <input 
-                                type="checkbox" 
-                                checked={s.completed} 
-                                onChange={() => toggleSubtaskCompletion(s.id)}
-                                className="rounded border-muted-foreground/50 text-primary focus:ring-primary w-5 h-5 cursor-pointer shadow-sm" 
-                              />
-                              <span className={`text-[15px] font-medium transition-all ${s.completed ? 'line-through text-muted-foreground opacity-70' : 'text-foreground'}`}>{s.title}</span>
-                            </div>
-                          ))}
+                          {viewingTask.subtasks?.map(s => {
+                            const isExpanded = expandedSubtasks.has(s.id);
+                            return (
+                              <div key={s.id} className="flex flex-col hover:bg-muted/30 transition-colors group">
+                                <div className="p-4 flex items-center justify-between cursor-pointer" onClick={() => toggleSubtaskExpansion(s.id)}>
+                                  <div className="flex items-center gap-4 flex-1">
+                                    <input 
+                                      type="checkbox" 
+                                      checked={s.completed} 
+                                      onChange={(e) => { e.stopPropagation(); toggleSubtaskCompletion(s.id); }}
+                                      className="rounded border-muted-foreground/50 text-primary focus:ring-primary w-5 h-5 cursor-pointer shadow-sm" 
+                                    />
+                                    <div className="flex flex-col">
+                                      <span className={`text-[15px] font-medium transition-all ${s.completed ? 'line-through text-muted-foreground opacity-70' : 'text-foreground'}`}>{s.title}</span>
+                                      {s.dueDate && !isExpanded && <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{s.dueDate}</span>}
+                                    </div>
+                                  </div>
+                                  <Button variant="ghost" size="icon" className="w-6 h-6 shrink-0 opacity-50 group-hover:opacity-100 transition-opacity">
+                                    <ChevronDown className={`w-4 h-4 transition-transform duration-200 ${isExpanded ? 'rotate-180' : ''}`} />
+                                  </Button>
+                                </div>
+                                {isExpanded && (
+                                  <div className="px-12 pb-4 pt-1 space-y-3 animate-in slide-in-from-top-2">
+                                    {s.dueDate && (
+                                      <div className="flex items-center gap-2 text-xs font-semibold text-primary/80 bg-primary/10 w-fit px-2 py-1 rounded-md">
+                                        <CalendarIcon className="w-3 h-3" /> Due: {s.dueDate}
+                                      </div>
+                                    )}
+                                    {s.description && (
+                                      <div className="text-[13px] text-muted-foreground leading-relaxed bg-muted/20 p-3 rounded-lg border border-border/30">
+                                        {s.description}
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       )}
                       {isAddingSubtask && (
-                        <div className="p-4 flex items-center gap-4 bg-primary/5 border-t border-primary/10">
-                          <input type="checkbox" disabled className="rounded border-primary/30 w-5 h-5 bg-background" />
-                          <Input 
-                            autoFocus 
-                            value={newSubtaskTitle} 
-                            onChange={e => setNewSubtaskTitle(e.target.value)} 
-                            placeholder="What needs to be done?"
-                            className="h-10 text-[15px] bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 flex-1 rounded-lg"
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') handleAddSubtask();
-                              if (e.key === 'Escape') { setIsAddingSubtask(false); setNewSubtaskTitle(''); }
-                            }}
-                          />
-                          <Button size="icon" onClick={handleAddSubtask} className="h-10 w-10 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl">
-                            <Check className="w-5 h-5" />
-                          </Button>
+                        <div className="p-4 flex flex-col gap-3 bg-primary/5 border-t border-primary/10">
+                          <div className="flex items-center gap-4">
+                            <input type="checkbox" disabled className="rounded border-primary/30 w-5 h-5 bg-background shrink-0" />
+                            <Input 
+                              autoFocus 
+                              value={newSubtaskTitle} 
+                              onChange={e => setNewSubtaskTitle(e.target.value)} 
+                              placeholder="What needs to be done?"
+                              className="h-10 text-[15px] bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 flex-1 rounded-lg"
+                              onKeyDown={e => {
+                                if (e.key === 'Escape') { setIsAddingSubtask(false); setNewSubtaskTitle(''); setNewSubtaskDescription(''); setNewSubtaskDueDate(''); }
+                              }}
+                            />
+                            <Input 
+                              type="date"
+                              value={newSubtaskDueDate}
+                              onChange={e => setNewSubtaskDueDate(e.target.value)}
+                              className="h-10 text-xs bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 w-[140px] rounded-lg shrink-0"
+                            />
+                          </div>
+                          <div className="pl-9 flex gap-3 items-end">
+                            <textarea
+                              value={newSubtaskDescription}
+                              onChange={e => setNewSubtaskDescription(e.target.value)}
+                              placeholder="Add more details or context..."
+                              className="w-full min-h-[60px] text-sm bg-background border border-primary/20 focus:outline-none focus:ring-2 focus:ring-primary shadow-inner p-3 rounded-lg resize-none"
+                            />
+                            <Button size="icon" onClick={handleAddSubtask} className="h-10 w-10 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl">
+                              <Check className="w-5 h-5" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
