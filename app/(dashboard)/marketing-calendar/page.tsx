@@ -21,22 +21,8 @@ import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { toast } from 'sonner';
 
-// --- Data Schema ---
-export interface ScheduledEvent {
-  id: string | number;
-  date: string | number; // ISO string for sorting
-  title: string;
-  channel: string;
-  time: string;
-  type?: string;
-  author: string;
-  company?: string;
-  client?: string;
-  badgeChannel?: string;
-  badgeStatus?: string;
-  status?: string;
-  color?: string;
-}
+import { useAuth } from '@/lib/firebase/auth-context';
+import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, subscribeToCalendar, ScheduledEvent } from '@/lib/db/marketing-calendar/api';
 
 // --- Constants ---
 const CHANNELS = ['LinkedIn', 'Twitter', 'Instagram', 'Email', 'Blog', 'YouTube'];
@@ -48,11 +34,27 @@ const COLORS = [
 const MOCK_EVENTS: ScheduledEvent[] = [];
 
 export default function MarketingCalendarPage() {
+  const { user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
   // State
   const [events, setEvents] = useState<ScheduledEvent[]>(MOCK_EVENTS);
+  
+  useEffect(() => {
+    if (!user?.company_id) return;
+    const unsubscribe = subscribeToCalendar(user.company_id, (data) => {
+      setEvents(data);
+      if (editingEvent) {
+        setEditingEvent(prev => data.find(i => i.id === prev?.id) || null);
+      }
+      if (viewingEvent) {
+        setViewingEvent(prev => data.find(i => i.id === prev?.id) || null);
+      }
+    });
+    return () => unsubscribe();
+  }, [user?.company_id]);
+
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null); // null means "Month View"
   
@@ -121,16 +123,15 @@ export default function MarketingCalendarPage() {
     setIsScheduleModalOpen(true);
   };
 
-  const saveEvent = () => {
+  const saveEvent = async () => {
+    if (!user?.company_id) return;
     if (!formTitle) return toast.error('Title is required');
     
-    // Parse time back if needed, assuming simple text input for time for now based on spec (Time input)
     let finalDateStr = formDate;
-    if (editingEvent) finalDateStr = editingEvent.date as string; // Spec says "Date input - only visible in 'Schedule' mode, not 'Edit' mode"
+    if (editingEvent) finalDateStr = editingEvent.date as string;
     else finalDateStr = new Date(formDate).toISOString();
 
-    const finalEvent: ScheduledEvent = {
-      id: editingEvent ? editingEvent.id : Date.now().toString(),
+    const finalEventData = {
       date: finalDateStr,
       title: formTitle,
       company: formCompany,
@@ -142,19 +143,28 @@ export default function MarketingCalendarPage() {
       status: editingEvent ? editingEvent.status : 'Scheduled'
     };
 
-    if (editingEvent) {
-      setEvents(prev => prev.map(e => e.id === editingEvent.id ? finalEvent : e));
-      toast.success('Post scheduled successfully!', { className: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
-    } else {
-      setEvents(prev => [...prev, finalEvent]);
-      toast.success('Post scheduled successfully!', { className: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
+    try {
+      if (editingEvent) {
+        await updateCalendarEvent(user.company_id, editingEvent.id, finalEventData);
+        toast.success('Post updated successfully!', { className: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
+      } else {
+        await createCalendarEvent(user.company_id, finalEventData);
+        toast.success('Post scheduled successfully!', { className: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
+      }
+      setIsScheduleModalOpen(false);
+    } catch (e) {
+      toast.error('Failed to save post');
     }
-    setIsScheduleModalOpen(false);
   };
 
-  const deleteEvent = (id: string | number) => {
-    setEvents(prev => prev.filter(e => e.id !== id));
-    toast.success('Post removed.', { className: 'bg-rose-50 text-rose-700 border-rose-200' });
+  const deleteEvent = async (id: string | number) => {
+    if (!user?.company_id) return;
+    try {
+      await deleteCalendarEvent(user.company_id, id);
+      toast.success('Post removed.', { className: 'bg-rose-50 text-rose-700 border-rose-200' });
+    } catch (e) {
+      toast.error('Failed to remove post');
+    }
   };
 
   const getChannelBadge = (channel: string) => {
