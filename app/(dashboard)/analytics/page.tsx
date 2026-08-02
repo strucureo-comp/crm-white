@@ -20,7 +20,7 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { subscribeToLeads } from '@/lib/firebase/database';
 import { subscribeToCampaigns, Campaign } from '@/lib/db/campaigns/api';
 import { subscribeToProjectsData } from '@/lib/db/projects/api';
-import { Deal } from '@/lib/db/types';
+import { Lead } from '@/lib/db/types';
 
 // --- Data Schemas ---
 type WidgetType = 'kpi' | 'bar' | 'donut' | 'line' | 'funnel' | 'area';
@@ -289,7 +289,7 @@ export default function AnalyticsDashboard() {
   });
 
   const { user } = useAuth();
-  const [deals, setDeals] = useState<Deal[]>([]);
+  const [deals, setDeals] = useState<Lead[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
@@ -580,7 +580,7 @@ export default function AnalyticsDashboard() {
                                 )}
                               </div>
                               <div className="flex-1 p-5 pt-0 min-h-0 relative">
-                                <WidgetRenderer widget={w} data={dashboardData[w.config.metricId]} />
+                                <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
                                 {isEditMode && <div className="absolute inset-0 bg-transparent" />}
                               </div>
                             </div>

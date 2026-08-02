@@ -24,6 +24,9 @@ export interface Member {
   id: string;
   name: string;
   avatar: string; // 2-letter initials
+  email?: string;
+  role?: string;
+  projectIds?: string[];
 }
 
 export interface Task {

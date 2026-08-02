@@ -28,16 +28,16 @@ export function ClientSection({ client, onClientChange }: ClientSectionProps) {
   const options = Array.from(
     new Map(
       leads
-        .filter((l) => l.company_name || l.name)
+        .filter((l) => l.company || l.name)
         .map((l) => {
-          const val = l.company_name || l.name;
+          const val = l.company || l.name;
           return [val, { label: val, value: val, group: 'Saved Clients' }];
         })
     ).values()
   );
 
   const handleCompanySelect = (val: string) => {
-    const lead = leads.find((l) => l.company_name === val || l.name === val);
+    const lead = leads.find((l) => l.company === val || l.name === val);
     if (lead) {
       onClientChange({
         company: val,

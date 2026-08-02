@@ -16,8 +16,8 @@ export type HistoryEntry = {
 };
 
 export type ContentItem = {
-  id?: string; 
-  title: string; 
+  id: string;
+  title: string;
   type: string; 
   campaign: string;
   persona: string; 

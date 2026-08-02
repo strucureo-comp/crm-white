@@ -24,9 +24,9 @@ import {
   getActivityLogs,
   getContentItems,
 } from '@/lib/firebase/database';
-import { getCampaigns } from '@/lib/db/campaigns/api';
+import { getCampaigns, Campaign } from '@/lib/db/campaigns/api';
 import { useAuth } from '@/lib/firebase/auth-context';
-import type { Lead, Invoice, Project, User, ActivityLog, Campaign, ContentItem } from '@/lib/db/types';
+import type { Lead, Invoice, Project, User, ActivityLog, ContentItem } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
@@ -259,7 +259,7 @@ export default function OverviewPage() {
                       <p className="text-xs text-muted-foreground capitalize">{campaign.channel}</p>
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-3">
-                      <span className="text-xs text-muted-foreground">{campaign.start_date ? new Date(campaign.start_date).toLocaleDateString() : '—'}</span>
+                      <span className="text-xs text-muted-foreground">{campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : '—'}</span>
                       <span className="text-sm font-medium">{formatCurrency(campaign.budget || 0)}</span>
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${statusColors[campaign.status] || ''}`}>
                         {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}

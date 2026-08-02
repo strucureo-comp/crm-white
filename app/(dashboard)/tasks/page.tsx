@@ -652,8 +652,8 @@ export default function TaskManagerPage() {
                   <input type="date" value={task.dueDate} onChange={(e) => updateTaskField(task.id, 'dueDate', e.target.value)} className="h-8 w-full text-xs rounded-md border-0 bg-muted/50 px-2 outline-none focus:ring-1 focus:ring-primary" />
                 </div>
                 <div className="w-32 flex items-center gap-2">
-                  <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{task.assignee.avatar}</AvatarFallback></Avatar>
-                  <span className="text-xs font-semibold truncate">{task.assignee.name}</span>
+                  <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{task.assignee?.avatar}</AvatarFallback></Avatar>
+                  <span className="text-xs font-semibold truncate">{task.assignee?.name}</span>
                 </div>
                 <div className="w-12 text-center">
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600" onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))}><Trash2 className="w-4 h-4" /></Button>
@@ -706,7 +706,7 @@ export default function TaskManagerPage() {
                         <input type="date" value={task.dueDate} onChange={(e) => updateTaskField(task.id, 'dueDate', e.target.value)} className="h-7 w-full text-xs rounded-md border border-border/50 bg-transparent px-2 hover:bg-muted/50 focus:bg-background outline-none focus:ring-1" />
                       </td>
                       <td className="px-4 py-3">
-                        <div className="flex items-center gap-2"><Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-primary/10">{task.assignee.avatar}</AvatarFallback></Avatar><span className="text-xs font-semibold">{task.assignee.name}</span></div>
+                        <div className="flex items-center gap-2"><Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-primary/10">{task.assignee?.avatar}</AvatarFallback></Avatar><span className="text-xs font-semibold">{task.assignee?.name}</span></div>
                       </td>
                       <td className="px-4 py-3">
                         {task.dealReference ? (
