@@ -1,0 +1,14 @@
+{
+  "name": "bridgebreak-enquiries-server",
+  "version": "1.0.0",
+  "description": "Standalone HTTPS server for website enquiries → CRM integration",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node index.js",
+    "generate-certs": "mkdir -p certs && openssl req -x509 -newkey rsa:2048 -keyout certs/server.key -out certs/server.cert -days 365 -nodes -subj '/CN=localhost'"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
