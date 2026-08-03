@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { verifyAuthToken } from '@/lib/auth/verify-token';
 
 export const runtime = 'nodejs';
 
@@ -9,12 +10,15 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'No ID token provided' }, { status: 400 });
     }
 
-    const expiresIn = 60 * 60 * 24 * 14 * 1000; // 14 days
+    // Verify the Firebase ID token using RSA-SHA256 signature verification
+    const verified = await verifyAuthToken(idToken);
+    if (!verified) {
+      return NextResponse.json({ error: 'Invalid or expired token' }, { status: 401 });
+    }
 
-    // Extract UID from the JWT without Admin SDK verification.
-    // The client-side Firebase SDK already validated this token.
-    const payload = JSON.parse(Buffer.from(idToken.split('.')[1], 'base64').toString());
-    const uid: string = payload.uid || payload.sub;
+    const uid = verified.uid;
+
+    const expiresIn = 60 * 60 * 24 * 14 * 1000; // 14 days
 
     const response = NextResponse.json({ success: true, uid });
     

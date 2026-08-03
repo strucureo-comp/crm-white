@@ -1,7 +1,11 @@
 import { getApp, getApps, initializeApp, cert } from 'firebase-admin/app';
 import { Auth, getAuth } from 'firebase-admin/auth';
+import { Database, getDatabase } from 'firebase-admin/database';
 
 let adminAuthInstance: Auth | null = null;
+let adminDbInstance: Database | null = null;
+
+const DEFAULT_DATABASE_URL = 'https://crm-whitelab-default-rtdb.asia-southeast1.firebasedatabase.app';
 
 export function isAdminAvailable(): boolean {
   return true;
@@ -20,7 +24,7 @@ function getAdminApp() {
 
   return initializeApp({
     credential: cert({ projectId, clientEmail, privateKey }),
-    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || DEFAULT_DATABASE_URL,
   });
 }
 
@@ -30,4 +34,12 @@ export function getAdminAuth(): Auth {
     adminAuthInstance = getAuth(app);
   }
   return adminAuthInstance;
+}
+
+export function getAdminDatabase(): Database {
+  if (!adminDbInstance) {
+    const app = getAdminApp();
+    adminDbInstance = getDatabase(app);
+  }
+  return adminDbInstance;
 }

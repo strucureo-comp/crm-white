@@ -14,11 +14,18 @@ const MAX_LENGTHS = { name: 100, email: 254, subject: 200, message: 5000, phone:
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, subject, message, phone } = body;
+    const { name, email, subject, message, phone, company_id } = body;
 
     if (!name || !email || !message) {
       return NextResponse.json(
         { error: 'Missing required fields' },
+        { status: 400 }
+      );
+    }
+
+    if (!company_id) {
+      return NextResponse.json(
+        { error: 'Missing company_id — enquiries must be associated with a workspace' },
         { status: 400 }
       );
     }
@@ -45,6 +52,7 @@ export async function POST(request: Request) {
     }
 
     const enquiryId = await createEnquiry({
+      company_id: sanitize(company_id),
       name: sanitize(name),
       email: sanitize(email),
       subject: subject ? sanitize(String(subject).slice(0, MAX_LENGTHS.subject)) : 'New Website Enquiry',

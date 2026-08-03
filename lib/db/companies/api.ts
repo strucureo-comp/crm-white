@@ -202,7 +202,7 @@ export function getCompanyDefaults(company: Company): AutoFillDefaults {
 }
 
 /**
- * Calculate company statistics
+ * Calculate company statistics by querying related entities
  */
 export async function getCompanyStats(
   workspaceId: string, 
@@ -214,13 +214,41 @@ export async function getCompanyStats(
   invoice_count: number;
   total_revenue: number;
 }> {
-  // This would be implemented by querying related entities
-  // For now, return zeros
-  return {
-    contact_count: 0,
-    deal_count: 0,
-    quote_count: 0,
-    invoice_count: 0,
-    total_revenue: 0,
-  };
+  try {
+    const [contactsSnap, dealsSnap, quotesSnap, invoicesSnap] = await Promise.all([
+      get(query(ref(db, `workspaces/${workspaceId}/contacts`), orderByChild('company_id'), equalTo(companyId))),
+      get(query(ref(db, `workspaces/${workspaceId}/deals`), orderByChild('company_id'), equalTo(companyId))),
+      get(query(ref(db, `workspaces/${workspaceId}/quotes`), orderByChild('company_id'), equalTo(companyId))),
+      get(query(ref(db, `workspaces/${workspaceId}/invoices`), orderByChild('company_id'), equalTo(companyId))),
+    ]);
+
+    const contacts = contactsSnap.val() || {};
+    const deals = dealsSnap.val() || {};
+    const quotes = quotesSnap.val() || {};
+    const invoices = invoicesSnap.val() || {};
+
+    let totalRevenue = 0;
+    for (const inv of Object.values(invoices) as any[]) {
+      if (inv.status === 'paid' && inv.amount) {
+        totalRevenue += Number(inv.amount) || 0;
+      }
+    }
+
+    return {
+      contact_count: Object.keys(contacts).length,
+      deal_count: Object.keys(deals).length,
+      quote_count: Object.keys(quotes).length,
+      invoice_count: Object.keys(invoices).length,
+      total_revenue: totalRevenue,
+    };
+  } catch (error) {
+    console.error('getCompanyStats error:', error);
+    return {
+      contact_count: 0,
+      deal_count: 0,
+      quote_count: 0,
+      invoice_count: 0,
+      total_revenue: 0,
+    };
+  }
 }

@@ -1,207 +1,148 @@
-/**
- * Event Bridge - Connects all modules through events
- * 
- * When a lead is qualified, it creates a contact.
- * When a deal is won, it creates an invoice.
- * When a quote is accepted, it creates an invoice.
- * When a payment is received, it updates the invoice.
- * 
- * All automatic, all connected.
- */
+import { database } from '../../firebase/config';
+import { ref, get, update, onValue } from 'firebase/database';
+import { emitEvent } from './index';
+import { handleQuoteAccepted, handleInvoicePaid, convertLeadToContact } from '../conversion';
+import type { NormalizedLead } from '../types';
 
-import { EventType } from '../types';
-import { onEvent, emitEvent } from './index';
-import { getQuote, updateQuote } from '../quotes/api';
-import { getInvoice, updateInvoice } from '../invoices/api';
-import { getDeal, updateDeal } from '../deals/api';
-import { logQuoteAccepted, logInvoicePaid, logDealWon } from '../activities/api';
-
-// ===== Event Handlers =====
-
-/**
- * Initialize event bridge
- * Call this once when the app starts
- */
-export function initEventBridge(workspaceId: string) {
-  // Quote accepted → Create invoice
-  onEvent('quote:accepted', async (data) => {
-    console.log('[EventBridge] Quote accepted:', data.quote_id);
-    // Invoice creation is handled in conversion pipeline
-  });
-
-  // Quote rejected → Update deal probability
-  onEvent('quote:rejected', async (data) => {
-    console.log('[EventBridge] Quote rejected:', data.quote_id);
-    if (data.deal_id) {
-      await updateDeal(workspaceId, data.deal_id, {
-        probability: Math.max(0, (data.probability || 50) - 20),
-      });
-    }
-  });
-
-  // Invoice paid → Update deal status
-  onEvent('invoice:paid', async (data) => {
-    console.log('[EventBridge] Invoice paid:', data.invoice_id);
-    if (data.deal_id) {
-      await updateDeal(workspaceId, data.deal_id, {
-        status: 'won',
-        actual_close_date: new Date().toISOString(),
-        probability: 100,
-      });
-      await logDealWon(workspaceId, data.deal_id, '', data.company_id, data.contact_id);
-    }
-  });
-
-  // Deal won → Log activity
-  onEvent('deal:won', async (data) => {
-    console.log('[EventBridge] Deal won:', data.deal_id);
-    // Activity already logged by the caller
-  });
-
-  // Deal lost → Log activity
-  onEvent('deal:lost', async (data) => {
-    console.log('[EventBridge] Deal lost:', data.deal_id);
-    // Activity already logged by the caller
-  });
-
-  // Lead qualified → Create contact
-  onEvent('lead:qualified', async (data) => {
-    console.log('[EventBridge] Lead qualified:', data.lead_id);
-    // Contact creation is handled in conversion pipeline
-  });
-
-  // Lead converted → Update lead status
-  onEvent('lead:converted', async (data) => {
-    console.log('[EventBridge] Lead converted:', data.lead_id, '→', data.conversion_type);
-  });
-
-  // Payment received → Update invoice
-  onEvent('payment:received', async (data) => {
-    console.log('[EventBridge] Payment received:', data.payment_id);
-    // Invoice update is handled in payment recording
-  });
-
-  // Activity logged → Update entity timestamps
-  onEvent('activity:created', async (data) => {
-    console.log('[EventBridge] Activity created:', data.type);
-    // Could update last_activity_at on the entity
-  });
-
-  console.log('[EventBridge] Initialized');
-}
-
-// ===== Utility Functions =====
-
-/**
- * Emit quote accepted event with side effects
- */
-export async function acceptQuote(workspaceId: string, quoteId: string) {
-  const quote = await getQuote(workspaceId, quoteId);
-  if (!quote) throw new Error('Quote not found');
-
-  // Update quote status
-  await updateQuote(workspaceId, quoteId, { status: 'accepted' });
-
-  // Emit event
-  emitEvent('quote:accepted', {
-    quote_id: quoteId,
-    company_id: quote.company_id,
-    contact_id: quote.contact_id,
-    deal_id: quote.deal_id,
-    total: quote.total,
-  });
-
-  // Log activity
-  await logQuoteAccepted(workspaceId, quoteId, quote.quote_number, quote.company_id, quote.contact_id, quote.deal_id);
+function companyRef(companyId: string, ...segments: string[]) {
+  return ref(database, `workspaces/${companyId}/${segments.join('/')}`);
 }
 
 /**
- * Emit quote rejected event with side effects
+ * Initialize event bridge: subscribe to relevant Firebase paths
+ * and wire them to the conversion pipeline.
  */
-export async function rejectQuote(workspaceId: string, quoteId: string) {
-  const quote = await getQuote(workspaceId, quoteId);
-  if (!quote) throw new Error('Quote not found');
+export function initEventBridge(companyId: string): () => void {
+  // Lead status change → auto-convert to contact when qualified
+  const leadsRef = companyRef(companyId, 'leads');
+  const leadsListener = (snapshot: any) => {
+    const data = snapshot.val();
+    if (!data) return;
 
-  // Update quote status
-  await updateQuote(workspaceId, quoteId, { status: 'rejected' });
+    Object.entries(data).forEach(async ([id, lead]: [string, any]) => {
+      if (lead.status === 'qualified' && !lead.contact_id) {
+        try {
+          // Fetch full lead data for conversion
+          const leadSnap = await get(companyRef(companyId, `leads/${id}`));
+          const leadData = leadSnap.val();
+          if (!leadData) return;
 
-  // Emit event
-  emitEvent('quote:rejected', {
-    quote_id: quoteId,
-    company_id: quote.company_id,
-    contact_id: quote.contact_id,
-    deal_id: quote.deal_id,
-    probability: quote.deal_id ? (await getDeal(workspaceId, quote.deal_id))?.probability : undefined,
-  });
-}
+          const normalizedLead: NormalizedLead = {
+            lead_id: id,
+            workspace_id: companyId,
+            company_id: leadData.company_id || '',
+            contact_id: leadData.contact_id || '',
+            name: leadData.name || '',
+            email: leadData.email || '',
+            phone: leadData.phone || '',
+            source: leadData.source || 'unknown',
+            status: leadData.status || 'new',
+            intent: leadData.intent || 'warm',
+            lead_score: leadData.lead_score || 0,
+            probability: leadData.probability || 0,
+            potential_value: leadData.potential_value || 0,
+            tags: leadData.tags || [],
+            last_contacted: leadData.last_contacted || '',
+            next_follow_up: leadData.next_follow_up || '',
+            follow_up_notes: leadData.follow_up_notes || '',
+            converted_to_contact: leadData.converted_to_contact || '',
+            converted_to_deal: leadData.converted_to_deal || '',
+            converted_at: leadData.converted_at || '',
+            created_at: leadData.created_at || '',
+            updated_at: leadData.updated_at || '',
+            created_by: leadData.created_by || '',
+          };
 
-/**
- * Emit invoice paid event with side effects
- */
-export async function markInvoicePaid(workspaceId: string, invoiceId: string, amount: number) {
-  const invoice = await getInvoice(workspaceId, invoiceId);
-  if (!invoice) throw new Error('Invoice not found');
+          const contact = await convertLeadToContact(companyId, id, normalizedLead);
+          if (contact) {
+            emitEvent('lead:qualified', {
+              leadId: id,
+              contactId: contact.contact_id,
+              status: 'qualified',
+              companyId,
+            });
+          }
+        } catch (err) {
+          console.error('[EventBridge] Failed to convert lead:', id, err);
+        }
+      }
+    });
+  };
 
-  // Update invoice
-  await updateInvoice(workspaceId, invoiceId, {
-    status: 'paid',
-    amount_paid: invoice.total,
-    amount_due: 0,
-    paid_date: new Date().toISOString(),
-  });
+  // Deal status change → emit deal:won when status changes to won
+  const dealsRef = companyRef(companyId, 'deals');
+  const dealsListener = (snapshot: any) => {
+    const data = snapshot.val();
+    if (!data) return;
 
-  // Emit event
-  emitEvent('invoice:paid', {
-    invoice_id: invoiceId,
-    company_id: invoice.company_id,
-    contact_id: invoice.contact_id,
-    deal_id: invoice.deal_id,
-    total: invoice.total,
-  });
-}
+    Object.entries(data).forEach(([id, deal]: [string, any]) => {
+      if (deal.status === 'won' && !deal.invoice_id) {
+        emitEvent('deal:won', {
+          dealId: id,
+          companyId,
+          amount: deal.amount,
+        });
+      }
+    });
+  };
 
-/**
- * Emit deal won event with side effects
- */
-export async function markDealWon(workspaceId: string, dealId: string) {
-  const deal = await getDeal(workspaceId, dealId);
-  if (!deal) throw new Error('Deal not found');
+  // Quote status change → create invoice when accepted
+  const quotesRef = companyRef(companyId, 'quotes');
+  const quotesListener = (snapshot: any) => {
+    const data = snapshot.val();
+    if (!data) return;
 
-  // Update deal
-  await updateDeal(workspaceId, dealId, {
-    status: 'won',
-    actual_close_date: new Date().toISOString(),
-    probability: 100,
-  });
+    Object.entries(data).forEach(async ([id, quote]: [string, any]) => {
+      if (quote.status === 'accepted' && !quote.invoice_id) {
+        try {
+          const invoice = await handleQuoteAccepted(companyId, id);
+          if (invoice) {
+            emitEvent('quote:accepted', {
+              quoteId: id,
+              invoiceId: invoice.invoice_id,
+              companyId,
+            });
+          }
+        } catch (err) {
+          console.error('[EventBridge] Failed to handle quote accepted:', id, err);
+        }
+      }
+    });
+  };
 
-  // Emit event
-  emitEvent('deal:won', {
-    deal_id: dealId,
-    company_id: deal.company_id,
-    contact_id: deal.contact_id,
-    value: deal.value,
-  });
-}
+  // Invoice payment → update deal and contact
+  const invoicesRef = companyRef(companyId, 'invoices');
+  const invoicesListener = (snapshot: any) => {
+    const data = snapshot.val();
+    if (!data) return;
 
-/**
- * Emit deal lost event with side effects
- */
-export async function markDealLost(workspaceId: string, dealId: string) {
-  const deal = await getDeal(workspaceId, dealId);
-  if (!deal) throw new Error('Deal not found');
+    Object.entries(data).forEach(async ([id, invoice]: [string, any]) => {
+      if (invoice.status === 'paid' && !invoice._bridge_processed) {
+        try {
+          await handleInvoicePaid(companyId, id);
+          await update(companyRef(companyId, `invoices/${id}`), { _bridge_processed: true });
+          emitEvent('invoice:paid', {
+            invoiceId: id,
+            companyId,
+            amount: invoice.amount,
+          });
+        } catch (err) {
+          console.error('[EventBridge] Failed to handle invoice paid:', id, err);
+        }
+      }
+    });
+  };
 
-  // Update deal
-  await updateDeal(workspaceId, dealId, {
-    status: 'lost',
-    actual_close_date: new Date().toISOString(),
-    probability: 0,
-  });
+  // Subscribe
+  const unsubs = [
+    onValue(leadsRef, leadsListener),
+    onValue(dealsRef, dealsListener),
+    onValue(quotesRef, quotesListener),
+    onValue(invoicesRef, invoicesListener),
+  ];
 
-  // Emit event
-  emitEvent('deal:lost', {
-    deal_id: dealId,
-    company_id: deal.company_id,
-    contact_id: deal.contact_id,
-    value: deal.value,
-  });
+  // Cleanup
+  return () => {
+    unsubs.forEach((unsub: () => void) => unsub());
+  };
 }

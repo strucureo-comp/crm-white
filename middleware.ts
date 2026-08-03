@@ -31,7 +31,9 @@ export async function middleware(req: NextRequest) {
     try {
       // Decode base64 JSON payload
       const decoded = JSON.parse(atob(sessionCookie));
-      sessionValid = !!decoded.uid;
+      // Verify token hasn't expired
+      const notExpired = !decoded.exp || decoded.exp > Date.now();
+      sessionValid = !!decoded.uid && notExpired;
       companyId = decoded.companyId || '';
     } catch (e) {
       // Fallback for legacy generic sessions (dev_uid_timestamp)

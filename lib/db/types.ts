@@ -2028,7 +2028,7 @@ export interface WebhookLog {
 }
 
 // Connected Apps / Integrations
-export type IntegrationPlatform = 'google' | 'microsoft' | 'slack' | 'zapier' | 'hubspot' | 'salesforce' | 'quickbooks' | 'stripe' | 'custom';
+export type IntegrationPlatform = 'google' | 'microsoft' | 'slack' | 'zapier' | 'hubspot' | 'salesforce' | 'quickbooks' | 'stripe' | 'whatsapp' | 'meta_ads' | 'google_ads' | 'website_enquiries' | 'custom';
 export interface ConnectedApp {
   id: string;
   app_id?: string;
