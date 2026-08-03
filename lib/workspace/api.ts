@@ -8,12 +8,6 @@ const WORKSPACES_PATH = 'workspaces';
 const WORKSPACE_MEMBERS_PATH = 'workspace_members';
 const PLATFORM_ADMINS_PATH = 'platform_admins';
 
-const SUPER_ADMIN_EMAILS = [
-  'viyasramachandran@gmail.com',
-  'aathish@strucureo.works',
-  'aathihacker2004@gmail.com',
-];
-
 // ===== WORKSPACE CRUD =====
 
 export async function createWorkspace(
@@ -150,7 +144,7 @@ export async function createWorkspaceMember(
       workspace_id: workspaceId,
       user_id: userId,
       role,
-      invited_by: invitedBy,
+      ...(invitedBy ? { invited_by: invitedBy } : {}),
       joined_at: new Date().toISOString(),
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
@@ -201,15 +195,6 @@ export async function getUserWorkspaceRole(userId: string): Promise<{ workspace:
 
 export async function isPlatformAdmin(userId: string): Promise<boolean> {
   try {
-    // Check hardcoded list first
-    const userSnapshot = await get(ref(database, `users/${userId}`));
-    if (userSnapshot.exists()) {
-      const userData = userSnapshot.val();
-      if (SUPER_ADMIN_EMAILS.includes(userData.email?.toLowerCase())) {
-        return true;
-      }
-    }
-
     // Check platform_admins collection
     const snapshot = await get(ref(database, PLATFORM_ADMINS_PATH));
     if (!snapshot.exists()) return false;
