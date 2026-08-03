@@ -79,22 +79,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (errorMsg.includes('Permission denied')) {
         console.warn('Firebase permission denied. Using minimal user profile.');
         
-        // Check if this is a known admin email
-        const adminEmails = [
-          'viyasramachandran@gmail.com',
-          'aathish@strucureo.works',
-          'aathihacker2004@gmail.com',
-        ];
-        const isAdmin = adminEmails.includes(firebaseUser.email?.toLowerCase() || '');
-        
-        // Still allow user to access the app with basic info
+        // Default to client role; admin access managed via platform_admins collection
         resolvedUser = {
           id: firebaseUser.uid,
           user_id: firebaseUser.uid,
           company_id: '',
           email: firebaseUser.email!,
           full_name: firebaseUser.displayName || firebaseUser.email!.split('@')[0],
-          role: isAdmin ? 'admin' : 'client',
+          role: 'client',
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         };
@@ -233,14 +225,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Check if this email is a known admin
-      const adminEmails = [
-        'viyasramachandran@gmail.com',
-        'aathish@strucureo.works',
-        'aathihacker2004@gmail.com',
-      ];
       // The first user who signs up gets marked as 'admin' (unless they are invited to an existing company)
-      let finalRole: UserRole = existingCompanyId ? 'client' : (adminEmails.includes(email.toLowerCase()) ? 'admin' : 'admin');
+      let finalRole: UserRole = existingCompanyId ? 'client' : 'admin';
 
       let resolvedCompanyId = existingCompanyId || '';
       let resolvedWorkspaceId = existingWorkspaceId || '';
