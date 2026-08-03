@@ -167,46 +167,46 @@ export default function ContractsPage() {
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="border-border shadow-sm rounded-xl">
-          <CardContent className="p-5 flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Active Contracts</span>
+          <CardContent className="p-3 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
+            <span className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground tracking-wider">Active</span>
             <div className="flex items-end justify-between">
-              <span className="text-3xl font-black text-foreground tracking-tighter">{activeContractsCount}</span>
-              <div className="w-8 h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle size={16} /></div>
+              <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">{activeContractsCount}</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center"><CheckCircle size={14} className="sm:hidden" /><CheckCircle size={16} className="hidden sm:block" /></div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-border shadow-sm rounded-xl">
-          <CardContent className="p-5 flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Expiring Contracts</span>
+          <CardContent className="p-3 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
+            <span className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground tracking-wider">Expiring</span>
             <div className="flex items-end justify-between">
-              <span className="text-3xl font-black text-foreground tracking-tighter">{expiringContractsCount}</span>
-              <div className="w-8 h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center"><AlertTriangle size={16} /></div>
+              <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">{expiringContractsCount}</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-amber-50 text-amber-600 flex items-center justify-center"><AlertTriangle size={14} className="sm:hidden" /><AlertTriangle size={16} className="hidden sm:block" /></div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-border shadow-sm rounded-xl">
-          <CardContent className="p-5 flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Draft Contracts</span>
+          <CardContent className="p-3 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
+            <span className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground tracking-wider">Draft</span>
             <div className="flex items-end justify-between">
-              <span className="text-3xl font-black text-foreground tracking-tighter">{draftContractsCount}</span>
-              <div className="w-8 h-8 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center"><Clock size={16} /></div>
+              <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">{draftContractsCount}</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-gray-50 text-gray-600 flex items-center justify-center"><Clock size={14} className="sm:hidden" /><Clock size={16} className="hidden sm:block" /></div>
             </div>
           </CardContent>
         </Card>
         <Card className="border-border shadow-sm rounded-xl">
-          <CardContent className="p-5 flex flex-col gap-2">
-            <span className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Active ARR (USD Equivalent)</span>
+          <CardContent className="p-3 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
+            <span className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground tracking-wider">Active ARR</span>
             <div className="flex items-end justify-between">
-              <span className="text-3xl font-black text-foreground tracking-tighter">{formatCurrency(totalARR, 'USD')}</span>
-              <div className="w-8 h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><Briefcase size={16} /></div>
+              <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">{formatCurrency(totalARR, 'USD')}</span>
+              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><Briefcase size={14} className="sm:hidden" /><Briefcase size={16} className="hidden sm:block" /></div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4 items-center">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 items-stretch sm:items-center">
         <div className="relative flex-1 max-w-md w-full">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -216,9 +216,9 @@ export default function ContractsPage() {
             onChange={(e) => setSearch(e.target.value)}
           />
         </div>
-        <div className="flex gap-2 w-full sm:w-auto">
+        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
           <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[150px] bg-background border-border rounded-xl font-medium text-sm">
+            <SelectTrigger className="w-full sm:w-[150px] bg-background border-border rounded-xl font-medium text-sm">
               <SelectValue placeholder="Status" />
             </SelectTrigger>
             <SelectContent>
@@ -232,7 +232,7 @@ export default function ContractsPage() {
           </Select>
 
           <Select value={templateFilter} onValueChange={setTemplateFilter}>
-            <SelectTrigger className="w-[180px] bg-background border-border rounded-xl font-medium text-sm">
+            <SelectTrigger className="w-full sm:w-[180px] bg-background border-border rounded-xl font-medium text-sm">
               <SelectValue placeholder="Contract Type" />
             </SelectTrigger>
             <SelectContent>

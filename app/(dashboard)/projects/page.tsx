@@ -66,7 +66,7 @@ const CircularProgress = ({ progress, color }: { progress: number, color: string
         <circle className="text-muted/30" strokeWidth="3" stroke="currentColor" fill="transparent" r={radius} cx="16" cy="16" />
         <circle strokeWidth="3" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" stroke={color} fill="transparent" r={radius} cx="16" cy="16" />
       </svg>
-      <span className="absolute text-[8px] font-bold">{progress}%</span>
+      <span className="absolute text-[8px] font-medium">{progress}%</span>
     </div>
   );
 };
@@ -230,7 +230,7 @@ export default function ProjectsPage() {
       {/* 2. Global Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 shrink-0">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Project Management</h2>
+          <h2 className="text-xl font-semibold tracking-tight">Project Management</h2>
           <p className="text-sm text-muted-foreground mt-1">Manage projects across different phases</p>
         </div>
         <div className="flex items-center gap-3">
@@ -243,7 +243,7 @@ export default function ProjectsPage() {
               className="pl-9 bg-background focus-visible:ring-1"
             />
           </div>
-          <Button variant="outline" onClick={() => setIsCreateOpen(true)} className="shadow-sm">
+          <Button variant="outline" onClick={() => setIsCreateOpen(true)}>
             <Plus className="w-4 h-4 mr-2" />
             Create Project
           </Button>
@@ -281,8 +281,8 @@ export default function ProjectsPage() {
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
                                 onClick={() => setSelectedProject(project)}
-                                className={`cursor-pointer transition-all border shadow-sm hover:shadow-md bg-background group
-                                  ${snapshot.isDragging ? 'shadow-xl ring-2 ring-primary/20 rotate-2' : 'hover:border-primary/30'}
+                                className={`cursor-pointer transition-all border bg-background group
+                                  ${snapshot.isDragging ? 'ring-2 ring-primary/20 rotate-2' : 'hover:border-primary/30'}
                                 `}
                                 style={{ ...provided.draggableProps.style }}
                               >
@@ -290,7 +290,7 @@ export default function ProjectsPage() {
                                   <div className="flex items-start justify-between gap-2">
                                     <div className="flex gap-2.5">
                                       <span className="text-2xl leading-none">{project.emoji}</span>
-                                      <h4 className="font-bold text-sm leading-tight text-foreground line-clamp-2">{project.name}</h4>
+                                      <h4 className="font-medium text-sm leading-tight text-foreground line-clamp-2">{project.name}</h4>
                                     </div>
                                     <CircularProgress progress={project.progress} color={project.color} />
                                   </div>
@@ -303,8 +303,8 @@ export default function ProjectsPage() {
                                         const mem = members.find(m => m.id === mid);
                                         if (!mem) return null;
                                         return (
-                                          <Avatar key={mid} className="h-6 w-6 border-2 border-background shadow-sm" title={mem.name}>
-                                            <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{mem.avatar}</AvatarFallback>
+                                          <Avatar key={mid} className="h-6 w-6 border-2 border-background" title={mem.name}>
+                                            <AvatarFallback className="text-[9px] bg-muted-foreground/10">{mem.avatar}</AvatarFallback>
                                           </Avatar>
                                         );
                                       })}
@@ -328,7 +328,7 @@ export default function ProjectsPage() {
 
       {/* 4. Create Project Modal */}
       <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-        <DialogContent className="sm:max-w-[500px] bg-background/95 backdrop-blur-xl border-border/60 shadow-2xl">
+        <DialogContent className="sm:max-w-[500px]">
           <DialogHeader>
             <DialogTitle>Create New Project</DialogTitle>
           </DialogHeader>
@@ -369,7 +369,7 @@ export default function ProjectsPage() {
                         className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded-md cursor-pointer transition-colors"
                       >
                         <div className="flex items-center gap-2">
-                          <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px] bg-primary/10 text-primary">{m.avatar}</AvatarFallback></Avatar>
+                          <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px] bg-muted-foreground/10">{m.avatar}</AvatarFallback></Avatar>
                           <span className="text-sm">{m.name}</span>
                         </div>
                         {formMembers.includes(m.id) && <Check className="w-4 h-4 text-primary" />}
@@ -393,7 +393,7 @@ export default function ProjectsPage() {
 
       {/* 5. Project Detail Overlay (Full-Screen Modal) */}
       <Dialog open={!!selectedProject} onOpenChange={(open) => { if (!open) setSelectedProject(null); }}>
-        <DialogContent className="max-w-[90vw] h-[90vh] p-0 overflow-hidden flex bg-background shadow-2xl border-border/60">
+        <DialogContent className="max-w-[90vw] h-[90vh] p-0 overflow-hidden flex">
           {selectedProject && (
             <>
               {/* A. Left Sidebar */}
@@ -401,7 +401,7 @@ export default function ProjectsPage() {
                 <div className="p-6 pb-0 flex items-start justify-between">
                   <div className="space-y-1">
                     <span className="text-4xl">{selectedProject.emoji}</span>
-                    <h2 className="text-xl font-bold leading-tight mt-2">{selectedProject.name}</h2>
+                    <h2 className="text-lg font-semibold leading-tight mt-2">{selectedProject.name}</h2>
                     <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{selectedProject.status}</p>
                   </div>
                   <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground" onClick={() => setSelectedProject(null)}>
@@ -411,7 +411,7 @@ export default function ProjectsPage() {
 
                 <div className="p-6 space-y-8 overflow-y-auto">
                   <div className="space-y-3">
-                    <div className="flex items-center justify-between text-sm font-bold">
+                    <div className="flex items-center justify-between text-sm font-medium">
                       <span>Progress</span>
                       <span style={{ color: selectedProject.color }}>{selectedProject.progress}%</span>
                     </div>
@@ -421,7 +421,7 @@ export default function ProjectsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-bold border-b pb-2">Dates</h4>
+                    <h4 className="text-xs font-medium text-muted-foreground border-b pb-2">Dates</h4>
                     <div className="flex items-center justify-between text-sm">
                       <span className="text-muted-foreground">Start Date</span>
                       <span className="font-semibold">{selectedProject.startDate}</span>
@@ -437,14 +437,14 @@ export default function ProjectsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-bold border-b pb-2">Team</h4>
+                    <h4 className="text-xs font-medium text-muted-foreground border-b pb-2">Team</h4>
                     <div className="flex flex-wrap gap-2">
                       {selectedProject.members.map(mid => {
                         const mem = members.find(m => m.id === mid);
                         if (!mem) return null;
                         return (
-                          <Badge key={mid} variant="secondary" className="pl-1 pr-2 py-1 gap-1.5 bg-background border shadow-sm">
-                            <Avatar className="h-4 w-4"><AvatarFallback className="text-[7px] bg-primary/10 text-primary">{mem.avatar}</AvatarFallback></Avatar>
+                          <Badge key={mid} variant="secondary" className="pl-1 pr-2 py-1 gap-1.5">
+                            <Avatar className="h-4 w-4"><AvatarFallback className="text-[7px] bg-muted-foreground/10">{mem.avatar}</AvatarFallback></Avatar>
                             <span className="font-medium text-xs">{mem.name}</span>
                           </Badge>
                         );
@@ -453,7 +453,7 @@ export default function ProjectsPage() {
                   </div>
 
                   <div className="space-y-3">
-                    <h4 className="text-xs uppercase tracking-wider text-muted-foreground font-bold border-b pb-2">Linked Entities</h4>
+                    <h4 className="text-xs font-medium text-muted-foreground border-b pb-2">Linked Entities</h4>
                     {selectedProject.linkedDeal ? (
                       <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{selectedProject.linkedDeal}</Badge>
                     ) : (
@@ -470,7 +470,7 @@ export default function ProjectsPage() {
                     <button
                       key={tab}
                       onClick={() => setActiveTab(tab)}
-                      className={`pb-3 text-sm transition-colors whitespace-nowrap ${activeTab === tab ? 'font-bold text-foreground border-b-[3px] border-purple-500' : 'font-medium text-muted-foreground hover:text-foreground'}`}
+                      className={`pb-3 text-sm transition-colors whitespace-nowrap ${activeTab === tab ? 'font-medium text-foreground border-b-[3px] border-primary' : 'font-medium text-muted-foreground hover:text-foreground'}`}
                     >
                       {tab}
                     </button>
@@ -487,11 +487,11 @@ export default function ProjectsPage() {
                         return (
                           <div key={phase} className="space-y-3">
                             <div className="flex items-center gap-2">
-                              <h3 className="text-lg font-bold">{phase}</h3>
+                              <h3 className="text-sm font-medium">{phase}</h3>
                               <Badge variant="secondary" className="text-xs px-1.5 py-0">{phaseTasks.length}</Badge>
                             </div>
 
-                            <div className="bg-card border rounded-lg shadow-sm overflow-hidden">
+                            <div className="bg-card border rounded-lg overflow-hidden">
                               <table className="w-full text-sm text-left">
                                 <tbody className="divide-y divide-border">
                                   {phaseTasks.map(task => {
@@ -507,14 +507,14 @@ export default function ProjectsPage() {
                                         <td className="px-4 py-3 w-40">
                                           {owner && (
                                             <div className="flex items-center gap-2">
-                                              <Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-primary/10 text-primary">{owner.avatar}</AvatarFallback></Avatar>
+                                              <Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-muted-foreground/10">{owner.avatar}</AvatarFallback></Avatar>
                                               <span className="text-xs text-muted-foreground">{owner.name}</span>
                                             </div>
                                           )}
                                         </td>
                                         <td className="px-4 py-3 w-32 text-xs text-muted-foreground">{task.due}</td>
                                         <td className="px-4 py-3 w-28">
-                                          <Badge variant="outline" className={`text-[10px] ${task.priority === 'Urgent' ? 'bg-red-50 text-red-600 border-red-200' : task.priority === 'High' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-slate-50 text-slate-600'}`}>
+                                          <Badge variant="outline" className={`text-[10px] ${task.priority === 'Urgent' ? 'bg-red-50 text-red-600 border-red-200' : task.priority === 'High' ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-muted text-muted-foreground'}`}>
                                             {task.priority}
                                           </Badge>
                                         </td>
@@ -525,7 +525,7 @@ export default function ProjectsPage() {
                               </table>
                               <div className="p-2 bg-muted/20 border-t">
                                 {addingTaskPhase === phase ? (
-                                  <div className="flex items-center gap-2 bg-background p-2 rounded border shadow-sm flex-wrap sm:flex-nowrap">
+                                  <div className="flex items-center gap-2 bg-background p-2 rounded border flex-wrap sm:flex-nowrap">
                                     <Input placeholder="Task subject" value={taskFormTitle} onChange={e => setTaskFormTitle(e.target.value)} className="h-8 text-xs flex-1 min-w-[150px]" autoFocus />
                                     <Select value={taskFormOwner} onValueChange={setTaskFormOwner}>
                                       <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Assignee" /></SelectTrigger>
@@ -566,7 +566,7 @@ export default function ProjectsPage() {
                     <div className="space-y-6 h-full flex flex-col">
                       <div className="flex items-center justify-between border-b pb-4 shrink-0">
                         <div className="flex gap-2">
-                          <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">All</Badge>
+                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All</Badge>
                           <Badge variant="outline" className="cursor-pointer">Deal files</Badge>
                           <Badge variant="outline" className="cursor-pointer">Project files</Badge>
                         </div>
@@ -576,15 +576,15 @@ export default function ProjectsPage() {
                       </div>
                       <div className="border-2 border-dashed border-emerald-500/30 rounded-xl bg-emerald-500/5 p-8 flex flex-col items-center justify-center text-center shrink-0">
                         <UploadCloud className="w-10 h-10 text-emerald-600 mb-3" />
-                        <p className="font-bold mb-4">Drag and drop files here</p>
+                        <p className="font-medium mb-4">Drag and drop files here</p>
                         <div className="flex gap-3">
-                          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm">Upload files</Button>
+                          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">Upload files</Button>
                           <Button variant="outline" className="bg-background">Connect to Google Drive</Button>
                         </div>
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
                         <FileIcon className="w-16 h-16 mb-4" />
-                        <p className="font-bold">No files added yet</p>
+                        <p className="font-medium">No files added yet</p>
                       </div>
                     </div>
                   )}
@@ -592,15 +592,15 @@ export default function ProjectsPage() {
                   {/* NOTES TAB */}
                   {activeTab === 'Notes' && (
                     <div className="space-y-6 h-full flex flex-col">
-                      <div className="bg-card border shadow-sm rounded-xl p-4 shrink-0 space-y-4">
+                      <div className="bg-card border rounded-lg p-4 shrink-0 space-y-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px] bg-primary text-primary-foreground">ME</AvatarFallback></Avatar>
-                            <span className="text-sm font-bold">Current User</span>
+                            <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px] bg-muted-foreground/10">ME</AvatarFallback></Avatar>
+                            <span className="text-sm font-medium">Current User</span>
                           </div>
                           <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-bold">✅ Complete</Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground font-bold">✖ Cancel</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium">✅ Complete</Button>
+                            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground font-medium">✖ Cancel</Button>
                             <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="w-4 h-4" /></Button>
                           </div>
                         </div>
@@ -608,7 +608,7 @@ export default function ProjectsPage() {
                       </div>
                       <div className="flex items-center justify-between border-b pb-4 shrink-0">
                         <div className="flex gap-2">
-                          <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">All</Badge>
+                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All</Badge>
                           <Badge variant="outline" className="cursor-pointer">Deal notes</Badge>
                           <Badge variant="outline" className="cursor-pointer">Project notes</Badge>
                         </div>
@@ -618,7 +618,7 @@ export default function ProjectsPage() {
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
                         <MessageSquare className="w-16 h-16 mb-4" />
-                        <p className="font-bold">No notes added yet</p>
+                        <p className="font-medium">No notes added yet</p>
                       </div>
                     </div>
                   )}
@@ -626,12 +626,12 @@ export default function ProjectsPage() {
                   {/* EMAILS TAB */}
                   {activeTab === 'Emails' && (
                     <div className="space-y-6 h-full flex flex-col">
-                      <div className="bg-background border shadow-sm rounded-lg p-3 text-sm text-muted-foreground cursor-text hover:border-primary/50 transition-colors shrink-0">
+                      <div className="bg-background border rounded-md p-3 text-sm text-muted-foreground cursor-text hover:border-primary/50 transition-colors shrink-0">
                         Click here to add an email...
                       </div>
                       <div className="flex items-center justify-between border-b pb-4 shrink-0">
                         <div className="flex gap-2">
-                          <Badge variant="secondary" className="bg-primary/10 text-primary hover:bg-primary/20 cursor-pointer">All</Badge>
+                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All</Badge>
                           <Badge variant="outline" className="cursor-pointer">Deal emails</Badge>
                           <Badge variant="outline" className="cursor-pointer">Project emails</Badge>
                         </div>
@@ -641,7 +641,7 @@ export default function ProjectsPage() {
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
                         <Mail className="w-16 h-16 mb-4" />
-                        <p className="font-bold">No emails linked yet</p>
+                        <p className="font-medium">No emails linked yet</p>
                       </div>
                     </div>
                   )}
@@ -650,23 +650,23 @@ export default function ProjectsPage() {
                   {activeTab === 'Documents' && (
                     <div className="space-y-6 h-full flex flex-col">
                       <div className="flex items-center justify-between border-b pb-4 shrink-0">
-                        <div className="flex gap-6 text-sm font-bold text-muted-foreground">
+                        <div className="flex gap-6 text-sm font-medium text-muted-foreground">
                           <span className="text-foreground border-b-2 border-primary pb-4 -mb-[18px]">Documents</span>
                           <span>Templates</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Button variant="ghost" size="sm" className="h-8 text-xs font-bold">❓ Learn more</Button>
+                          <Button variant="ghost" size="sm" className="h-8 text-xs font-medium">❓ Learn more</Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8"><MoreHorizontal className="w-4 h-4" /></Button>
                         </div>
                       </div>
                       <div className="flex gap-3 shrink-0">
-                        <Button variant="outline" className="bg-background font-bold shadow-sm"><span className="mr-2">🖥️</span> Upload from device</Button>
-                        <Button variant="outline" className="bg-background font-bold shadow-sm"><span className="mr-2">☁️</span> Connect cloud storage</Button>
+                        <Button variant="outline"><span className="mr-2">🖥️</span> Upload from device</Button>
+                        <Button variant="outline"><span className="mr-2">☁️</span> Connect cloud storage</Button>
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                        <p className="text-[10px] font-bold tracking-widest uppercase mb-4 opacity-70">Documents Created</p>
+                        <p className="text-xs font-medium text-muted-foreground mb-4">Documents Created</p>
                         <FileText className="w-12 h-12 mb-3" />
-                        <p className="font-bold text-sm">No documents created yet</p>
+                        <p className="font-medium text-sm">No documents created yet</p>
                       </div>
                     </div>
                   )}

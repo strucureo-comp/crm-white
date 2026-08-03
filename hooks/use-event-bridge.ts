@@ -24,11 +24,11 @@ export function useEventBridge() {
     if (!workspace?.id) return;
     
     // Initialize event bridge with workspace ID
-    initEventBridge(workspace.id);
+    const cleanupEventBridge = initEventBridge(workspace.id);
     
     // Cleanup on unmount
     return () => {
-      // Event handlers are cleaned up automatically
+      cleanupEventBridge();
     };
   }, [workspace?.id]);
 }

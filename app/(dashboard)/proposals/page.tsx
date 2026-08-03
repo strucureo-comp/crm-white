@@ -326,7 +326,7 @@ export default function ProposalsPage() {
                       </h1>
 
                       <p className="leading-relaxed mt-6 text-foreground">
-                        This {TEMPLATES.find(t => t.id === selectedTemplate)?.name} (the "Agreement") is entered into as of {new Date().toLocaleDateString()} (the "Effective Date") by and between our company and <span className="bg-muted font-bold px-1">{formClient || '[COUNTERPARTY NAME]'}</span>.
+                        This {TEMPLATES.find(t => t.id === selectedTemplate)?.name} (the &quot;Agreement&quot;) is entered into as of {new Date().toLocaleDateString()} (the &quot;Effective Date&quot;) by and between our company and <span className="bg-muted font-bold px-1">{formClient || '[COUNTERPARTY NAME]'}</span>.
                       </p>
 
                       {selectedTemplate === 'service' && (

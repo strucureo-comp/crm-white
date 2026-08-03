@@ -17,11 +17,12 @@ export function EventBridgeProvider({ children }: { children: React.ReactNode })
     if (!workspace?.id) return;
     
     // Initialize event bridge with workspace ID
-    initEventBridge(workspace.id);
+    const cleanupEventBridge = initEventBridge(workspace.id);
     
     console.log('[EventBridge] Provider mounted for workspace:', workspace.id);
     
     return () => {
+      cleanupEventBridge();
       console.log('[EventBridge] Provider unmounted');
     };
   }, [workspace?.id]);

@@ -317,7 +317,7 @@ export default function DealsPage() {
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="flex items-center gap-3 w-full sm:w-auto">
           <Select value={selectedPipelineId} onValueChange={setSelectedPipelineId}>
-            <SelectTrigger className="w-48">
+            <SelectTrigger className="w-full sm:w-48">
               <SelectValue placeholder="All Pipelines" />
             </SelectTrigger>
             <SelectContent>
@@ -385,18 +385,18 @@ export default function DealsPage() {
       </div>
 
       {viewMode === 'list' && (
-        <div className="rounded-xl border bg-card">
-          <Table>
+        <div className="rounded-xl border bg-card overflow-x-auto">
+          <Table className="min-w-[600px]">
             <TableHeader>
               <TableRow>
                 <TableHead>Deal Name</TableHead>
-                <TableHead>Client</TableHead>
+                <TableHead className="hidden md:table-cell">Client</TableHead>
                 <TableHead>Value</TableHead>
                 <TableHead>Stage</TableHead>
-                <TableHead>Days in Stage</TableHead>
-                <TableHead>Follow-up</TableHead>
-                <TableHead>Owner</TableHead>
-                <TableHead>Source</TableHead>
+                <TableHead className="hidden lg:table-cell">Days in Stage</TableHead>
+                <TableHead className="hidden md:table-cell">Follow-up</TableHead>
+                <TableHead className="hidden lg:table-cell">Owner</TableHead>
+                <TableHead className="hidden lg:table-cell">Source</TableHead>
                 <TableHead className="w-12" />
               </TableRow>
             </TableHeader>
@@ -423,7 +423,7 @@ export default function DealsPage() {
                         {lead.name}
                       </div>
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="hidden md:table-cell">
                       <div className="flex items-center gap-1 text-muted-foreground">
                         <Building2 size={14} />
                         {lead.company || '—'}
@@ -436,8 +436,8 @@ export default function DealsPage() {
                       </Badge>
                     </TableCell>
 
-                    <TableCell className="text-muted-foreground">{daysInStage}d</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground">{daysInStage}d</TableCell>
+                    <TableCell className="hidden md:table-cell">
                       {needsFollowUp ? (
                         <div className="flex items-center gap-1 text-amber-600">
                           <AlertCircle size={14} />
@@ -451,8 +451,8 @@ export default function DealsPage() {
                         <span className="text-xs text-muted-foreground">—</span>
                       )}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">—</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden lg:table-cell text-muted-foreground">—</TableCell>
+                    <TableCell className="hidden lg:table-cell">
                       {lead.source ? (
                         <span className="text-xs text-muted-foreground">{lead.source}</span>
                       ) : (
@@ -490,7 +490,7 @@ export default function DealsPage() {
 
       {viewMode === 'kanban' && (
         <DragDropContext onDragEnd={onDragEnd}>
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4">
             {pipelineStages.map((stage) => {
               const stageLeads = grouped[stage] || [];
               return (
@@ -525,8 +525,8 @@ export default function DealsPage() {
                                   opacity: snapshot.isDragging ? 0.9 : 1,
                                 }}
                               >
-                                <Card className={`hover:shadow-sm transition-all cursor-grab active:cursor-grabbing ${snapshot.isDragging ? 'shadow-lg ring-2 ring-primary/20 scale-[1.02]' : ''}`} onClick={() => openDetailDrawer(lead)}>
-                                  <CardContent className="p-4">
+                                <Card className={`transition-all cursor-grab active:cursor-grabbing ${snapshot.isDragging ? 'ring-2 ring-border scale-[1.02]' : ''}`} onClick={() => openDetailDrawer(lead)}>
+                                  <CardContent className="p-3 sm:p-4">
                                     <div className="flex items-start justify-between mb-2">
                                       <div className="flex items-center gap-2 min-w-0">
                                         <div className={`w-2 h-2 rounded-full shrink-0 ${
@@ -626,9 +626,9 @@ export default function DealsPage() {
           </SheetHeader>
           {selectedLead && (
             <div className="space-y-6">
-              <div className="rounded-xl bg-gradient-to-br from-primary/5 to-primary/10 border p-5">
+              <div className="rounded-xl border bg-card p-5">
                 <p className="text-sm text-muted-foreground mb-1">Deal Value</p>
-                <p className="text-3xl font-bold">
+                <p className="text-2xl sm:text-3xl font-semibold">
                   {selectedLead.estimated_value ? formatCurrency(selectedLead.estimated_value) : 'Not set'}
                 </p>
               </div>

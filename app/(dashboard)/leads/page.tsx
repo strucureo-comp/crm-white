@@ -213,9 +213,9 @@ export default function LeadsPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <KpiCard
           title="Total Leads"
           value={kpis.total.toString()}
@@ -263,9 +263,9 @@ export default function LeadsPage() {
       </div>
 
       {/* Stage Tabs & Search */}
-      <div className="space-y-4">
+      <div className="space-y-3 sm:space-y-4">
         <Tabs value={stageTab} onValueChange={setStageTab}>
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
             <TabsList className="w-full sm:w-auto overflow-x-auto">
               {stageTabs.map((tab) => (
                 <TabsTrigger key={tab.value} value={tab.value} className="whitespace-nowrap">
@@ -297,7 +297,7 @@ export default function LeadsPage() {
 
         {/* Advanced Filters */}
         {showAdvanced && (
-          <div className="rounded-lg border p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+          <div className="rounded-lg border p-3 sm:p-4 space-y-3 sm:space-y-4 animate-in slide-in-from-top-2 duration-200">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
                 <SlidersHorizontal size={14} />
@@ -310,7 +310,7 @@ export default function LeadsPage() {
                 </Button>
               )}
             </div>
-            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
               <div>
                 <label className="text-xs font-medium text-muted-foreground mb-1 block">Company</label>
                 <Input
@@ -427,6 +427,7 @@ export default function LeadsPage() {
                 {
                   key: 'company',
                   header: 'Company',
+                  hideOnMobile: true,
                   render: (lead) => (
                     <div className="flex items-center gap-1.5 text-sm">
                       <Building2 size={14} className="text-muted-foreground shrink-0" />
@@ -437,6 +438,7 @@ export default function LeadsPage() {
                 {
                   key: 'tags',
                   header: 'Tags',
+                  hideOnMobile: true,
                   render: (lead) => (
                     <div className="flex flex-wrap gap-1 max-w-[140px]">
                       {(lead.tags?.length ?? 0) > 0 ? (
@@ -458,6 +460,7 @@ export default function LeadsPage() {
                 {
                   key: 'priority',
                   header: 'Priority',
+                  hideOnMobile: true,
                   render: (lead) => {
                     if (!lead.priority) return <span className="text-sm text-muted-foreground">—</span>;
                     return (
@@ -479,12 +482,14 @@ export default function LeadsPage() {
                 {
                   key: 'source',
                   header: 'Source',
+                  hideOnMobile: true,
                   render: (lead) => <span className="text-sm">{lead.source || '—'}</span>,
                 },
 
                 {
                   key: 'wa',
                   header: 'WA',
+                  hideOnMobile: true,
                   render: (lead) => (
                     <div className="flex items-center justify-center">
                       <span className={cn('flex h-2 w-2 rounded-full', lead.phone ? 'bg-primary' : 'bg-muted-foreground/30')} />
@@ -558,8 +563,8 @@ export default function LeadsPage() {
             <DialogDescription>Lead details</DialogDescription>
           </DialogHeader>
           {viewingLead && (
-            <div className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-3 sm:space-y-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">Email</p>
                   <p className="text-sm flex items-center gap-1 mt-0.5"><Mail size={12} className="shrink-0" />{viewingLead.email}</p>
@@ -613,7 +618,7 @@ export default function LeadsPage() {
                   <p className="text-sm mt-0.5 text-muted-foreground">{viewingLead.notes}</p>
                 </div>
               )}
-              <div className="grid grid-cols-1 gap-4">
+              <div className="grid grid-cols-1 gap-3 sm:gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground font-medium">Next Follow-up</p>
                   <p className="text-sm mt-0.5">{viewingLead.next_follow_up ? new Date(viewingLead.next_follow_up).toLocaleDateString() : '—'}</p>

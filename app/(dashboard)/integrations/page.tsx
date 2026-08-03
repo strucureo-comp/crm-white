@@ -1,491 +1,328 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Search,
-  Plus,
-  ExternalLink,
-  CheckCircle,
-  Zap,
-  Globe,
-  BarChart3,
-  Mail,
   MessageSquare,
-  FileText,
-  Users,
-  ShoppingCart,
-  Calendar,
-  Database,
-  Cloud,
-  Code,
-  Shield,
+  BarChart3,
   TrendingUp,
-  Filter,
+  Globe,
+  Plus,
+  CheckCircle,
+  XCircle,
+  Settings,
   ArrowRight,
+  Activity,
+  Webhook as WebhookIcon,
+  Zap,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '@/lib/firebase/auth-context';
-import { getConnectedApps } from '@/lib/db/automation/api';
-import { ConnectedApp } from '@/lib/db/automation/types';
+import { getConnectedApps, getWebhooks } from '@/lib/db/automation/api';
+import { ConnectedApp, Webhook } from '@/lib/db/automation/types';
 import { formatDistanceToNow } from 'date-fns';
 
-interface MarketplaceApp {
+interface ConnectorDef {
   id: string;
   name: string;
   description: string;
-  category: string;
   icon: React.ReactNode;
   color: string;
+  href: string;
+  platform: string;
   features: string[];
-  popular: boolean;
-  connected?: boolean;
 }
 
-const marketplaceApps: MarketplaceApp[] = [
+const connectors: ConnectorDef[] = [
   {
-    id: 'slack',
-    name: 'Slack',
-    description: 'Send notifications, update channels, and manage messages from Slack.',
-    category: 'Communication',
+    id: 'whatsapp',
+    name: 'WhatsApp Business',
+    description: 'Send and receive messages via WhatsApp Cloud API. Manage templates, webhooks, and two-way conversations.',
     icon: <MessageSquare size={24} />,
-    color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
-    features: ['Send messages', 'Create channels', 'Update status'],
-    popular: true,
-  },
-  {
-    id: 'discord',
-    name: 'Discord',
-    description: 'Post updates, manage servers, and engage with communities on Discord.',
-    category: 'Communication',
-    icon: <MessageSquare size={24} />,
-    color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-    features: ['Post messages', 'Manage channels', 'User roles'],
-    popular: true,
-  },
-  {
-    id: 'google_ads',
-    name: 'Google Ads',
-    description: 'Manage ad campaigns, track performance, and optimize spending.',
-    category: 'Advertising',
-    icon: <TrendingUp size={24} />,
-    color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    features: ['Campaign management', 'Performance tracking', 'Budget alerts'],
-    popular: true,
+    color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
+    href: '/integrations/whatsapp',
+    platform: 'whatsapp',
+    features: ['Send messages', 'Template management', 'Webhook events', 'Two-way chat'],
   },
   {
     id: 'meta_ads',
     name: 'Meta Ads',
-    description: 'Run Facebook and Instagram ad campaigns with advanced targeting.',
-    category: 'Advertising',
+    description: 'Create and manage Facebook & Instagram ad campaigns. Track performance with real-time insights.',
     icon: <BarChart3 size={24} />,
     color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    features: ['Ad creation', 'Audience targeting', 'Performance reports'],
-    popular: true,
+    href: '/integrations/meta',
+    platform: 'meta_ads',
+    features: ['Campaign creation', 'Audience targeting', 'Performance stats', 'Budget management'],
   },
   {
-    id: 'github',
-    name: 'GitHub',
-    description: 'Sync issues, manage repositories, and track development progress.',
-    category: 'Development',
-    icon: <Code size={24} />,
-    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    features: ['Issue sync', 'PR notifications', 'Release tracking'],
-    popular: false,
+    id: 'google_ads',
+    name: 'Google Ads',
+    description: 'Manage Google Search ad campaigns with GAQL queries. Create budgets, ad groups, and responsive search ads.',
+    icon: <TrendingUp size={24} />,
+    color: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
+    href: '/integrations/google',
+    platform: 'google_ads',
+    features: ['GAQL queries', 'Budget management', 'Ad group creation', 'Performance tracking'],
   },
   {
-    id: 'google_calendar',
-    name: 'Google Calendar',
-    description: 'Sync events, schedule meetings, and manage your team calendar.',
-    category: 'Productivity',
-    icon: <Calendar size={24} />,
-    color: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
-    features: ['Event sync', 'Meeting scheduling', 'Calendar sharing'],
-    popular: true,
-  },
-  {
-    id: 'stripe',
-    name: 'Stripe',
-    description: 'Process payments, manage subscriptions, and track revenue.',
-    category: 'Finance',
-    icon: <ShoppingCart size={24} />,
-    color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400',
-    features: ['Payment processing', 'Subscription management', 'Revenue tracking'],
-    popular: true,
-  },
-  {
-    id: 'mailchimp',
-    name: 'Mailchimp',
-    description: 'Manage email campaigns, subscribers, and marketing automation.',
-    category: 'Email Marketing',
-    icon: <Mail size={24} />,
-    color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-900/30 dark:text-yellow-400',
-    features: ['Email campaigns', 'Subscriber management', 'Analytics'],
-    popular: false,
-  },
-  {
-    id: 'zapier',
-    name: 'Zapier',
-    description: 'Connect to 5,000+ apps and automate workflows without code.',
-    category: 'Automation',
-    icon: <Zap size={24} />,
-    color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
-    features: ['5000+ integrations', 'Multi-step zaps', 'Conditional logic'],
-    popular: true,
-  },
-  {
-    id: 'airtable',
-    name: 'Airtable',
-    description: 'Sync data between Airtable bases and manage your databases.',
-    category: 'Database',
-    icon: <Database size={24} />,
-    color: 'bg-cyan-100 text-cyan-600 dark:bg-cyan-900/30 dark:text-cyan-400',
-    features: ['Base sync', 'Record management', 'Views'],
-    popular: false,
-  },
-  {
-    id: 'hubspot',
-    name: 'HubSpot',
-    description: 'Sync contacts, deals, and marketing data with HubSpot CRM.',
-    category: 'CRM',
-    icon: <Users size={24} />,
-    color: 'bg-orange-100 text-orange-600 dark:bg-orange-900/30 dark:text-orange-400',
-    features: ['Contact sync', 'Deal tracking', 'Marketing automation'],
-    popular: false,
-  },
-  {
-    id: 'salesforce',
-    name: 'Salesforce',
-    description: 'Integrate with Salesforce for enterprise CRM synchronization.',
-    category: 'CRM',
-    icon: <Cloud size={24} />,
-    color: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
-    features: ['Lead sync', 'Opportunity tracking', 'Custom objects'],
-    popular: false,
-  },
-  {
-    id: 'notion',
-    name: 'Notion',
-    description: 'Sync pages, databases, and content between Notion and your apps.',
-    category: 'Productivity',
-    icon: <FileText size={24} />,
-    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    features: ['Page sync', 'Database sync', 'Content management'],
-    popular: false,
-  },
-  {
-    id: 'webhook',
-    name: 'Custom Webhook',
-    description: 'Connect to any service using HTTP webhooks.',
-    category: 'Developer',
+    id: 'website_enquiries',
+    name: 'Website Enquiries',
+    description: 'HTTPS webhook endpoint to receive website form submissions directly into your CRM pipeline.',
     icon: <Globe size={24} />,
-    color: 'bg-teal-100 text-teal-600 dark:bg-teal-900/30 dark:text-teal-400',
-    features: ['HTTP requests', 'Custom headers', 'JSON payloads'],
-    popular: false,
-  },
-  {
-    id: 'api',
-    name: 'REST API',
-    description: 'Integrate with any REST API endpoint.',
-    category: 'Developer',
-    icon: <Code size={24} />,
-    color: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
-    features: ['GET/POST/PUT/DELETE', 'Authentication', 'Custom headers'],
-    popular: false,
+    color: 'bg-purple-100 text-purple-600 dark:bg-purple-900/30 dark:text-purple-400',
+    href: '/integrations/website-enquiries',
+    platform: 'website_enquiries',
+    features: ['HTTPS webhook', 'Auto-create leads', 'Form validation', 'CRM pipeline sync'],
   },
 ];
 
-const categories = ['All', 'Communication', 'Advertising', 'Development', 'Productivity', 'Finance', 'Email Marketing', 'Automation', 'Database', 'CRM', 'Developer'];
-
-export default function MarketplacePage() {
+export default function IntegrationsPage() {
   const { workspace } = useAuth();
   const workspaceId = workspace?.id || '';
-  
+
   const [connectedApps, setConnectedApps] = useState<ConnectedApp[]>([]);
-  const [search, setSearch] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  const [webhooks, setWebhooks] = useState<Webhook[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     if (!workspaceId) return;
-    
-    const loadConnectedApps = async () => {
+    const load = async () => {
       try {
-        const apps = await getConnectedApps(workspaceId);
+        const [apps, wh] = await Promise.all([
+          getConnectedApps(workspaceId),
+          getWebhooks(workspaceId),
+        ]);
         setConnectedApps(apps);
-      } catch (error) {
-        console.error('Failed to load connected apps:', error);
+        setWebhooks(wh);
+      } catch (e) {
+        console.error('Failed to load integrations:', e);
       } finally {
         setLoading(false);
       }
     };
-    
-    loadConnectedApps();
+    load();
   }, [workspaceId]);
 
-  const isConnected = (appId: string) => {
-    return connectedApps.some(app => app.platform === appId && app.status === 'connected');
-  };
+  const isConnected = (platform: string) =>
+    connectedApps.some((a) => a.platform === platform && a.status === 'connected');
 
-  const filteredApps = marketplaceApps.filter(app => {
-    const matchesSearch = app.name.toLowerCase().includes(search.toLowerCase()) ||
-      app.description.toLowerCase().includes(search.toLowerCase());
-    const matchesCategory = selectedCategory === 'All' || app.category === selectedCategory;
-    return matchesSearch && matchesCategory;
-  });
-
-  const popularApps = filteredApps.filter(app => app.popular);
-  const allApps = filteredApps;
+  const connectedCount = connectedApps.filter((a) => a.status === 'connected').length;
+  const activeWebhooks = webhooks.filter((w) => w.status === 'active').length;
 
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Integration Marketplace</h1>
-          <p className="text-muted-foreground">Connect your favorite tools and services</p>
-        </div>
-        <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white dark:bg-indigo-600 dark:hover:bg-indigo-700">
-          <Plus size={16} className="mr-2" />
-          Request Integration
-        </Button>
-      </div>
-
-      {/* Search and Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search integrations..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
-          />
-        </div>
-        <div className="flex items-center gap-2">
-          <Filter size={16} className="text-muted-foreground" />
-          <select
-            value={selectedCategory}
-            onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 border rounded-md bg-background text-sm"
-          >
-            {categories.map(cat => (
-              <option key={cat} value={cat}>{cat}</option>
-            ))}
-          </select>
+          <h1 className="text-2xl font-bold tracking-tight">Connector Hub</h1>
+          <p className="text-muted-foreground">
+            Connect your communication and advertising channels to the CRM
+          </p>
         </div>
       </div>
 
-      {/* Connected Apps Summary */}
-      {connectedApps.length > 0 && (
+      {/* Stats */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Connected Apps ({connectedApps.length})</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex flex-wrap gap-3">
-              {connectedApps
-                .filter(app => app.status === 'connected')
-                .map(app => (
-                <div
-                  key={app.app_id}
-                  className="flex items-center gap-2 px-3 py-2 bg-muted rounded-lg"
-                >
-                  <CheckCircle size={14} className="text-green-600" />
-                  <span className="text-sm font-medium">{app.name}</span>
-                  <Badge variant="outline" className="text-xs">
-                    {app.platform}
-                  </Badge>
-                </div>
-              ))}
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Connected</p>
+                <p className="text-2xl font-bold">{connectedCount}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-500" />
             </div>
           </CardContent>
         </Card>
-      )}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Available</p>
+                <p className="text-2xl font-bold">{connectors.length}</p>
+              </div>
+              <Zap className="h-8 w-8 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Active Webhooks</p>
+                <p className="text-2xl font-bold">{activeWebhooks}</p>
+              </div>
+              <WebhookIcon className="h-8 w-8 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-muted-foreground">Enquiries</p>
+                <p className="text-2xl font-bold">
+                  {connectedApps.filter((a) => a.platform === 'website_enquiries').length > 0
+                    ? 'Active'
+                    : 'Setup'}
+                </p>
+              </div>
+              <Users className="h-8 w-8 text-primary" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
-      {/* Tabs */}
-      <Tabs defaultValue="popular" className="space-y-4">
+      {/* Connectors Grid */}
+      <Tabs defaultValue="all" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="popular" className="flex items-center gap-2">
-            <TrendingUp size={14} />
-            Popular
-          </TabsTrigger>
-          <TabsTrigger value="all" className="flex items-center gap-2">
-            <Globe size={14} />
-            All Integrations
-          </TabsTrigger>
+          <TabsTrigger value="all">All Connectors</TabsTrigger>
+          <TabsTrigger value="connected">Connected</TabsTrigger>
+          <TabsTrigger value="available">Available</TabsTrigger>
         </TabsList>
 
-        {/* Popular Apps Tab */}
-        <TabsContent value="popular" className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {popularApps.map((app) => (
-              <Card key={app.id} className="relative overflow-hidden">
-                {app.popular && (
-                  <div className="absolute top-2 right-2">
-                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400 hover:bg-amber-100 border-none shadow-none">Popular</Badge>
-                  </div>
-                )}
-                <CardContent className="p-6">
-                  <div className={`w-12 h-12 rounded-xl ${app.color} flex items-center justify-center mb-4`}>
-                    {app.icon}
-                  </div>
-                  <h3 className="text-lg font-semibold mb-2">{app.name}</h3>
-                  <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                    {app.description}
-                  </p>
-                  <div className="flex flex-wrap gap-2 mb-4">
-                    {app.features.slice(0, 3).map((feature) => (
-                      <Badge key={feature} variant="secondary" className="text-xs">
-                        {feature}
-                      </Badge>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    {isConnected(app.id) ? (
-                      <Button variant="outline" className="flex-1" disabled>
-                        <CheckCircle size={16} className="mr-2" />
-                        Connected
-                      </Button>
-                    ) : (
-                      <Button className="flex-1 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm">
-                        <Zap size={16} className="mr-2" />
-                        Connect
-                      </Button>
-                    )}
-                    <Button variant="ghost" size="icon">
-                      <ExternalLink size={16} />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </TabsContent>
-
-        {/* All Apps Tab */}
         <TabsContent value="all" className="space-y-4">
-          {selectedCategory === 'All' ? (
-            <div className="space-y-6">
-              {categories.filter(cat => cat !== 'All').map(category => {
-                const categoryApps = allApps.filter(app => app.category === category);
-                if (categoryApps.length === 0) return null;
-                
-                return (
-                  <div key={category}>
-                    <h2 className="text-lg font-semibold mb-3">{category}</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {categoryApps.map((app) => (
-                        <Card key={app.id}>
-                          <CardContent className="p-6">
-                            <div className={`w-12 h-12 rounded-xl ${app.color} flex items-center justify-center mb-4`}>
-                              {app.icon}
-                            </div>
-                            <h3 className="text-lg font-semibold mb-2">{app.name}</h3>
-                            <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                              {app.description}
-                            </p>
-                            <div className="flex flex-wrap gap-2 mb-4">
-                              {app.features.slice(0, 3).map((feature) => (
-                                <Badge key={feature} variant="secondary" className="text-xs">
-                                  {feature}
-                                </Badge>
-                              ))}
-                            </div>
-                            <div className="flex gap-2">
-                              {isConnected(app.id) ? (
-                                <Button variant="outline" className="flex-1" disabled>
-                                  <CheckCircle size={16} className="mr-2" />
-                                  Connected
-                                </Button>
-                              ) : (
-                                <Button className="flex-1 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm">
-                                  <Zap size={16} className="mr-2" />
-                                  Connect
-                                </Button>
-                              )}
-                              <Button variant="ghost" size="icon">
-                                <ExternalLink size={16} />
-                              </Button>
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {allApps.map((app) => (
-                <Card key={app.id}>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {connectors.map((connector) => {
+              const connected = isConnected(connector.platform);
+              return (
+                <Card key={connector.id} className="relative overflow-hidden hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
-                    <div className={`w-12 h-12 rounded-xl ${app.color} flex items-center justify-center mb-4`}>
-                      {app.icon}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className={`w-12 h-12 rounded-xl ${connector.color} flex items-center justify-center`}>
+                        {connector.icon}
+                      </div>
+                      {connected ? (
+                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                          <CheckCircle size={12} className="mr-1" />
+                          Connected
+                        </Badge>
+                      ) : (
+                        <Badge variant="outline">
+                          <XCircle size={12} className="mr-1" />
+                          Not Connected
+                        </Badge>
+                      )}
                     </div>
-                    <h3 className="text-lg font-semibold mb-2">{app.name}</h3>
-                    <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
-                      {app.description}
-                    </p>
+                    <h3 className="text-lg font-semibold mb-2">{connector.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{connector.description}</p>
                     <div className="flex flex-wrap gap-2 mb-4">
-                      {app.features.slice(0, 3).map((feature) => (
-                        <Badge key={feature} variant="secondary" className="text-xs">
-                          {feature}
+                      {connector.features.map((f) => (
+                        <Badge key={f} variant="secondary" className="text-xs">
+                          {f}
                         </Badge>
                       ))}
                     </div>
                     <div className="flex gap-2">
-                      {isConnected(app.id) ? (
-                        <Button variant="outline" className="flex-1" disabled>
-                          <CheckCircle size={16} className="mr-2" />
-                          Connected
+                      <Link href={connector.href} className="flex-1">
+                        <Button
+                          className="w-full"
+                          variant={connected ? 'outline' : 'default'}
+                        >
+                          {connected ? (
+                            <>
+                              <Settings size={16} className="mr-2" />
+                              Configure
+                            </>
+                          ) : (
+                            <>
+                              <Plus size={16} className="mr-2" />
+                              Connect
+                            </>
+                          )}
                         </Button>
-                      ) : (
-                        <Button className="flex-1 bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 dark:bg-slate-800 dark:text-slate-100 dark:border-slate-700 dark:hover:bg-slate-700 shadow-sm">
-                          <Zap size={16} className="mr-2" />
-                          Connect
-                        </Button>
-                      )}
-                      <Button variant="ghost" size="icon">
-                        <ExternalLink size={16} />
-                      </Button>
+                      </Link>
                     </div>
                   </CardContent>
                 </Card>
+              );
+            })}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="connected" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {connectors
+              .filter((c) => isConnected(c.platform))
+              .map((connector) => (
+                <Card key={connector.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className={`w-12 h-12 rounded-xl ${connector.color} flex items-center justify-center`}>
+                        {connector.icon}
+                      </div>
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
+                        <CheckCircle size={12} className="mr-1" />
+                        Connected
+                      </Badge>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">{connector.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{connector.description}</p>
+                    <Link href={connector.href}>
+                      <Button variant="outline" className="w-full">
+                        <Settings size={16} className="mr-2" />
+                        Configure
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
               ))}
-            </div>
-          )}
+            {connectors.filter((c) => isConnected(c.platform)).length === 0 && (
+              <Card className="col-span-2">
+                <CardContent className="py-12 text-center">
+                  <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">No connected integrations</h3>
+                  <p className="text-muted-foreground">
+                    Connect your first channel to start automating
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </TabsContent>
+
+        <TabsContent value="available" className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {connectors
+              .filter((c) => !isConnected(c.platform))
+              .map((connector) => (
+                <Card key={connector.id} className="hover:shadow-md transition-shadow">
+                  <CardContent className="p-6">
+                    <div className="flex items-start justify-between mb-4">
+                      <div className={`w-12 h-12 rounded-xl ${connector.color} flex items-center justify-center`}>
+                        {connector.icon}
+                      </div>
+                      <Badge variant="outline">Available</Badge>
+                    </div>
+                    <h3 className="text-lg font-semibold mb-2">{connector.name}</h3>
+                    <p className="text-sm text-muted-foreground mb-4">{connector.description}</p>
+                    <Link href={connector.href}>
+                      <Button className="w-full">
+                        <Plus size={16} className="mr-2" />
+                        Connect
+                      </Button>
+                    </Link>
+                  </CardContent>
+                </Card>
+              ))}
+            {connectors.filter((c) => !isConnected(c.platform)).length === 0 && (
+              <Card className="col-span-2">
+                <CardContent className="py-12 text-center">
+                  <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                  <h3 className="text-lg font-medium mb-2">All connectors are set up</h3>
+                  <p className="text-muted-foreground">
+                    Every available connector is already connected
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
         </TabsContent>
       </Tabs>
-
-      {/* Custom Integration CTA */}
-      <Card className="bg-primary text-primary-foreground">
-        <CardContent className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
-              <h3 className="text-lg font-semibold">Need a custom integration?</h3>
-              <p className="text-primary-foreground/80">
-                Use our REST API or webhooks to connect to any service. 
-                Our developer docs make it easy to build custom integrations.
-              </p>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="secondary">
-                <Code size={16} className="mr-2" />
-                API Docs
-              </Button>
-              <Button variant="secondary">
-                <Globe size={16} className="mr-2" />
-                Webhooks
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
     </div>
   );
 }

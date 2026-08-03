@@ -1,435 +1,406 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
+import React, { useState, useEffect, useMemo } from 'react';
+import {
   BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell
 } from 'recharts';
-import { 
-  RefreshCw, Calendar, Users, MapPin, Package, FileText, Download, 
+import {
+  RefreshCw, Calendar, Users, MapPin, Package, Download,
   Trash2, Clock, Play, FileSpreadsheet, ArrowUpRight, ArrowDownRight,
-  TrendingUp, CircleDollarSign, Target, Activity, FileIcon, ShieldAlert,
-  Sparkles, CheckCircle2, ChevronDown, Check, X
+  TrendingUp, CircleDollarSign, Target, Activity, FileText, CheckCircle2, ShieldAlert,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import { KpiCard } from '@/components/dashboard/kpi-card';
+import { toast } from 'sonner';
+import { useAuth } from '@/lib/firebase/auth-context';
+import { subscribeToDeals } from '@/lib/db/deals/api';
+import { subscribeToInvoices } from '@/lib/db/invoices/api';
+import type { Deal, NormalizedInvoice as Invoice } from '@/lib/db/types';
 
-// --- Data Schemas ---
 type SortDir = 'asc' | 'desc' | null;
 type ReportType = 'sales' | 'revenue' | 'activity' | 'conversion' | 'pipeline';
-type FrequencyType = 'daily' | 'weekly' | 'monthly';
 
 interface TableRow {
-  id: number;
-  agent: string;
-  region: string;
-  product: string;
+  id: string;
+  name: string;
+  source: string;
   deals: number;
   revenue: number;
-  conversion: number; 
+  wonDeals: number;
+  lostDeals: number;
   pipeline: number;
-  status: string; 
+  status: string;
 }
 
-interface SavedReport {
-  id: string;
-  name: string;
-  type: ReportType;
-  createdAt: string;
-  lastRun: string;
-  status: 'success' | 'error';
-}
-
-interface ScheduledReport {
-  id: string;
-  name: string;
-  frequency: FrequencyType;
-  nextRun: string;
-  recipients: number;
-  active: boolean; 
-}
-
-// --- Mock Data ---
-const MOCK_TABLE_DATA: TableRow[] = [
-  { id: 1, agent: 'Sarah Jenkins', region: 'North America', product: 'Enterprise Suite', deals: 45, revenue: 1250000, conversion: 68, pipeline: 2400000, status: 'Won' },
-  { id: 2, agent: 'Michael Chen', region: 'APAC', product: 'Professional', deals: 82, revenue: 840000, conversion: 45, pipeline: 1100000, status: 'Active' },
-  { id: 3, agent: 'Emma Wilson', region: 'Europe', product: 'Starter', deals: 156, revenue: 390000, conversion: 82, pipeline: 450000, status: 'Won' },
-  { id: 4, agent: 'James Smith', region: 'North America', product: 'Enterprise Suite', deals: 12, revenue: 420000, conversion: 25, pipeline: 3800000, status: 'At Risk' },
-  { id: 5, agent: 'Olivia Davis', region: 'LATAM', product: 'Professional', deals: 64, revenue: 620000, conversion: 54, pipeline: 890000, status: 'Active' },
+const REPORT_TYPES: { id: ReportType; label: string }[] = [
+  { id: 'sales', label: 'Sales' },
+  { id: 'revenue', label: 'Revenue' },
+  { id: 'activity', label: 'Customer Activity' },
+  { id: 'conversion', label: 'Lead Conversion' },
+  { id: 'pipeline', label: 'Pipeline' },
 ];
 
-const MOCK_SAVED_REPORTS: SavedReport[] = [
-  { id: 'sr1', name: 'Q2 Global Revenue Summary', type: 'revenue', createdAt: '2026-06-30', lastRun: 'Today, 09:41 AM', status: 'success' },
-  { id: 'sr2', name: 'APAC Underperforming Leads', type: 'conversion', createdAt: '2026-07-15', lastRun: 'Yesterday, 14:22 PM', status: 'success' },
-  { id: 'sr3', name: 'Enterprise Pipeline Risk', type: 'pipeline', createdAt: '2026-07-28', lastRun: 'Jul 28, 08:00 AM', status: 'error' },
-];
-
-const MOCK_SCHEDULED_REPORTS: ScheduledReport[] = [
-  { id: 'sch1', name: 'Daily Sales Flash', frequency: 'daily', nextRun: 'Tomorrow, 08:00 AM', recipients: 12, active: true },
-  { id: 'sch2', name: 'Weekly Region Performance', frequency: 'weekly', nextRun: 'Monday, 09:00 AM', recipients: 45, active: true },
-  { id: 'sch3', name: 'Monthly Board Packet (Data)', frequency: 'monthly', nextRun: 'Aug 1, 00:00 AM', recipients: 5, active: false },
-];
-
-const REVENUE_DATA = [
-  { month: 'Jan', revenue: 1.2, target: 1.0 },
-  { month: 'Feb', revenue: 1.5, target: 1.2 },
-  { month: 'Mar', revenue: 1.4, target: 1.4 },
-  { month: 'Apr', revenue: 1.8, target: 1.6 },
-  { month: 'May', revenue: 2.2, target: 1.8 },
-  { month: 'Jun', revenue: 2.4, target: 2.0 },
-];
-
-const FUNNEL_DATA = [
-  { stage: 'Lead', count: 1240, fill: '#3b82f6' },
-  { stage: 'Qualified', count: 850, fill: '#8b5cf6' },
-  { stage: 'Proposal', count: 420, fill: '#ec4899' },
-  { stage: 'Negotiation', count: 280, fill: '#f59e0b' },
-  { stage: 'Closed Won', count: 156, fill: '#10b981' },
-];
-
-const REPORT_TYPES: { id: ReportType, label: string, color: string }[] = [
-  { id: 'sales', label: 'Sales', color: 'bg-blue-500' },
-  { id: 'revenue', label: 'Revenue', color: 'bg-emerald-500' },
-  { id: 'activity', label: 'Customer activity', color: 'bg-purple-500' },
-  { id: 'conversion', label: 'Lead conversion', color: 'bg-amber-500' },
-  { id: 'pipeline', label: 'Pipeline', color: 'bg-pink-500' },
-];
+const STATUS_COLORS: Record<string, string> = {
+  Won: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
+  Active: 'bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400',
+  'At Risk': 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+};
 
 export default function ReportsPage() {
+  const { user } = useAuth();
+  const companyId = user?.company_id;
+
   const [activeType, setActiveType] = useState<ReportType>('revenue');
   const [isGenerating, setIsGenerating] = useState(false);
-  const [hasGenerated, setHasGenerated] = useState(true); // Default true for demo
+  const [hasGenerated, setHasGenerated] = useState(true);
   const [activeTab, setActiveTab] = useState<'table' | 'saved' | 'scheduled'>('table');
-  
-  // Table state
   const [sortCol, setSortCol] = useState<keyof TableRow>('revenue');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
-  
-  // Scheduled state
-  const [scheduled, setScheduled] = useState(MOCK_SCHEDULED_REPORTS);
-
-  // Export Modal state
   const [exportPreview, setExportPreview] = useState<'pdf' | 'excel' | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const [deals, setDeals] = useState<Deal[]>([]);
+  const [invoices, setInvoices] = useState<Invoice[]>([]);
+
+  // Firebase subscriptions
+  useEffect(() => {
+    if (!companyId) return;
+    const unsubDeals = subscribeToDeals(companyId, (d) => {
+      setDeals(d);
+      setIsLoading(false);
+    });
+    const unsubInvoices = subscribeToInvoices(companyId, (inv) => {
+      setInvoices(inv);
+    });
+    return () => { unsubDeals(); unsubInvoices(); };
+  }, [companyId]);
+
+  // Compute table data: group deals by source (acts as "region"/"product" proxy)
+  const tableData = useMemo<TableRow[]>(() => {
+    const sourceMap = new Map<string, { deals: number; revenue: number; wonDeals: number; lostDeals: number; pipeline: number }>();
+
+    for (const deal of deals) {
+      const source = deal.source || 'Unknown';
+      const existing = sourceMap.get(source) || { deals: 0, revenue: 0, wonDeals: 0, lostDeals: 0, pipeline: 0 };
+      existing.deals += 1;
+      if (deal.status === 'won') {
+        existing.wonDeals += 1;
+        existing.revenue += deal.value || 0;
+      } else if (deal.status === 'lost') {
+        existing.lostDeals += 1;
+      } else {
+        existing.pipeline += deal.value || 0;
+      }
+      sourceMap.set(source, existing);
+    }
+
+    return Array.from(sourceMap.entries()).map(([source, data], i) => {
+      const totalActive = data.deals - data.wonDeals - data.lostDeals;
+      const conversion = data.deals > 0 ? Math.round((data.wonDeals / data.deals) * 100) : 0;
+      let status = 'Active';
+      if (conversion >= 60) status = 'Won';
+      else if (conversion < 30 && data.deals > 3) status = 'At Risk';
+
+      return {
+        id: String(i + 1),
+        name: source,
+        source,
+        deals: data.deals,
+        revenue: data.revenue,
+        wonDeals: data.wonDeals,
+        lostDeals: data.lostDeals,
+        pipeline: data.pipeline,
+        status,
+      };
+    });
+  }, [deals]);
+
+  // KPIs from real data
+  const kpis = useMemo(() => {
+    const wonDeals = deals.filter(d => d.status === 'won');
+    const activeDeals = deals.filter(d => d.status === 'open');
+    const totalRevenue = wonDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+    const totalPipeline = activeDeals.reduce((sum, d) => sum + (d.value || 0), 0);
+    const closedDeals = wonDeals.length;
+    const conversion = deals.length > 0 ? Math.round((closedDeals / deals.length) * 100) : 0;
+
+    return { totalRevenue, totalPipeline, closedDeals, conversion, totalDeals: deals.length };
+  }, [deals]);
+
+  // Revenue chart data: group won deals by month
+  const revenueChartData = useMemo(() => {
+    const monthMap = new Map<string, number>();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    for (const deal of deals) {
+      if (deal.status === 'won' && deal.actual_close_date) {
+        const date = new Date(deal.actual_close_date);
+        const monthKey = months[date.getMonth()];
+        monthMap.set(monthKey, (monthMap.get(monthKey) || 0) + (deal.value || 0));
+      }
+    }
+
+    // Show last 6 months
+    const now = new Date();
+    const result = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const key = months[d.getMonth()];
+      result.push({ month: key, revenue: (monthMap.get(key) || 0) / 1000, target: (monthMap.get(key) || 0) / 1000 * 0.85 });
+    }
+    return result;
+  }, [deals]);
+
+  // Funnel data from real deals
+  const funnelData = useMemo(() => {
+    const stageCounts = new Map<string, number>();
+    for (const deal of deals) {
+      const status = deal.status || 'open';
+      stageCounts.set(status, (stageCounts.get(status) || 0) + 1);
+    }
+
+    return [
+      { stage: 'Open', count: stageCounts.get('open') || 0, fill: '#3b82f6' },
+      { stage: 'Won', count: stageCounts.get('won') || 0, fill: '#10b981' },
+      { stage: 'Lost', count: stageCounts.get('lost') || 0, fill: '#ef4444' },
+    ];
+  }, [deals]);
 
   const handleGenerate = () => {
     setIsGenerating(true);
     setHasGenerated(false);
-    setTimeout(() => {
-      setIsGenerating(false);
-      setHasGenerated(true);
-    }, 1500);
+    setTimeout(() => { setIsGenerating(false); setHasGenerated(true); }, 1500);
   };
 
   const handleSort = (col: keyof TableRow) => {
-    if (sortCol === col) {
-      setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortCol(col);
-      setSortDir('desc');
-    }
+    if (sortCol === col) setSortDir(sortDir === 'asc' ? 'desc' : 'asc');
+    else { setSortCol(col); setSortDir('desc'); }
   };
 
-  const sortedData = [...MOCK_TABLE_DATA].sort((a, b) => {
-    if (!sortDir) return 0;
-    const modifier = sortDir === 'asc' ? 1 : -1;
-    if (a[sortCol] < b[sortCol]) return -1 * modifier;
-    if (a[sortCol] > b[sortCol]) return 1 * modifier;
-    return 0;
-  });
-
-  const toggleScheduled = (id: string) => {
-    setScheduled(prev => prev.map(s => s.id === id ? { ...s, active: !s.active } : s));
-  };
+  const sortedData = useMemo(() => {
+    return [...tableData].sort((a, b) => {
+      if (!sortDir) return 0;
+      const modifier = sortDir === 'asc' ? 1 : -1;
+      if (a[sortCol] < b[sortCol]) return -1 * modifier;
+      if (a[sortCol] > b[sortCol]) return 1 * modifier;
+      return 0;
+    });
+  }, [tableData, sortCol, sortDir]);
 
   const formatCurrency = (val: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(val);
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] dark:bg-background">
-      
-      {/* 2. Global Layout & Header */}
-      <div className="p-6 pb-4 bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 shrink-0">
-        <div className="flex flex-col gap-6">
-          
-          <div>
-            <h1 className="text-3xl text-slate-900 dark:text-slate-100 tracking-tight mb-1" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 800 }}>Reports</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium">Analyze performance, track trends, and schedule automated reports.</p>
-          </div>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Reports</h1>
+          <p className="text-sm text-muted-foreground">Analyze performance, track trends, and schedule automated reports.</p>
+        </div>
 
-          <div className="flex flex-wrap gap-2">
-            {REPORT_TYPES.map(rt => {
-              const isActive = activeType === rt.id;
-              return (
-                <button
-                  key={rt.id}
-                  onClick={() => setActiveType(rt.id)}
-                  className={`px-5 py-2 rounded-full text-sm font-bold transition-all duration-300 ${
-                    isActive 
-                      ? `${rt.color} text-white shadow-lg ring-2 ring-offset-2 ring-transparent` 
-                      : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-                  }`}
-                  style={isActive ? { boxShadow: `0 8px 20px -8px ${rt.color.replace('bg-', 'var(--tw-colors-').replace('-500', '-500)')}` } : {}}
-                >
-                  {rt.label}
-                </button>
-              )
-            })}
-          </div>
+        {/* Report Type Tabs */}
+        <div className="flex flex-wrap gap-2">
+          {REPORT_TYPES.map(rt => (
+            <button
+              key={rt.id}
+              onClick={() => setActiveType(rt.id)}
+              className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                activeType === rt.id
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground hover:text-foreground hover:bg-muted/80'
+              }`}
+            >
+              {rt.label}
+            </button>
+          ))}
+        </div>
 
-          <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl overflow-hidden bg-slate-50/50 dark:bg-slate-900/50">
-            <div className="p-3 px-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        {/* Filters & Actions */}
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
               <div className="flex flex-wrap items-center gap-4 flex-1">
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Date Range</label>
-                  <Select defaultValue="ytd">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><Calendar className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="ytd">Year to Date</SelectItem><SelectItem value="q2">Q2 2026</SelectItem></SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Agent</label>
-                  <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><Users className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="all">All Agents</SelectItem></SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Region</label>
-                  <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><MapPin className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="all">Global</SelectItem><SelectItem value="na">North America</SelectItem></SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[10px] font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest px-1">Product</label>
-                  <Select defaultValue="all">
-                    <SelectTrigger className="w-[160px] h-9 bg-white dark:bg-card border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-sm shadow-sm"><Package className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="all">All Products</SelectItem></SelectContent>
-                  </Select>
-                </div>
+                <Select defaultValue="ytd">
+                  <SelectTrigger className="w-[150px] h-9"><Calendar className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue placeholder="Date Range" /></SelectTrigger>
+                  <SelectContent><SelectItem value="ytd">Year to Date</SelectItem><SelectItem value="q2">Q2 2026</SelectItem></SelectContent>
+                </Select>
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-[150px] h-9"><Users className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue placeholder="Agent" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All Agents</SelectItem></SelectContent>
+                </Select>
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-[150px] h-9"><MapPin className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue placeholder="Region" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">Global</SelectItem><SelectItem value="na">North America</SelectItem></SelectContent>
+                </Select>
+                <Select defaultValue="all">
+                  <SelectTrigger className="w-[150px] h-9"><Package className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue placeholder="Product" /></SelectTrigger>
+                  <SelectContent><SelectItem value="all">All Products</SelectItem></SelectContent>
+                </Select>
               </div>
-              
-              <div className="flex items-center gap-3 pt-4 xl:pt-0">
-                <Button variant="ghost" className="font-bold text-slate-600 dark:text-slate-300 rounded-xl">Schedule</Button>
-                <div className="flex items-center bg-white dark:bg-card border border-slate-200 dark:border-slate-700 rounded-xl p-1 shadow-sm">
-                  <span className="text-xs font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest px-3">Export:</span>
-                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 hover:text-red-600 dark:hover:text-red-400 text-slate-600 dark:text-slate-300" onClick={() => setExportPreview('pdf')}><FileIcon className="w-3 h-3 mr-1" /> PDF</Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-green-50 dark:hover:bg-green-900/20 hover:text-green-600 dark:hover:text-green-400 text-slate-600 dark:text-slate-300" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> CSV</Button>
-                  <Button variant="ghost" size="sm" className="h-7 px-3 text-xs font-bold rounded-lg hover:bg-emerald-50 dark:hover:bg-emerald-900/20 hover:text-emerald-600 dark:hover:text-emerald-400 text-slate-600 dark:text-slate-300" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> Excel</Button>
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="sm">Schedule</Button>
+                <div className="flex items-center border rounded-lg p-1">
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setExportPreview('pdf')}><FileText className="w-3 h-3 mr-1" /> PDF</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> CSV</Button>
+                  <Button variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => setExportPreview('excel')}><FileSpreadsheet className="w-3 h-3 mr-1" /> Excel</Button>
                 </div>
-                <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white rounded-xl shadow-md font-bold px-6" onClick={handleGenerate} disabled={isGenerating}>
+                <Button size="sm" onClick={handleGenerate} disabled={isGenerating}>
                   <RefreshCw className={`w-4 h-4 mr-2 ${isGenerating ? 'animate-spin' : ''}`} /> {isGenerating ? 'Generating...' : 'Generate'}
                 </Button>
               </div>
             </div>
-          </Card>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-6 relative">
-        {isGenerating && (
-          <div className="absolute inset-0 bg-white/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
-            <div className="w-16 h-16 border-4 border-slate-100 border-t-[#1e1a4f] rounded-full animate-spin mb-4" />
-            <h2 className="text-xl font-black text-[#1e1a4f] animate-pulse">Crunching numbers...</h2>
+      {/* Content */}
+      <div className="relative">
+        {(isGenerating || isLoading) && (
+          <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center rounded-lg">
+            <RefreshCw className="h-8 w-8 animate-spin text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-muted-foreground">Crunching numbers...</p>
           </div>
         )}
 
         {hasGenerated && (
-          <div className="max-w-7xl mx-auto space-y-8 animate-in fade-in duration-500">
-            
-            {/* 3. Generated Content Dashboard */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { label: 'Total Revenue', value: '$3.5M', delta: '+15.2%', icon: CircleDollarSign, color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-50 dark:bg-emerald-900/20' },
-                { label: 'Deals Closed', value: '359', delta: '+4.1%', icon: Target, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-                { label: 'Avg Conversion', value: '54%', delta: '-2.4%', icon: Activity, color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/20', down: true },
-                { label: 'Active Pipeline', value: '$8.2M', delta: '+22.5%', icon: TrendingUp, color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/20' },
-              ].map((kpi, i) => (
-                <Card key={i} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
-                  <CardContent className="p-5 flex flex-col gap-4">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">{kpi.label}</span>
-                      <div className={`w-8 h-8 rounded-full ${kpi.bg} ${kpi.color} flex items-center justify-center`}>
-                        <kpi.icon className="w-4 h-4" />
-                      </div>
-                    </div>
-                    <div className="flex items-end justify-between">
-                      <span className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tighter">{kpi.value}</span>
-                      <Badge className={`${kpi.down ? 'bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400' : 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400'} hover:bg-transparent font-bold border-transparent px-2`}>
-                        {kpi.down ? <ArrowDownRight className="w-3 h-3 mr-0.5" /> : <ArrowUpRight className="w-3 h-3 mr-0.5" />} {kpi.delta}
-                      </Badge>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
+          <div className="space-y-6">
+            {/* KPI Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard title="Total Revenue" value={formatCurrency(kpis.totalRevenue)} change={`${kpis.closedDeals} deals won`} trend="up" icon={CircleDollarSign} />
+              <KpiCard title="Deals Closed" value={String(kpis.closedDeals)} change={`${kpis.totalDeals} total`} trend="up" icon={Target} />
+              <KpiCard title="Avg Conversion" value={`${kpis.conversion}%`} change={`${kpis.totalDeals} deals`} trend={kpis.conversion >= 50 ? 'up' : 'down'} icon={Activity} />
+              <KpiCard title="Active Pipeline" value={formatCurrency(kpis.totalPipeline)} change={`${deals.filter(d => d.status === 'open').length} open deals`} trend="up" icon={TrendingUp} />
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
-                <div className="p-5 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Revenue Trend vs Target</h3>
-                  <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold border-slate-200 dark:border-slate-700">Last 6 Months</Badge>
-                </div>
-                <div className="p-5 h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={REVENUE_DATA} margin={{ top: 5, right: 20, left: -20, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                      <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} dy={10} />
-                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} tickFormatter={(v) => `$${v}M`} />
-                      <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.1)' }} formatter={(v: number) => [`$${v}M`, '']} />
-                      <Line type="monotone" dataKey="target" stroke="#94a3b8" strokeDasharray="5 5" strokeWidth={2} dot={false} name="Target" />
-                      <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={3} dot={{ strokeWidth: 2, r: 4, fill: '#fff' }} activeDot={{ r: 6, fill: '#10b981', stroke: '#fff', strokeWidth: 2 }} name="Revenue" />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
+            {/* Charts */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-semibold">Revenue Trend</CardTitle>
+                  <Badge variant="secondary">Last 6 Months</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={revenueChartData} margin={{ top: 5, right: 20, left: -20, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+                        <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(v) => `$${v}k`} />
+                        <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }} formatter={(v: number) => [`$${v.toFixed(0)}k`, '']} />
+                        <Line type="monotone" dataKey="target" stroke="hsl(var(--muted-foreground))" strokeDasharray="5 5" strokeWidth={2} dot={false} name="Target" />
+                        <Line type="monotone" dataKey="revenue" stroke="#10b981" strokeWidth={2} dot={{ strokeWidth: 2, r: 4, fill: 'hsl(var(--background))' }} activeDot={{ r: 6, fill: '#10b981', stroke: 'hsl(var(--background))', strokeWidth: 2 }} name="Revenue" />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
               </Card>
 
-              <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card">
-                <div className="p-5 border-b border-slate-100 dark:border-slate-800/50 flex items-center justify-between">
-                  <h3 className="font-bold text-slate-900 dark:text-slate-100">Pipeline Funnel</h3>
-                  <Badge variant="outline" className="text-slate-500 dark:text-slate-400 font-bold border-slate-200 dark:border-slate-700">All Agents</Badge>
-                </div>
-                <div className="p-5 h-[300px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={FUNNEL_DATA} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 0 }}>
-                      <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e2e8f0" />
-                      <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} />
-                      <YAxis dataKey="stage" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#1e293b', fontWeight: 700 }} dx={-10} />
-                      <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.1)' }} />
-                      <Bar dataKey="count" radius={[0, 8, 8, 0]} barSize={24}>
-                        {FUNNEL_DATA.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.fill} />
-                        ))}
-                      </Bar>
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-semibold">Deal Funnel</CardTitle>
+                  <Badge variant="secondary">All Deals</Badge>
+                </CardHeader>
+                <CardContent>
+                  <div className="h-[300px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={funnelData} layout="vertical" margin={{ top: 5, right: 30, left: 40, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-border" />
+                        <XAxis type="number" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+                        <YAxis dataKey="stage" type="category" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--foreground))', fontWeight: 600 }} dx={-10} />
+                        <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }} />
+                        <Bar dataKey="count" radius={[0, 4, 4, 0]} barSize={24}>
+                          {funnelData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                </CardContent>
               </Card>
             </div>
 
-            {/* 4. Tabbed Content Area */}
-            <div className="space-y-4 pt-4 border-t border-slate-200 dark:border-slate-800">
-              <div className="flex border-b border-slate-200 dark:border-slate-800">
-                <button onClick={() => setActiveTab('table')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'table' ? 'border-[#1e1a4f] dark:border-indigo-400 text-[#1e1a4f] dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}>Report table</button>
-                <button onClick={() => setActiveTab('saved')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'saved' ? 'border-[#1e1a4f] dark:border-indigo-400 text-[#1e1a4f] dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}>Saved reports</button>
-                <button onClick={() => setActiveTab('scheduled')} className={`px-6 py-3 text-sm font-bold border-b-2 transition-colors ${activeTab === 'scheduled' ? 'border-[#1e1a4f] dark:border-indigo-400 text-[#1e1a4f] dark:text-indigo-400' : 'border-transparent text-slate-500 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'}`}>Scheduled</button>
+            {/* Tabbed Content */}
+            <div className="space-y-4">
+              <div className="flex border-b">
+                {(['table', 'saved', 'scheduled'] as const).map(tab => (
+                  <button
+                    key={tab}
+                    onClick={() => setActiveTab(tab)}
+                    className={`px-4 py-3 text-sm font-medium border-b-2 transition-colors ${
+                      activeTab === tab
+                        ? 'border-primary text-primary'
+                        : 'border-transparent text-muted-foreground hover:text-foreground'
+                    }`}
+                  >
+                    {tab === 'table' ? 'Report Table' : tab === 'saved' ? 'Saved Reports' : 'Scheduled'}
+                  </button>
+                ))}
               </div>
 
               {activeTab === 'table' && (
-                <Card className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl overflow-hidden bg-white dark:bg-card">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left border-collapse">
-                      <thead>
-                        <tr className="border-b border-slate-100 dark:border-slate-800/50 bg-slate-50/50 dark:bg-slate-900/50">
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('agent')}>Agent</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('region')}>Region</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('product')}>Product</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer text-right" onClick={() => handleSort('deals')}>Deals</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer text-right" onClick={() => handleSort('revenue')}>Revenue</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer w-48" onClick={() => handleSort('conversion')}>Conv. Rate</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer text-right" onClick={() => handleSort('pipeline')}>Pipeline</th>
-                          <th className="p-4 text-[11px] font-black uppercase tracking-wider text-slate-500 cursor-pointer" onClick={() => handleSort('status')}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-100 dark:divide-slate-800/50">
-                        {sortedData.map(row => (
-                          <tr key={row.id} className="hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors">
-                            <td className="p-4 font-bold text-slate-900 dark:text-slate-100">{row.agent}</td>
-                            <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-400">{row.region}</td>
-                            <td className="p-4 text-sm font-medium text-slate-600 dark:text-slate-400">{row.product}</td>
-                            <td className="p-4 text-sm font-black text-slate-900 dark:text-slate-100 text-right">{row.deals}</td>
-                            <td className="p-4 text-sm font-black text-emerald-600 text-right">{formatCurrency(row.revenue)}</td>
-                            <td className="p-4">
-                              <div className="flex items-center gap-3">
-                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300 w-8">{row.conversion}%</span>
-                                <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${row.conversion}%` }} />
-                                </div>
-                              </div>
-                            </td>
-                            <td className="p-4 text-sm font-black text-slate-700 dark:text-slate-300 text-right">{formatCurrency(row.pipeline)}</td>
-                            <td className="p-4">
-                              <Badge variant="outline" className={`text-[10px] uppercase font-black tracking-wider px-2 py-0.5 border-transparent ${
-                                row.status === 'Won' ? 'bg-emerald-50 text-emerald-700' : 
-                                row.status === 'Active' ? 'bg-purple-50 text-purple-700' : 'bg-amber-50 text-amber-700'
-                              }`}>
-                                {row.status}
-                              </Badge>
-                            </td>
+                <Card>
+                  {sortedData.length === 0 ? (
+                    <div className="p-12 text-center">
+                      <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                      <h3 className="text-lg font-bold text-foreground mb-1">No data yet</h3>
+                      <p className="text-sm text-muted-foreground">Add deals to see your report table.</p>
+                    </div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left">
+                        <thead>
+                          <tr className="border-b">
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground" onClick={() => handleSort('name')}>Source</th>
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground text-right" onClick={() => handleSort('deals')}>Deals</th>
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground text-right" onClick={() => handleSort('revenue')}>Revenue</th>
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground text-right" onClick={() => handleSort('wonDeals')}>Won</th>
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground text-right" onClick={() => handleSort('lostDeals')}>Lost</th>
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider cursor-pointer hover:text-foreground text-right" onClick={() => handleSort('pipeline')}>Pipeline</th>
+                            <th className="p-4 text-xs font-medium text-muted-foreground uppercase tracking-wider">Status</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                        </thead>
+                        <tbody className="divide-y">
+                          {sortedData.map(row => (
+                            <tr key={row.id} className="hover:bg-muted/50 transition-colors">
+                              <td className="p-4 font-medium">{row.name}</td>
+                              <td className="p-4 text-sm font-medium text-right">{row.deals}</td>
+                              <td className="p-4 text-sm font-medium text-emerald-600 dark:text-emerald-400 text-right">{formatCurrency(row.revenue)}</td>
+                              <td className="p-4 text-sm font-medium text-right">{row.wonDeals}</td>
+                              <td className="p-4 text-sm font-medium text-right">{row.lostDeals}</td>
+                              <td className="p-4 text-sm font-medium text-right">{formatCurrency(row.pipeline)}</td>
+                              <td className="p-4">
+                                <Badge variant="secondary" className={STATUS_COLORS[row.status] || ''}>
+                                  {row.status}
+                                </Badge>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                 </Card>
               )}
 
               {activeTab === 'saved' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {MOCK_SAVED_REPORTS.map(r => (
-                    <Card key={r.id} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                      <CardContent className="p-5 flex flex-col gap-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-500"><FileText className="w-5 h-5" /></div>
-                            <div>
-                              <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{r.name}</h4>
-                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400 capitalize">{r.type} Report</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="text-xs font-medium text-slate-500 space-y-1">
-                          <p>Created: {r.createdAt}</p>
-                          <p>Last run: {r.lastRun}</p>
-                        </div>
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-                          {r.status === 'success' ? (
-                            <Badge className="bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800"><CheckCircle2 className="w-3 h-3 mr-1" /> Success</Badge>
-                          ) : (
-                            <Badge className="bg-rose-50 dark:bg-rose-900/20 text-rose-700 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 border-rose-200 dark:border-rose-800"><ShieldAlert className="w-3 h-3 mr-1" /> Failed</Badge>
-                          )}
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" className="h-8 font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20 px-3"><Play className="w-3 h-3 mr-1" /> Run</Button>
-                            <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"><Trash2 className="w-4 h-4" /></Button>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="p-12 text-center">
+                  <FileText className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-bold text-foreground mb-1">No saved reports</h3>
+                  <p className="text-sm text-muted-foreground">Generate a report and save it to see it here.</p>
                 </div>
               )}
 
               {activeTab === 'scheduled' && (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {scheduled.map(s => (
-                    <Card key={s.id} className="border-slate-200 dark:border-slate-800 shadow-sm rounded-2xl bg-white dark:bg-card hover:border-slate-300 dark:hover:border-slate-600 transition-colors">
-                      <CardContent className="p-5 flex flex-col gap-4">
-                        <div className="flex items-start justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center text-blue-600 dark:text-blue-400"><Clock className="w-5 h-5" /></div>
-                            <div>
-                              <h4 className="font-bold text-slate-900 dark:text-slate-100 leading-tight">{s.name}</h4>
-                              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">{s.recipients} Recipients</p>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Badge variant="outline" className="uppercase text-[10px] font-black tracking-widest text-slate-500">{s.frequency}</Badge>
-                          <span className="text-xs font-medium text-slate-500">Next: {s.nextRun}</span>
-                        </div>
-                        <div className="flex items-center justify-between pt-4 border-t border-slate-100 dark:border-slate-800">
-                          <div className="flex items-center gap-2 cursor-pointer" onClick={() => toggleScheduled(s.id)}>
-                            <div className={`w-10 h-5 rounded-full p-0.5 transition-colors ${s.active ? 'bg-emerald-500' : 'bg-slate-200 dark:bg-slate-700'}`}>
-                              <div className={`w-4 h-4 bg-white rounded-full shadow-sm transition-transform ${s.active ? 'translate-x-5' : 'translate-x-0'}`} />
-                            </div>
-                            <span className="text-xs font-bold text-slate-600 dark:text-slate-400">{s.active ? 'Active' : 'Paused'}</span>
-                          </div>
-                          <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20"><Trash2 className="w-4 h-4" /></Button>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="p-12 text-center">
+                  <Clock className="w-12 h-12 text-muted-foreground mx-auto mb-4 opacity-50" />
+                  <h3 className="text-lg font-bold text-foreground mb-1">No scheduled reports</h3>
+                  <p className="text-sm text-muted-foreground">Schedule a report to see it here.</p>
                 </div>
               )}
             </div>
@@ -437,79 +408,43 @@ export default function ReportsPage() {
         )}
       </div>
 
-      {/* 5. Export Preview Modal */}
-      <Dialog open={!!exportPreview} onOpenChange={(open) => { if(!open) setExportPreview(null) }}>
-        <DialogContent className={`max-w-[1200px] h-[90vh] p-0 border-0 shadow-2xl rounded-[1.5rem] overflow-hidden flex flex-col ${exportPreview === 'excel' ? 'bg-[#1e293b]' : 'bg-slate-100'}`}>
-          <DialogHeader className="p-4 border-b border-white/10 bg-[#0f172a] shrink-0 flex flex-row items-center justify-between text-white">
-            <DialogTitle className="text-lg font-bold">
-              {exportPreview === 'pdf' ? 'Analytical Report Preview (PDF)' : 'Spreadsheet Preview (Excel/CSV)'}
+      {/* Export Preview Modal */}
+      <Dialog open={!!exportPreview} onOpenChange={(open) => { if (!open) setExportPreview(null); }}>
+        <DialogContent className="max-w-[1000px] max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              {exportPreview === 'pdf' ? 'Report Preview (PDF)' : 'Spreadsheet Preview (Excel/CSV)'}
             </DialogTitle>
-            <div className="flex items-center gap-3">
-              <Button className="bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-md font-bold px-6 h-9"><Download className="w-4 h-4 mr-2" /> Export</Button>
-              <DialogClose asChild>
-                <button className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-colors"><X className="w-4 h-4" /></button>
-              </DialogClose>
-            </div>
           </DialogHeader>
-
-          <div className="flex-1 overflow-y-auto p-8 flex justify-center">
+          <div className="pt-4">
             {exportPreview === 'pdf' ? (
-              // PDF Preview Body (A4 Style)
-              <div className="w-full max-w-[800px] bg-white shadow-xl min-h-[1100px] p-12 flex flex-col gap-8">
-                <div className="border-b-2 border-slate-900 pb-6 text-center">
-                  <h1 className="text-4xl text-slate-900 mb-2" style={{ fontFamily: "'Playfair Display', serif", fontWeight: 900 }}>CRM Analytical Report</h1>
-                  <p className="text-slate-500 font-bold tracking-widest uppercase text-sm">Generated: July 30, 2026</p>
+              <div className="space-y-6">
+                <div className="text-center border-b pb-6">
+                  <h2 className="text-2xl font-bold mb-1">CRM Analytical Report</h2>
+                  <p className="text-sm text-muted-foreground">Generated: {new Date().toLocaleDateString()}</p>
                 </div>
-
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 mb-3 border-l-4 border-[#1e1a4f] pl-3">1. Executive Summary</h2>
-                  <p className="text-slate-600 leading-relaxed">
-                    This report synthesizes performance metrics across all global regions for the current period. Overall revenue has exceeded targets by 15.2%, driven primarily by strong enterprise software adoption in North America and APAC. Pipeline velocity remains stable, though specific starter segments require optimization to improve lead conversion rates.
+                  <h3 className="font-semibold mb-2 border-l-4 border-primary pl-3">1. Executive Summary</h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Across {kpis.totalDeals} deals, total revenue reached {formatCurrency(kpis.totalRevenue)} with a {kpis.conversion}% conversion rate. Active pipeline stands at {formatCurrency(kpis.totalPipeline)}.
                   </p>
                 </div>
-
-                <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles className="w-24 h-24 text-indigo-500" /></div>
-                  <h3 className="text-indigo-900 font-black text-lg mb-4 flex items-center gap-2 relative z-10"><Sparkles className="w-5 h-5 text-indigo-600" /> Comprehensive AI Insights</h3>
-                  <div className="flex gap-6 relative z-10">
-                    <div className="flex-1 space-y-3">
-                      <p className="text-indigo-800 text-sm font-medium leading-relaxed">
-                        <strong className="font-black text-indigo-950">High conversion predicted:</strong> Our models indicate a 24% higher likelihood of closing Enterprise deals in Q3 based on current engagement signals.
-                      </p>
-                      <p className="text-indigo-800 text-sm font-medium leading-relaxed">
-                        <strong className="font-black text-indigo-950">Risk identified:</strong> Starter product pipeline has stagnated in Europe. Recommend launching the Q3 promotional campaign immediately.
-                      </p>
-                    </div>
-                    <div className="w-48 h-32 bg-white rounded-lg p-2 shadow-sm border border-indigo-100 flex items-end justify-between px-4">
-                      {/* Mini mock bar chart */}
-                      {[60, 80, 40, 100].map((h, i) => <div key={i} className="w-6 bg-indigo-400 rounded-t-sm" style={{ height: `${h}%` }} />)}
-                    </div>
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="border border-slate-200 p-4 rounded-lg"><span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Total Revenue</span><p className="text-3xl font-black text-slate-900">$3.5M</p></div>
-                  <div className="border border-slate-200 p-4 rounded-lg"><span className="text-xs font-bold text-slate-500 uppercase tracking-widest">Active Pipeline</span><p className="text-3xl font-black text-slate-900">$8.2M</p></div>
+                  <div className="border p-4 rounded-lg"><span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Total Revenue</span><p className="text-2xl font-bold mt-1">{formatCurrency(kpis.totalRevenue)}</p></div>
+                  <div className="border p-4 rounded-lg"><span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Active Pipeline</span><p className="text-2xl font-bold mt-1">{formatCurrency(kpis.totalPipeline)}</p></div>
                 </div>
-
                 <div>
-                  <h2 className="text-xl font-bold text-slate-900 mb-3 border-l-4 border-[#1e1a4f] pl-3">2. Top Performers</h2>
-                  <table className="w-full text-left border-collapse mt-4">
+                  <h3 className="font-semibold mb-2 border-l-4 border-primary pl-3">2. Top Sources</h3>
+                  <table className="w-full text-left text-sm mt-2">
                     <thead>
-                      <tr className="border-b-2 border-slate-200">
-                        <th className="py-2 text-sm font-black uppercase text-slate-900">Agent</th>
-                        <th className="py-2 text-sm font-black uppercase text-slate-900">Region</th>
-                        <th className="py-2 text-sm font-black uppercase text-slate-900 text-right">Deals</th>
-                        <th className="py-2 text-sm font-black uppercase text-slate-900 text-right">Revenue</th>
-                      </tr>
+                      <tr className="border-b"><th className="py-2 font-medium">Source</th><th className="py-2 font-medium text-right">Deals</th><th className="py-2 font-medium text-right">Revenue</th></tr>
                     </thead>
-                    <tbody className="divide-y divide-slate-100">
-                      {MOCK_TABLE_DATA.slice(0, 3).map(r => (
+                    <tbody className="divide-y">
+                      {sortedData.slice(0, 3).map(r => (
                         <tr key={r.id}>
-                          <td className="py-3 text-sm font-bold text-slate-700">{r.agent}</td>
-                          <td className="py-3 text-sm text-slate-600">{r.region}</td>
-                          <td className="py-3 text-sm font-bold text-slate-700 text-right">{r.deals}</td>
-                          <td className="py-3 text-sm font-bold text-emerald-600 text-right">{formatCurrency(r.revenue)}</td>
+                          <td className="py-2 font-medium">{r.name}</td>
+                          <td className="py-2 text-right">{r.deals}</td>
+                          <td className="py-2 text-right font-medium text-emerald-600 dark:text-emerald-400">{formatCurrency(r.revenue)}</td>
                         </tr>
                       ))}
                     </tbody>
@@ -517,49 +452,33 @@ export default function ReportsPage() {
                 </div>
               </div>
             ) : (
-              // Excel/CSV Preview Body (Dark Mode)
-              <div className="w-full flex flex-col gap-6">
-                <div className="grid grid-cols-3 gap-4">
-                  {['Revenue trend indicates +15% QoQ growth', 'Sarah Jenkins is top performer in NA', 'Enterprise Suite accounts for 65% of pipeline'].map((txt, i) => (
-                    <div key={i} className="bg-slate-800 border border-slate-700 rounded-xl p-4 flex gap-3 shadow-lg">
-                      <Sparkles className="w-5 h-5 text-blue-400 shrink-0" />
-                      <p className="text-slate-300 text-sm font-medium">{txt}</p>
-                    </div>
-                  ))}
-                </div>
-                
-                <div className="bg-slate-900 border border-slate-700 rounded-xl overflow-hidden shadow-2xl flex-1">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-left text-slate-300 whitespace-nowrap">
-                      <thead>
-                        <tr className="bg-slate-800 border-b border-slate-700">
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700">ID</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700">Agent Name</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700">Region</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700">Product Line</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700 text-right">Deals Closed</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700 text-right">Revenue (USD)</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 border-r border-slate-700 text-right">Pipeline (USD)</th>
-                          <th className="p-3 text-xs font-black uppercase tracking-wider text-slate-400 text-right">Conv. %</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-800 font-mono text-sm">
-                        {[...MOCK_TABLE_DATA, ...MOCK_TABLE_DATA].map((r, i) => (
-                          <tr key={i} className="hover:bg-slate-800/50">
-                            <td className="p-3 border-r border-slate-800 text-slate-500">{r.id + (i > 4 ? 5 : 0)}</td>
-                            <td className="p-3 border-r border-slate-800 text-blue-400">{r.agent}</td>
-                            <td className="p-3 border-r border-slate-800">{r.region}</td>
-                            <td className="p-3 border-r border-slate-800">{r.product}</td>
-                            <td className="p-3 border-r border-slate-800 text-right">{r.deals}</td>
-                            <td className="p-3 border-r border-slate-800 text-right text-emerald-400">{r.revenue}</td>
-                            <td className="p-3 border-r border-slate-800 text-right">{r.pipeline}</td>
-                            <td className="p-3 text-right">{r.conversion}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-left text-sm whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b bg-muted">
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase">Source</th>
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase text-right">Deals</th>
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase text-right">Revenue</th>
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase text-right">Won</th>
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase text-right">Lost</th>
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase text-right">Pipeline</th>
+                      <th className="p-3 text-xs font-medium text-muted-foreground uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {sortedData.map((r) => (
+                      <tr key={r.id} className="hover:bg-muted/50">
+                        <td className="p-3 font-medium">{r.name}</td>
+                        <td className="p-3 text-right">{r.deals}</td>
+                        <td className="p-3 text-right text-emerald-600 dark:text-emerald-400">{formatCurrency(r.revenue)}</td>
+                        <td className="p-3 text-right">{r.wonDeals}</td>
+                        <td className="p-3 text-right">{r.lostDeals}</td>
+                        <td className="p-3 text-right">{formatCurrency(r.pipeline)}</td>
+                        <td className="p-3">{r.status}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             )}
           </div>

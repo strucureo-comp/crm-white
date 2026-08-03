@@ -49,8 +49,8 @@ export default function CampaignsPage() {
     return () => unsubscribe();
   }, [user?.company_id]);
   
-  const [metaConnected, setMetaConnected] = useState(false);
-  const [googleConnected, setGoogleConnected] = useState(false);
+  const metaConnected = externalCampaigns.some(c => c.source === 'meta');
+  const googleConnected = externalCampaigns.some(c => c.source === 'google');
   
   const [syncing, setSyncing] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -91,7 +91,6 @@ export default function CampaignsPage() {
         lastSynced: new Date().toISOString(),
         currency: "USD",
       });
-      setMetaConnected(true);
       addToast("Meta Ads connected successfully!");
     } catch {
       addToast("Failed to connect Meta Ads", "error");
@@ -112,7 +111,6 @@ export default function CampaignsPage() {
         lastSynced: new Date().toISOString(),
         currency: "USD",
       });
-      setGoogleConnected(true);
       addToast("Google Ads connected successfully!");
     } catch {
       addToast("Failed to connect Google Ads", "error");

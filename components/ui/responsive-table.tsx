@@ -45,7 +45,7 @@ export function ResponsiveTable<T>({
     <>
       {/* Desktop table */}
       <div className={cn('hidden sm:block overflow-x-auto', className)}>
-        <table className="w-full">
+        <table className="w-full min-w-[600px]">
           <thead>
             <tr className="border-b">
               {visibleColumns.map((col) => (

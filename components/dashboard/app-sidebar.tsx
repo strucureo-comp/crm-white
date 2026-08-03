@@ -47,6 +47,9 @@ import {
   GitBranch,
   Handshake,
   Filter,
+  MessageSquare,
+  TrendingUp,
+  Globe,
 } from 'lucide-react';
 
 interface NavItem {
@@ -123,7 +126,12 @@ function getNavConfig(leadCount: number): NavConfig {
       {
         title: 'Integration Hub',
         items: [
-          { title: 'Automation Hub', href: '/integrations', icon: Puzzle },
+          { title: 'Connector Hub', href: '/integrations', icon: Puzzle },
+          { title: 'WhatsApp', href: '/integrations/whatsapp', icon: MessageSquare },
+          { title: 'WhatsApp Chats', href: '/whatsapp-chats', icon: MessageSquare },
+          { title: 'Meta Ads', href: '/integrations/meta', icon: BarChart3 },
+          { title: 'Google Ads', href: '/integrations/google', icon: TrendingUp },
+          { title: 'Website Enquiries', href: '/integrations/website-enquiries', icon: Globe },
         ],
       },
     ]
@@ -155,7 +163,7 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
           )}
           {!collapsed && (
             <span className="font-semibold text-lg tracking-tight whitespace-nowrap">
-              Tagverse.io
+              {companyName || 'CRM'}
             </span>
           )}
         </div>
@@ -337,7 +345,7 @@ export function AppSidebar() {
                 </div>
               )}
               <SheetTitle className="font-semibold text-lg tracking-tight">
-                Tagverse.io
+                {companyName || 'CRM'}
               </SheetTitle>
             </div>
             <SheetDescription className="sr-only">Navigation menu</SheetDescription>

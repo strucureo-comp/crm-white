@@ -31,10 +31,10 @@ import { formatCurrency } from '@/lib/utils';
 import { generateInvoicePdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
 
 const statusStyles: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
-  paid: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950 dark:text-emerald-400',
-  overdue: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
-  cancelled: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
+  pending: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
+  paid: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400',
+  overdue: 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400',
+  cancelled: 'bg-muted text-muted-foreground',
 };
 
 export default function InvoicesPage() {
@@ -109,13 +109,13 @@ export default function InvoicesPage() {
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search invoices..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -144,6 +144,7 @@ export default function InvoicesPage() {
                 {
                   key: 'description',
                   header: 'Description',
+                  hideOnMobile: true,
                   render: (inv) => <span className="text-sm">{inv.description || '—'}</span>,
                 },
                 {
@@ -163,11 +164,13 @@ export default function InvoicesPage() {
                 {
                   key: 'due',
                   header: 'Due Date',
+                  hideOnMobile: true,
                   render: (inv) => <span className="text-sm text-muted-foreground">{inv.due_date ? new Date(inv.due_date).toLocaleDateString() : '—'}</span>,
                 },
                 {
                   key: 'date',
                   header: 'Date',
+                  hideOnMobile: true,
                   render: (inv) => <span className="text-sm text-muted-foreground">{new Date(inv.created_at).toLocaleDateString()}</span>,
                 },
                 {
@@ -217,7 +220,7 @@ export default function InvoicesPage() {
         </Card>
       ) : (
         <Card>
-          <CardContent className="py-12 text-center">
+          <CardContent className="py-8 sm:py-12 text-center">
             <Receipt size={48} className="mx-auto text-muted-foreground/50 mb-3" />
             <p className="text-sm text-muted-foreground">No invoices yet</p>
           </CardContent>

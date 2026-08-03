@@ -14,7 +14,7 @@ interface KpiCardProps {
 
 export function KpiCard({ title, value, change, trend, icon: Icon, description }: KpiCardProps) {
   return (
-    <div className="rounded-xl border bg-card p-5 hover:shadow-sm transition-all duration-200 animate-fadeIn">
+    <div className="rounded-xl border bg-card p-3 sm:p-5 hover:shadow-sm transition-all duration-200 animate-fadeIn">
       <div className="flex items-start justify-between">
         <div className="space-y-1">
           <p className="text-sm text-muted-foreground font-medium">{title}</p>

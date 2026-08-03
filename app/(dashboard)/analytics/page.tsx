@@ -1,40 +1,40 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
-import { 
-  BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell, 
+import {
+  BarChart, Bar, LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend
 } from 'recharts';
-import { 
-  Calendar, Building2, Users, Tag, Share2, Download, LayoutTemplate, 
-  Plus, X, Save, Settings, Trash2, LayoutDashboard, ArrowUpRight, ArrowDownRight, ArrowRight, Activity, DollarSign
+import {
+  Calendar, Building2, Users, Share2, Download, LayoutTemplate,
+  Plus, X, Save, Settings, Trash2, LayoutDashboard, ArrowUpRight, ArrowDownRight, ArrowRight, TrendingUp
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/ui/dialog';
+import { KpiCard } from '@/components/dashboard/kpi-card';
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import { subscribeToLeads } from '@/lib/firebase/database';
 import { subscribeToCampaigns, Campaign } from '@/lib/db/campaigns/api';
 import { subscribeToProjectsData } from '@/lib/db/projects/api';
+import { subscribeToDashboardSettings, saveDashboardSettings, DashboardSettings, WidgetLayout } from '@/lib/db/dashboard/api';
 import { Lead } from '@/lib/db/types';
 
-// --- Data Schemas ---
 type WidgetType = 'kpi' | 'bar' | 'donut' | 'line' | 'funnel' | 'area';
-
-interface WidgetConfig {
-  metricId: string;
-  colorTheme: string;
-}
 
 interface Widget {
   id: string;
   type: WidgetType;
   title: string;
-  config: WidgetConfig;
+  config: {
+    metricId: string;
+    colorTheme: string;
+  };
 }
 
 interface GlobalFilters {
@@ -74,70 +74,15 @@ const METRICS_BY_TYPE = {
   'Area Charts': AVAILABLE_METRICS.filter(m => m.type === 'area'),
 };
 
-// --- Mock Data specific to metrics ---
-const MOCK_DATA: Record<string, any> = {
-  total_pipeline_value: { value: '$1,245,000', change: '+12%', trend: 'up' },
-  total_revenue: { value: '$450,000', change: '+8%', trend: 'up' },
-  win_rate: { value: '34%', change: '-2%', trend: 'down' },
-  avg_deal_size: { value: '$24,500', change: '+5%', trend: 'up' },
-  
-  pipeline_by_stage: [
-    { name: 'Lead', value: 120000 }, { name: 'Qualified', value: 300000 }, 
-    { name: 'Proposal', value: 450000 }, { name: 'Negotiation', value: 250000 }, { name: 'Won', value: 125000 }
-  ],
-  revenue_by_owner: [
-    { name: 'Sarah', value: 150000 }, { name: 'John', value: 120000 }, 
-    { name: 'Mike', value: 95000 }, { name: 'Emma', value: 85000 }
-  ],
-  leads_by_source: [
-    { name: 'Organic', value: 450 }, { name: 'Paid Ads', value: 320 }, 
-    { name: 'Referral', value: 150 }, { name: 'Social', value: 280 }
-  ],
-  campaign_roi: [
-    { name: 'Q1 Launch', budget: 5000, spent: 4800 }, 
-    { name: 'Summer Promo', budget: 10000, spent: 12500 },
-    { name: 'Retargeting', budget: 3000, spent: 1500 }
-  ],
-  revenue_growth: [
-    { name: 'Jan', value: 20000 }, { name: 'Feb', value: 35000 }, { name: 'Mar', value: 45000 },
-    { name: 'Apr', value: 42000 }, { name: 'May', value: 65000 }, { name: 'Jun', value: 85000 }
-  ],
-  win_rate_trend: [
-    { name: 'Jan', value: 28 }, { name: 'Feb', value: 30 }, { name: 'Mar', value: 29 },
-    { name: 'Apr', value: 32 }, { name: 'May', value: 34 }, { name: 'Jun', value: 35 }
-  ],
-  lead_gen_trend: [
-    { name: 'Week 1', value: 120 }, { name: 'Week 2', value: 150 }, 
-    { name: 'Week 3', value: 130 }, { name: 'Week 4', value: 190 }
-  ],
-  deal_status_breakdown: [
-    { name: 'Open', value: 60 }, { name: 'Won', value: 25 }, { name: 'Lost', value: 15 }
-  ],
-  lead_intent_dist: [
-    { name: 'High', value: 25 }, { name: 'Medium', value: 45 }, { name: 'Low', value: 30 }
-  ],
-  campaign_channels: [
-    { name: 'Email', value: 40 }, { name: 'Social', value: 30 }, { name: 'Paid Search', value: 20 }, { name: 'Events', value: 10 }
-  ],
-  sales_funnel: [
-    { name: 'Total Deals', value: 500 }, { name: 'Qualified', value: 350 },
-    { name: 'Proposals', value: 200 }, { name: 'Negotiation', value: 100 }, { name: 'Closed Won', value: 50 }
-  ],
-  lead_lifecycle: [
-    { name: 'Raw Leads', value: 1000 }, { name: 'MQL', value: 600 },
-    { name: 'SQL', value: 300 }, { name: 'Opportunities', value: 150 }
-  ],
-  cumulative_revenue: [
-    { name: 'Jan', value: 20000 }, { name: 'Feb', value: 55000 }, { name: 'Mar', value: 100000 },
-    { name: 'Apr', value: 142000 }, { name: 'May', value: 207000 }, { name: 'Jun', value: 292000 }
-  ],
-  active_pipeline_vol: [
-    { name: 'Jan', value: 500000 }, { name: 'Feb', value: 550000 }, { name: 'Mar', value: 480000 },
-    { name: 'Apr', value: 600000 }, { name: 'May', value: 750000 }, { name: 'Jun', value: 800000 }
-  ],
+const THEME_COLORS: Record<string, string[]> = {
+  '#8b5cf6': ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe'],
+  '#ec4899': ['#ec4899', '#f472b6', '#fbcfe8', '#fce7f3', '#fdf2f8'],
+  '#3b82f6': ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#eff6ff'],
+  '#10b981': ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#ecfdf5'],
+  '#f59e0b': ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fffbeb'],
 };
 
-const INITIAL_WIDGETS: Widget[] = [
+const DEFAULT_WIDGETS: Widget[] = [
   { id: 'w1', type: 'kpi', title: 'Total Pipeline Value', config: { metricId: 'total_pipeline_value', colorTheme: '#3b82f6' } },
   { id: 'w2', type: 'kpi', title: 'Total Revenue (Won Deals)', config: { metricId: 'total_revenue', colorTheme: '#10b981' } },
   { id: 'w3', type: 'kpi', title: 'Win Rate', config: { metricId: 'win_rate', colorTheme: '#8b5cf6' } },
@@ -147,34 +92,24 @@ const INITIAL_WIDGETS: Widget[] = [
   { id: 'w7', type: 'line', title: 'Revenue Growth Over Time', config: { metricId: 'revenue_growth', colorTheme: '#10b981' } },
 ];
 
-const THEME_COLORS: Record<string, string[]> = {
-  '#8b5cf6': ['#8b5cf6', '#a78bfa', '#c4b5fd', '#ddd6fe', '#ede9fe'],
-  '#ec4899': ['#ec4899', '#f472b6', '#fbcfe8', '#fce7f3', '#fdf2f8'],
-  '#3b82f6': ['#3b82f6', '#60a5fa', '#93c5fd', '#bfdbfe', '#eff6ff'],
-  '#10b981': ['#10b981', '#34d399', '#6ee7b7', '#a7f3d0', '#ecfdf5'],
-  '#f59e0b': ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fffbeb'],
-};
-
-// --- Components ---
-
-const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
+const WidgetRenderer = ({ widget, data }: { widget: Widget; data: any }) => {
   const color = widget.config.colorTheme || '#8b5cf6';
   const palette = THEME_COLORS[color] || THEME_COLORS['#8b5cf6'];
 
-  if (!data) return <div className="flex items-center justify-center h-full text-slate-400">No data</div>;
+  if (!data) return <div className="flex items-center justify-center h-full text-muted-foreground">No data</div>;
 
   switch (widget.type) {
     case 'kpi':
       return (
         <div className="flex flex-col h-full justify-center">
           <div className="flex items-end gap-3 mb-2">
-            <span className="text-4xl font-black tracking-tighter text-slate-900 dark:text-white">{data.value}</span>
-            <Badge className={`font-bold mb-1 ${data.trend === 'up' ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-50 border-emerald-200' : 'bg-rose-50 text-rose-700 hover:bg-rose-50 border-rose-200'}`}>
-              {data.trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-0.5" /> : <ArrowDownRight className="w-3 h-3 mr-0.5" />} 
+            <span className="text-4xl font-bold tracking-tight">{data.value}</span>
+            <Badge className={data.trend === 'up' ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-400' : 'bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400'}>
+              {data.trend === 'up' ? <ArrowUpRight className="w-3 h-3 mr-0.5" /> : <ArrowDownRight className="w-3 h-3 mr-0.5" />}
               {data.change}
             </Badge>
           </div>
-          <span className="text-sm font-semibold text-slate-500">vs last period</span>
+          <span className="text-sm text-muted-foreground">vs last period</span>
         </div>
       );
     case 'bar':
@@ -182,14 +117,14 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
       return (
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} />
-            <Tooltip cursor={{ fill: '#f8fafc' }} contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.1)' }} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+            <Tooltip cursor={{ fill: 'hsl(var(--muted))' }} contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }} />
             {isMultiBar ? (
               <>
-                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, fontWeight: 600, paddingTop: 10 }} />
-                <Bar dataKey="budget" name="Budget" fill="#cbd5e1" radius={[4, 4, 0, 0]} />
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 12, paddingTop: 10 }} />
+                <Bar dataKey="budget" name="Budget" fill="hsl(var(--muted))" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="spent" name="Spent" fill={color} radius={[4, 4, 0, 0]} />
               </>
             ) : (
@@ -202,11 +137,11 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
       return (
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} />
-            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.1)' }} />
-            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={3} dot={{ strokeWidth: 2, r: 4, fill: '#fff' }} activeDot={{ r: 6, fill: color, stroke: '#fff', strokeWidth: 2 }} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }} />
+            <Line type="monotone" dataKey="value" stroke={color} strokeWidth={2} dot={{ strokeWidth: 2, r: 4, fill: 'hsl(var(--background))' }} activeDot={{ r: 6, fill: color, stroke: 'hsl(var(--background))', strokeWidth: 2 }} />
           </LineChart>
         </ResponsiveContainer>
       );
@@ -216,15 +151,15 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
           <AreaChart data={data} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
             <defs>
               <linearGradient id={`color-${widget.id}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={color} stopOpacity={0.3}/>
-                <stop offset="95%" stopColor={color} stopOpacity={0}/>
+                <stop offset="5%" stopColor={color} stopOpacity={0.3} />
+                <stop offset="95%" stopColor={color} stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} dy={10} />
-            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: '#64748b', fontWeight: 600 }} />
-            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.1)' }} />
-            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={3} fillOpacity={1} fill={`url(#color-${widget.id})`} />
+            <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-border" />
+            <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+            <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }} />
+            <Area type="monotone" dataKey="value" stroke={color} strokeWidth={2} fillOpacity={1} fill={`url(#color-${widget.id})`} />
           </AreaChart>
         </ResponsiveContainer>
       );
@@ -237,8 +172,8 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
                 <Cell key={`cell-${index}`} fill={palette[index % palette.length]} />
               ))}
             </Pie>
-            <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 4px 20px -2px rgba(0,0,0,0.1)' }} />
-            <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 12, fontWeight: 600 }} />
+            <Tooltip contentStyle={{ borderRadius: '8px', border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))' }} />
+            <Legend verticalAlign="bottom" height={36} iconType="circle" wrapperStyle={{ fontSize: 12 }} />
           </PieChart>
         </ResponsiveContainer>
       );
@@ -250,43 +185,42 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget, data: any }) => {
             const width = Math.max((step.value / maxVal) * 100, 10);
             return (
               <div key={i} className="flex flex-col items-center group w-full">
-                <div className="w-full flex justify-between text-xs font-bold text-slate-500 mb-1 px-4">
+                <div className="w-full flex justify-between text-xs font-medium text-muted-foreground mb-1 px-4">
                   <span>{step.name}</span>
                   <span>{step.value}</span>
                 </div>
-                <div 
-                  className="h-8 rounded-full transition-all duration-500 flex items-center justify-center relative overflow-hidden"
+                <div
+                  className="h-8 rounded-lg transition-all duration-500 flex items-center justify-center relative overflow-hidden"
                   style={{ width: `${width}%`, backgroundColor: palette[i % palette.length] }}
                 >
                   <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 {i < data.length - 1 && (
-                  <ArrowDownRight className="w-4 h-4 text-slate-300 mt-2" />
+                  <ArrowRight className="w-4 h-4 text-muted-foreground mt-2 rotate-90" />
                 )}
               </div>
-            )
+            );
           })}
         </div>
       );
     default:
-      return <div className="flex items-center justify-center h-full text-slate-400 font-bold">Unsupported Type</div>;
+      return <div className="flex items-center justify-center h-full text-muted-foreground">Unsupported Type</div>;
   }
 };
 
 export default function AnalyticsDashboard() {
   const [isClient, setIsClient] = useState(false);
-  
-  // Global State
   const [isEditMode, setIsEditMode] = useState(false);
-  const [widgets, setWidgets] = useState<Widget[]>(INITIAL_WIDGETS);
+  const [widgets, setWidgets] = useState<Widget[]>(DEFAULT_WIDGETS);
   const [selectedWidgetId, setSelectedWidgetId] = useState<string | null>(null);
-  
+  const [isAddOpen, setIsAddOpen] = useState(false);
   const [globalFilters, setGlobalFilters] = useState<GlobalFilters>({
     dateRange: '30days',
     pipeline: 'all',
     owner: 'all',
     tag: 'all'
   });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const { user } = useAuth();
   const [deals, setDeals] = useState<Lead[]>([]);
@@ -295,55 +229,148 @@ export default function AnalyticsDashboard() {
 
   useEffect(() => {
     if (!user?.company_id) return;
-    
     const unsubDeals = subscribeToLeads(user.company_id, setDeals);
     const unsubMembers = subscribeToProjectsData(user.company_id, (data) => setMembers(data.members || []));
     const unsubCampaigns = subscribeToCampaigns(user.company_id, setCampaigns);
-    
-    return () => {
-      unsubDeals();
-      unsubMembers();
-      unsubCampaigns();
-    };
+    return () => { unsubDeals(); unsubMembers(); unsubCampaigns(); };
   }, [user]);
 
+  // Load dashboard settings from Firebase
+  useEffect(() => {
+    if (!user?.company_id || settingsLoaded) return;
+    const unsub = subscribeToDashboardSettings(user.company_id, (settings) => {
+      if (settings) {
+        if (settings.widgets && settings.widgets.length > 0) {
+          setWidgets(settings.widgets as Widget[]);
+        }
+        if (settings.globalFilters) {
+          setGlobalFilters(settings.globalFilters);
+        }
+      }
+      setSettingsLoaded(true);
+    });
+    return () => unsub();
+  }, [user?.company_id, settingsLoaded]);
+
+  // Persist dashboard settings to Firebase when widgets or filters change
+  const persistSettings = useCallback(async () => {
+    if (!user?.company_id || !settingsLoaded) return;
+    try {
+      await saveDashboardSettings(user.company_id, {
+        widgets: widgets as WidgetLayout[],
+        globalFilters,
+      });
+    } catch (e) {
+      console.error('Failed to save dashboard settings:', e);
+    }
+  }, [user?.company_id, widgets, globalFilters, settingsLoaded]);
+
+  // Auto-save when exiting edit mode
+  useEffect(() => {
+    if (!isEditMode && settingsLoaded) {
+      persistSettings();
+    }
+  }, [isEditMode]);
+
+  // Filter deals based on global filters
+  const filteredDeals = useMemo(() => {
+    let result = deals;
+
+    if (globalFilters.owner !== 'all') {
+      result = result.filter(d => d.owner_id === user?.id);
+    }
+
+    if (globalFilters.pipeline !== 'all') {
+      // Pipeline filtering would need pipeline_id on deals
+      // For now, show all if a specific pipeline is selected
+    }
+
+    return result;
+  }, [deals, globalFilters, user?.id]);
+
   const dashboardData = useMemo(() => {
-    // Remove mock data fallback: calculate zeroed/empty structures instead if no deals exist.
-    const openDeals = deals.filter(d => d.status !== 'won' && d.status !== 'lost');
-    const wonDeals = deals.filter(d => d.status === 'won');
-    const lostDeals = deals.filter(d => d.status === 'lost');
+    const openDeals = filteredDeals.filter(d => d.status !== 'won' && d.status !== 'lost');
+    const wonDeals = filteredDeals.filter(d => d.status === 'won');
+    const lostDeals = filteredDeals.filter(d => d.status === 'lost');
     const resolvedDeals = wonDeals.length + lostDeals.length;
 
-    const totalPipeline = openDeals.reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
-    const totalRevenue = wonDeals.reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+    const totalPipeline = openDeals.reduce((acc, d) => acc + (d.estimated_value || 0), 0);
+    const totalRevenue = wonDeals.reduce((acc, d) => acc + (d.estimated_value || 0), 0);
     const winRate = resolvedDeals > 0 ? Math.round((wonDeals.length / resolvedDeals) * 100) : 0;
     const avgDealSize = wonDeals.length > 0 ? Math.round(totalRevenue / wonDeals.length) : 0;
 
+    // Compute change values from previous period
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+    const prevMonth = currentMonth === 0 ? 11 : currentMonth - 1;
+    const prevYear = currentMonth === 0 ? currentYear - 1 : currentYear;
+
+    const wonThisMonth = wonDeals.filter(d => {
+      const closedAt = d.updated_at;
+      if (!closedAt) return false;
+      const date = new Date(closedAt);
+      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    });
+    const wonPrevMonth = wonDeals.filter(d => {
+      const closedAt = d.updated_at;
+      if (!closedAt) return false;
+      const date = new Date(closedAt);
+      return date.getMonth() === prevMonth && date.getFullYear() === prevYear;
+    });
+
+    const revenueThisMonth = wonThisMonth.reduce((acc, d) => acc + (d.estimated_value || 0), 0);
+    const revenuePrevMonth = wonPrevMonth.reduce((acc, d) => acc + (d.estimated_value || 0), 0);
+
+    const resolvedThisMonth = wonThisMonth.length + lostDeals.filter(d => {
+      const closedAt = d.updated_at;
+      if (!closedAt) return false;
+      const date = new Date(closedAt);
+      return date.getMonth() === currentMonth && date.getFullYear() === currentYear;
+    }).length;
+    const resolvedPrevMonth = wonPrevMonth.length + lostDeals.filter(d => {
+      const closedAt = d.updated_at;
+      if (!closedAt) return false;
+      const date = new Date(closedAt);
+      return date.getMonth() === prevMonth && date.getFullYear() === prevYear;
+    }).length;
+
+    const winRateThisMonth = resolvedThisMonth > 0 ? Math.round((wonThisMonth.length / resolvedThisMonth) * 100) : 0;
+    const winRatePrevMonth = resolvedPrevMonth > 0 ? Math.round((wonPrevMonth.length / resolvedPrevMonth) * 100) : 0;
+
+    const formatChange = (current: number, previous: number) => {
+      if (previous === 0) return current > 0 ? '+100%' : '+0%';
+      const change = ((current - previous) / previous) * 100;
+      return `${change >= 0 ? '+' : ''}${Math.round(change)}%`;
+    };
+
+    const revenueChange = formatChange(revenueThisMonth, revenuePrevMonth);
+    const winRateChange = formatChange(winRateThisMonth, winRatePrevMonth);
+    const pipelineChange = formatChange(totalPipeline, openDeals.reduce((acc, d) => acc + (d.estimated_value || 0), 0) - revenueThisMonth + revenuePrevMonth);
+    const avgDealChange = formatChange(avgDealSize, wonPrevMonth.length > 0 ? Math.round(wonPrevMonth.reduce((acc, d) => acc + (d.estimated_value || 0), 0) / wonPrevMonth.length) : 0);
+
     const pipelineByStage = [
-      { name: 'Lead', value: openDeals.filter(d => d.status === 'new' || d.status === 'contacted').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) },
-      { name: 'Qualified', value: openDeals.filter(d => d.status === 'qualified').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) },
-      { name: 'Proposal', value: openDeals.filter(d => d.status === 'proposal').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) },
-      { name: 'Negotiation', value: openDeals.filter(d => d.status === 'negotiation').reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0) }
+      { name: 'Lead', value: openDeals.filter(d => d.status === 'new' || d.status === 'contacted').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Qualified', value: openDeals.filter(d => d.status === 'qualified').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Proposal', value: openDeals.filter(d => d.status === 'proposal').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Negotiation', value: openDeals.filter(d => d.status === 'negotiation').reduce((acc, d) => acc + (d.estimated_value || 0), 0) }
     ];
 
     const revenueByOwnerMap: Record<string, number> = {};
     wonDeals.forEach(d => {
-      const ownerId = (d as any).owner_id || (d as any).assigned_to;
-      if (ownerId) {
-        revenueByOwnerMap[ownerId] = (revenueByOwnerMap[ownerId] || 0) + ((d as any).estimated_value || 0);
-      }
+      const ownerId = d.owner_id;
+      if (ownerId) revenueByOwnerMap[ownerId] = (revenueByOwnerMap[ownerId] || 0) + (d.estimated_value || 0);
     });
-    
     const revenueByOwner = Object.entries(revenueByOwnerMap).map(([ownerId, value]) => {
       const member = members.find(m => m.id === ownerId);
       return { name: member ? member.name.split(' ')[0] : 'Unknown', value };
     }).sort((a, b) => b.value - a.value);
 
     const salesFunnel = [
-      { name: 'Total Deals', value: deals.length },
-      { name: 'Qualified', value: deals.filter(d => d.status === 'qualified' || d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
-      { name: 'Proposals', value: deals.filter(d => d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
-      { name: 'Negotiation', value: deals.filter(d => d.status === 'negotiation' || d.status === 'won').length },
+      { name: 'Total Deals', value: filteredDeals.length },
+      { name: 'Qualified', value: filteredDeals.filter(d => d.status === 'qualified' || d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
+      { name: 'Proposals', value: filteredDeals.filter(d => d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
+      { name: 'Negotiation', value: filteredDeals.filter(d => d.status === 'negotiation' || d.status === 'won').length },
       { name: 'Closed Won', value: wonDeals.length }
     ];
 
@@ -359,9 +386,7 @@ export default function AnalyticsDashboard() {
       spent: c.spent || 0
     }));
 
-    // Generate basic historical timeseries data (grouping by month)
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const currentMonth = new Date().getMonth();
     const last6Months = Array.from({ length: 6 }).map((_, i) => {
       const d = new Date();
       d.setMonth(currentMonth - (5 - i));
@@ -370,15 +395,14 @@ export default function AnalyticsDashboard() {
 
     const revenueGrowth = last6Months.map(m => {
       const revInMonth = wonDeals.filter(d => {
-        const closedAt = (d as any).closed_at || d.updated_at;
+        const closedAt = d.updated_at;
         if (!closedAt) return false;
         const closedDate = new Date(closedAt);
         return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
-      }).reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+      }).reduce((acc, d) => acc + (d.estimated_value || 0), 0);
       return { name: m.name, value: revInMonth };
     });
-    
-    // Cumulative revenue growth logic
+
     let runningTotal = 0;
     const cumulativeRevenueGrowth = revenueGrowth.map(item => {
       runningTotal += item.value;
@@ -386,18 +410,17 @@ export default function AnalyticsDashboard() {
     });
 
     const activePipelineVolume = last6Months.map(m => {
-      // Find open deals that were created on or before this month
-      const vol = deals.filter(d => {
+      const vol = filteredDeals.filter(d => {
         if (!d.created_at || d.status === 'won' || d.status === 'lost') return false;
         const createdDate = new Date(d.created_at);
         return (createdDate.getFullYear() < m.year) || (createdDate.getFullYear() === m.year && createdDate.getMonth() <= m.monthIndex);
-      }).reduce((acc, d) => acc + ((d as any).estimated_value || 0), 0);
+      }).reduce((acc, d) => acc + (d.estimated_value || 0), 0);
       return { name: m.name, value: vol };
     });
 
     const winRateTrend = last6Months.map(m => {
-      const resolvedInMonth = deals.filter(d => {
-        const closedAt = (d as any).closed_at || d.updated_at;
+      const resolvedInMonth = filteredDeals.filter(d => {
+        const closedAt = d.updated_at;
         if (!closedAt || (d.status !== 'won' && d.status !== 'lost')) return false;
         const closedDate = new Date(closedAt);
         return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
@@ -408,10 +431,10 @@ export default function AnalyticsDashboard() {
     });
 
     return {
-      total_pipeline_value: { value: `$${totalPipeline.toLocaleString()}`, change: '+0%', trend: 'up' },
-      total_revenue: { value: `$${totalRevenue.toLocaleString()}`, change: '+0%', trend: 'up' },
-      win_rate: { value: `${winRate}%`, change: '+0%', trend: 'up' },
-      avg_deal_size: { value: `$${avgDealSize.toLocaleString()}`, change: '+0%', trend: 'up' },
+      total_pipeline_value: { value: `$${totalPipeline.toLocaleString()}`, change: pipelineChange, trend: 'up' as const },
+      total_revenue: { value: `$${totalRevenue.toLocaleString()}`, change: revenueChange, trend: 'up' as const },
+      win_rate: { value: `${winRate}%`, change: winRateChange, trend: 'up' as const },
+      avg_deal_size: { value: `$${avgDealSize.toLocaleString()}`, change: avgDealChange, trend: 'up' as const },
       pipeline_by_stage: pipelineByStage,
       revenue_by_owner: revenueByOwner,
       sales_funnel: salesFunnel,
@@ -421,27 +444,16 @@ export default function AnalyticsDashboard() {
       active_pipeline_volume: activePipelineVolume,
       win_rate_trend: winRateTrend
     };
-  }, [deals, members, campaigns]);
-
-  // Modals
-  const [isAddOpen, setIsAddOpen] = useState(false);
+  }, [filteredDeals, members, campaigns]);
 
   useEffect(() => setIsClient(true), []);
 
   const handleDragEnd = (result: DropResult) => {
     if (!result.destination || !isEditMode) return;
-    
     const items = Array.from(widgets);
     const [reorderedItem] = items.splice(result.source.index, 1);
     items.splice(result.destination.index, 0, reorderedItem);
-    
     setWidgets(items);
-  };
-
-  const removeWidget = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setWidgets(prev => prev.filter(w => w.id !== id));
-    if (selectedWidgetId === id) setSelectedWidgetId(null);
   };
 
   const addWidget = (metric: typeof AVAILABLE_METRICS[0]) => {
@@ -449,58 +461,54 @@ export default function AnalyticsDashboard() {
       id: `w_${Date.now()}`,
       type: metric.type as WidgetType,
       title: metric.title,
-      config: {
-        metricId: metric.id,
-        colorTheme: '#8b5cf6',
-      }
+      config: { metricId: metric.id, colorTheme: '#8b5cf6' }
     };
     setWidgets([...widgets, newWidget]);
     setIsAddOpen(false);
   };
 
-  const getWidgetStyle = (type: WidgetType) => {
+  const getWidgetGridClass = (type: WidgetType) => {
     switch (type) {
-      case 'kpi': return { width: 'calc(25% - 15px)', minWidth: '200px', height: '160px', flexGrow: 1 };
-      case 'donut': return { width: '380px', height: '380px', flexGrow: 1 };
-      case 'funnel': return { width: 'calc(33% - 15px)', minWidth: '340px', height: '460px', flexGrow: 1 };
-      default: return { width: 'calc(50% - 10px)', minWidth: '400px', height: '380px', flexGrow: 1 };
+      case 'kpi': return 'col-span-1';
+      case 'donut': return 'col-span-1 md:col-span-2';
+      case 'funnel': return 'col-span-1';
+      default: return 'col-span-1 md:col-span-2';
     }
   };
 
   if (!isClient) return null;
 
   return (
-    <div className="flex flex-col h-[calc(100vh-100px)] min-h-0 bg-[#f8fafc] dark:bg-background">
-      
-      {/* Top Bar */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-5 bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 shrink-0 z-20 shadow-sm relative">
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-2xl font-black tracking-tight text-[#1e1a4f] dark:text-foreground font-sans" style={{ fontFamily: "'Outfit', sans-serif" }}>Analytics Dashboard</h1>
-            <p className="text-sm text-slate-500 dark:text-slate-400 font-medium mt-1">Real-time performance metrics across all client accounts.</p>
-          </div>
-          {isEditMode && <Badge className="bg-blue-50 text-blue-700 border-blue-200 uppercase font-black tracking-widest text-[10px] h-6 px-3">Edit Mode</Badge>}
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Analytics Dashboard</h1>
+          <p className="text-sm text-muted-foreground">Real-time performance metrics across all client accounts.</p>
         </div>
-        
         <div className="flex items-center gap-3">
+          {isEditMode && (
+            <Badge variant="secondary" className="bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+              Edit Mode
+            </Badge>
+          )}
           {!isEditMode ? (
             <>
-              <Button variant="ghost" className="font-bold text-slate-600 hover:text-slate-900 rounded-xl"><Share2 className="w-4 h-4 mr-2" /> Share</Button>
-              <Button variant="ghost" className="font-bold text-slate-600 hover:text-slate-900 rounded-xl"><Download className="w-4 h-4 mr-2" /> Export</Button>
-              <Button className="bg-[#1e1a4f] hover:bg-[#2d2770] text-white rounded-xl shadow-md font-bold px-5" onClick={() => setIsEditMode(true)}>
+              <Button variant="ghost" size="sm"><Share2 className="w-4 h-4 mr-2" /> Share</Button>
+              <Button variant="ghost" size="sm"><Download className="w-4 h-4 mr-2" /> Export</Button>
+              <Button size="sm" onClick={() => setIsEditMode(true)}>
                 <LayoutTemplate className="w-4 h-4 mr-2" /> Edit Layout
               </Button>
             </>
           ) : (
             <>
-              <Button variant="outline" className="border-blue-200 text-blue-700 hover:bg-blue-50 font-bold rounded-xl shadow-sm bg-white" onClick={() => setIsAddOpen(true)}>
+              <Button variant="outline" size="sm" onClick={() => setIsAddOpen(true)}>
                 <Plus className="w-4 h-4 mr-2" /> Add Component
               </Button>
-              <div className="w-px h-8 bg-slate-200 mx-1" />
-              <Button variant="ghost" className="font-bold text-slate-600 hover:text-slate-900 rounded-xl" onClick={() => { setIsEditMode(false); setSelectedWidgetId(null); }}>
+              <Button variant="ghost" size="sm" onClick={() => { setIsEditMode(false); setSelectedWidgetId(null); }}>
                 Cancel
               </Button>
-              <Button className="bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl shadow-md font-bold px-5" onClick={() => { setIsEditMode(false); setSelectedWidgetId(null); }}>
+              <Button size="sm" onClick={() => { setIsEditMode(false); setSelectedWidgetId(null); }}>
                 <Save className="w-4 h-4 mr-2" /> Save Changes
               </Button>
             </>
@@ -508,156 +516,139 @@ export default function AnalyticsDashboard() {
         </div>
       </div>
 
-      {/* Global Filters Row */}
-      <div className="bg-white dark:bg-card border-b border-slate-200 dark:border-slate-800 p-3 px-5 flex flex-wrap items-center gap-4 shrink-0 z-10">
-        <span className="text-xs font-black uppercase text-slate-400 dark:text-slate-500 tracking-widest">Filters:</span>
-        <Select value={globalFilters.dateRange} onValueChange={v => setGlobalFilters(p => ({...p, dateRange: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Calendar className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
+      {/* Filters */}
+      <div className="flex flex-wrap items-center gap-4">
+        <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Filters:</span>
+        <Select value={globalFilters.dateRange} onValueChange={v => setGlobalFilters(p => ({ ...p, dateRange: v }))}>
+          <SelectTrigger className="w-[160px] h-9"><Calendar className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="7days">Last 7 Days</SelectItem><SelectItem value="30days">Last 30 Days</SelectItem><SelectItem value="thisYear">This Year</SelectItem></SelectContent>
         </Select>
-        <Select value={globalFilters.pipeline} onValueChange={v => setGlobalFilters(p => ({...p, pipeline: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Building2 className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
-          <SelectContent><SelectItem value="all">All Pipelines</SelectItem><SelectItem value="sales">Sales Pipeline</SelectItem><SelectItem value="partners">Partner Pipeline</SelectItem></SelectContent>
+        <Select value={globalFilters.pipeline} onValueChange={v => setGlobalFilters(p => ({ ...p, pipeline: v }))}>
+          <SelectTrigger className="w-[160px] h-9"><Building2 className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue /></SelectTrigger>
+          <SelectContent><SelectItem value="all">All Pipelines</SelectItem><SelectItem value="sales">Sales Pipeline</SelectItem></SelectContent>
         </Select>
-        <Select value={globalFilters.owner} onValueChange={v => setGlobalFilters(p => ({...p, owner: v}))}>
-          <SelectTrigger className="w-[180px] h-9 bg-slate-50 dark:bg-slate-800 border-transparent shadow-none font-bold text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors rounded-lg"><Users className="w-4 h-4 mr-2 text-slate-400 dark:text-slate-500" /><SelectValue /></SelectTrigger>
+        <Select value={globalFilters.owner} onValueChange={v => setGlobalFilters(p => ({ ...p, owner: v }))}>
+          <SelectTrigger className="w-[160px] h-9"><Users className="w-4 h-4 mr-2 text-muted-foreground" /><SelectValue /></SelectTrigger>
           <SelectContent><SelectItem value="all">All Owners</SelectItem><SelectItem value="me">Assigned to Me</SelectItem></SelectContent>
         </Select>
       </div>
 
-      <div className="flex-1 flex overflow-hidden min-h-0 relative">
-        
-        {/* The Canvas Grid */}
-        <div className="flex-1 overflow-y-auto p-6 flex flex-col">
-          {widgets.length === 0 ? (
-            <div className="flex-1 flex flex-col items-center justify-center text-center">
-              <div className="w-20 h-20 rounded-full border-2 border-dashed border-slate-300 dark:border-slate-700 flex items-center justify-center mb-6">
-                <LayoutDashboard className="w-8 h-8 text-slate-400 dark:text-slate-500" />
-              </div>
-              <h3 className="text-xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Your Dashboard is Empty</h3>
-              <p className="text-slate-500 dark:text-slate-400 font-medium mt-2 mb-6 max-w-sm">Start building your custom view by adding components to the grid.</p>
-              {!isEditMode && <Button onClick={() => setIsEditMode(true)} className="rounded-xl font-bold bg-[#1e1a4f] text-white">Edit Layout</Button>}
-            </div>
-          ) : (
-            <DragDropContext onDragEnd={handleDragEnd}>
-              <Droppable droppableId="dashboard" direction="horizontal" isDropDisabled={!isEditMode}>
-                {(provided, snapshot) => (
-                  <div 
-                    {...provided.droppableProps} 
-                    ref={provided.innerRef}
-                    className="flex flex-wrap gap-5 w-full items-start"
-                  >
-                    {widgets.map((w, index) => (
-                      <Draggable key={w.id} draggableId={w.id} index={index} isDragDisabled={!isEditMode}>
-                        {(provided, snapshot) => {
-                          const style = getWidgetStyle(w.type);
-                          const isSelected = selectedWidgetId === w.id;
-                          
-                          return (
-                            <div
-                              ref={provided.innerRef}
-                              {...provided.draggableProps}
-                              {...provided.dragHandleProps}
-                              style={{ 
-                                ...provided.draggableProps.style,
-                                ...style,
-                                opacity: snapshot.isDragging ? 0.8 : 1,
-                                zIndex: snapshot.isDragging ? 50 : 1,
-                              }}
-                              className={`relative group bg-white dark:bg-card rounded-[16px] border shadow-sm flex flex-col transition-all duration-200
-                                ${isEditMode ? 'cursor-grab active:cursor-grabbing hover:border-slate-300 dark:hover:border-slate-600' : ''}
-                                ${isSelected && isEditMode ? 'ring-2 ring-blue-500 border-blue-500 shadow-md' : 'border-slate-200 dark:border-slate-800'}
-                              `}
-                              onClick={() => { if(isEditMode) setSelectedWidgetId(w.id); }}
-                            >
-                              <div className="flex items-center justify-between p-4 px-5">
-                                <h3 className="font-bold text-slate-900 dark:text-white tracking-tight">{w.title}</h3>
-                                {isEditMode && (
-                                  <div className="flex gap-2">
-                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50" onClick={() => setWidgets(widgets.filter(x => x.id !== w.id))}><Trash2 className="w-4 h-4" /></Button>
-                                    <Button variant="ghost" size="icon" className="w-8 h-8 rounded-lg text-slate-400 hover:text-blue-500 hover:bg-blue-50" onClick={() => setSelectedWidgetId(w.id)}><Settings className="w-4 h-4" /></Button>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex-1 p-5 pt-0 min-h-0 relative">
-                                <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
-                                {isEditMode && <div className="absolute inset-0 bg-transparent" />}
-                              </div>
-                            </div>
-                          )
-                        }}
-                      </Draggable>
-                    ))}
-                    {provided.placeholder}
-                  </div>
-                )}
-              </Droppable>
-            </DragDropContext>
-          )}
+      {/* Widget Grid */}
+      {widgets.length === 0 ? (
+        <div className="text-center py-12 border-2 border-dashed rounded-lg">
+          <LayoutDashboard className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
+          <h3 className="text-lg font-semibold mb-2">Your Dashboard is Empty</h3>
+          <p className="text-muted-foreground mb-4">Start building your custom view by adding components.</p>
+          {!isEditMode && <Button onClick={() => setIsEditMode(true)}>Edit Layout</Button>}
         </div>
+      ) : (
+        <DragDropContext onDragEnd={handleDragEnd}>
+          <Droppable droppableId="dashboard" direction="horizontal" isDropDisabled={!isEditMode}>
+            {(provided) => (
+              <div
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+              >
+                {widgets.map((w, index) => (
+                  <Draggable key={w.id} draggableId={w.id} index={index} isDragDisabled={!isEditMode}>
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        style={{
+                          ...provided.draggableProps.style,
+                          opacity: snapshot.isDragging ? 0.8 : 1,
+                        }}
+                        className={`${getWidgetGridClass(w.type)} ${isEditMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                      >
+                        <Card className={`h-full ${isEditMode && selectedWidgetId === w.id ? 'ring-2 ring-primary' : ''}`}>
+                          <CardHeader className="flex flex-row items-center justify-between pb-2">
+                            <CardTitle className="text-sm font-semibold">{w.title}</CardTitle>
+                            {isEditMode && (
+                              <div className="flex gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => { setWidgets(widgets.filter(x => x.id !== w.id)); if (selectedWidgetId === w.id) setSelectedWidgetId(null); }}>
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                </Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => setSelectedWidgetId(w.id)}>
+                                  <Settings className="w-3.5 h-3.5" />
+                                </Button>
+                              </div>
+                            )}
+                          </CardHeader>
+                          <CardContent className="pt-0">
+                            <div className="h-[200px]">
+                              <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        </DragDropContext>
+      )}
 
-        {/* Configurator Panel */}
-        {isEditMode && selectedWidgetId && (
-          <div className="w-80 border-l border-slate-200 dark:border-slate-800 bg-white dark:bg-card shadow-[-8px_0_24px_-12px_rgba(0,0,0,0.1)] z-20 flex flex-col shrink-0 animate-in slide-in-from-right-4 duration-300">
-            <div className="p-5 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-              <h3 className="font-black text-slate-900 dark:text-slate-100 tracking-tight">Widget Settings</h3>
-              <button className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300" onClick={() => setSelectedWidgetId(null)}><X className="w-4 h-4" /></button>
-            </div>
-            
-            <div className="p-5 overflow-y-auto flex-1 space-y-6">
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase text-slate-500 dark:text-slate-400 tracking-wider">Widget Title</label>
-                <Input 
-                  value={widgets.find(w => w.id === selectedWidgetId)?.title || ''} 
-                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? {...w, title: e.target.value} : w))}
-                  className="h-10 bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 font-bold rounded-xl focus-visible:ring-blue-500"
+      {/* Configurator Panel */}
+      {isEditMode && selectedWidgetId && (
+        <div className="fixed right-0 top-0 h-full w-80 border-l bg-card shadow-lg z-40 p-5 space-y-6">
+          <div className="flex items-center justify-between">
+            <h3 className="font-semibold">Widget Settings</h3>
+            <button onClick={() => setSelectedWidgetId(null)} className="text-muted-foreground hover:text-foreground"><X className="w-4 h-4" /></button>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Widget Title</label>
+            <Input
+              value={widgets.find(w => w.id === selectedWidgetId)?.title || ''}
+              onChange={(e: React.ChangeEvent<HTMLInputElement>) => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? { ...w, title: e.target.value } : w))}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-medium text-muted-foreground">Color Theme</label>
+            <div className="flex items-center gap-2 flex-wrap">
+              {Object.keys(THEME_COLORS).map(c => (
+                <button
+                  key={c}
+                  className={`w-8 h-8 rounded-full ring-2 ring-offset-2 transition-all ${widgets.find(w => w.id === selectedWidgetId)?.config.colorTheme === c ? 'ring-primary' : 'ring-transparent hover:ring-muted-foreground/30'}`}
+                  style={{ backgroundColor: c }}
+                  onClick={() => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? { ...w, config: { ...w.config, colorTheme: c } } : w))}
                 />
-              </div>
-
-              <div className="space-y-2">
-                <label className="text-[11px] font-black uppercase text-slate-500 tracking-wider">Color Theme</label>
-                <div className="flex items-center gap-3 flex-wrap">
-                  {Object.keys(THEME_COLORS).map(c => (
-                    <button
-                      key={c}
-                      className={`w-8 h-8 rounded-full ring-2 ring-offset-2 transition-all ${widgets.find(w => w.id === selectedWidgetId)?.config.colorTheme === c ? 'ring-blue-500' : 'ring-transparent hover:ring-slate-300'}`}
-                      style={{ backgroundColor: c }}
-                      onClick={() => setWidgets(prev => prev.map(w => w.id === selectedWidgetId ? {...w, config: {...w.config, colorTheme: c}} : w))}
-                    />
-                  ))}
-                </div>
-              </div>
+              ))}
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Dynamic Add Component Modal */}
+      {/* Add Component Modal */}
       <Dialog open={isAddOpen} onOpenChange={setIsAddOpen}>
-        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto p-0 bg-[#f8fafc] dark:bg-card border-0 shadow-2xl rounded-[1.5rem]">
-          <DialogHeader className="p-8 pb-4 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 sticky top-0 z-10">
-            <DialogTitle className="text-2xl font-black text-[#1e1a4f] dark:text-foreground tracking-tight">Add Component</DialogTitle>
-            <p className="text-sm text-slate-500 font-medium">Select a metric to add to your dashboard grid.</p>
+        <DialogContent className="sm:max-w-[800px] max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add Component</DialogTitle>
+            <p className="text-sm text-muted-foreground">Select a metric to add to your dashboard grid.</p>
           </DialogHeader>
-          
-          <div className="p-8 pt-6 space-y-10">
+          <div className="space-y-8 pt-4">
             {Object.entries(METRICS_BY_TYPE).map(([category, metrics]) => (
               <div key={category} className="space-y-4">
-                <h4 className="text-lg font-bold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-                  {category} <Badge className="bg-slate-200 text-slate-700 hover:bg-slate-200 border-none">{metrics.length}</Badge>
+                <h4 className="text-sm font-semibold flex items-center gap-2">
+                  {category} <Badge variant="secondary">{metrics.length}</Badge>
                 </h4>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
                   {metrics.map(metric => (
-                    <div 
-                      key={metric.id} 
+                    <div
+                      key={metric.id}
                       onClick={() => addWidget(metric)}
-                      className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col gap-2 cursor-pointer hover:border-blue-500 hover:shadow-md transition-all group"
+                      className="border rounded-lg p-4 cursor-pointer hover:border-primary hover:bg-muted/50 transition-colors group"
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className="font-bold text-sm text-slate-900 dark:text-slate-100">{metric.title}</span>
-                        <Plus className="w-4 h-4 text-slate-300 group-hover:text-blue-500 transition-colors" />
+                        <span className="font-medium text-sm">{metric.title}</span>
+                        <Plus className="w-4 h-4 text-muted-foreground group-hover:text-primary transition-colors" />
                       </div>
-                      <span className="text-xs font-medium text-slate-500 leading-relaxed">{metric.description}</span>
+                      <span className="text-xs text-muted-foreground">{metric.description}</span>
                     </div>
                   ))}
                 </div>

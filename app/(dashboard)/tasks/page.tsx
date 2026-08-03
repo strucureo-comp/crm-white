@@ -9,8 +9,9 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
@@ -350,24 +351,15 @@ export default function TaskManagerPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           
           {/* View Switchers */}
-          <div className="flex bg-muted p-1 rounded-lg border w-fit">
-            {(['Kanban', 'Dashboard', 'List', 'Table', 'Calendar'] as const).map(v => (
-              <button
-                key={v}
-                onClick={() => setView(v)}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
-                  view === v ? 'bg-purple-100 text-purple-700 shadow-sm border border-purple-200' : 'text-muted-foreground hover:text-foreground hover:bg-background/50'
-                }`}
-              >
-                {v === 'Kanban' && <Kanban className="w-3 h-3" />}
-                {v === 'Dashboard' && <LayoutGrid className="w-3 h-3" />}
-                {v === 'List' && <LayoutList className="w-3 h-3" />}
-                {v === 'Table' && <TableIcon className="w-3 h-3" />}
-                {v === 'Calendar' && <CalendarIcon className="w-3 h-3" />}
-                {v}
-              </button>
-            ))}
-          </div>
+          <Tabs value={view} onValueChange={(v) => setView(v as ViewType)}>
+            <TabsList>
+              <TabsTrigger value="Kanban" className="gap-1.5"><Kanban className="h-3 w-3" /> Kanban</TabsTrigger>
+              <TabsTrigger value="Dashboard" className="gap-1.5"><LayoutGrid className="h-3 w-3" /> Dashboard</TabsTrigger>
+              <TabsTrigger value="List" className="gap-1.5"><LayoutList className="h-3 w-3" /> List</TabsTrigger>
+              <TabsTrigger value="Table" className="gap-1.5"><TableIcon className="h-3 w-3" /> Table</TabsTrigger>
+              <TabsTrigger value="Calendar" className="gap-1.5"><CalendarIcon className="h-3 w-3" /> Calendar</TabsTrigger>
+            </TabsList>
+          </Tabs>
 
           {/* Top Right Actions */}
           <div className="flex items-center gap-3">
@@ -377,10 +369,10 @@ export default function TaskManagerPage() {
                 placeholder="Search tasks..." 
                 value={search} 
                 onChange={(e) => setSearch(e.target.value)} 
-                className="pl-9 h-9 bg-background focus-visible:ring-purple-500 text-sm" 
+                className="pl-9 h-9 bg-background focus-visible:ring-primary text-sm" 
               />
             </div>
-            <Button onClick={() => setIsNewTaskOpen(true)} className="h-9 bg-purple-600 hover:bg-purple-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-white font-bold shadow-sm">
+            <Button onClick={() => setIsNewTaskOpen(true)} className="h-9 bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-sm">
               <Plus className="w-4 h-4 mr-1.5" /> New Task
             </Button>
           </div>
@@ -428,14 +420,14 @@ export default function TaskManagerPage() {
 
       {/* 3. Bulk Actions Strip */}
       {selectedTaskIds.size > 0 && (view === 'List' || view === 'Table') && (
-        <div className="shrink-0 bg-purple-50 border border-purple-200 shadow-sm rounded-lg p-3 flex items-center justify-between animate-in slide-in-from-top-2">
+        <div className="shrink-0 bg-primary/5 border border-primary/20 shadow-sm rounded-lg p-3 flex items-center justify-between animate-in slide-in-from-top-2">
           <div className="flex items-center gap-3">
-            <CheckCircle2 className="w-5 h-5 text-purple-600 animate-pulse" />
-            <span className="text-sm font-bold text-purple-900">{selectedTaskIds.size} tasks selected</span>
+            <CheckCircle2 className="w-5 h-5 text-primary animate-pulse" />
+            <span className="text-sm font-bold text-foreground">{selectedTaskIds.size} tasks selected</span>
           </div>
           <div className="flex items-center gap-3">
             <Select onValueChange={handleBulkStatusChange}>
-              <SelectTrigger className="h-8 text-xs w-[150px] bg-white border-purple-200"><SelectValue placeholder="Move status to..." /></SelectTrigger>
+              <SelectTrigger className="h-8 text-xs w-[150px] bg-background border-border"><SelectValue placeholder="Move status to..." /></SelectTrigger>
               <SelectContent>
                 {columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
               </SelectContent>
@@ -443,8 +435,8 @@ export default function TaskManagerPage() {
             <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-8 text-rose-600 hover:bg-rose-100 hover:text-rose-700 font-bold">
               <Trash2 className="w-4 h-4 mr-2" /> Delete
             </Button>
-            <div className="w-px h-4 bg-purple-200" />
-            <Button variant="ghost" size="icon" className="h-8 w-8 text-purple-600 hover:bg-purple-200" onClick={() => setSelectedTaskIds(new Set())}>
+            <div className="w-px h-4 bg-border" />
+            <Button variant="ghost" size="icon" className="h-8 w-8 text-primary hover:bg-primary/10" onClick={() => setSelectedTaskIds(new Set())}>
               <X className="w-4 h-4" />
             </Button>
           </div>
@@ -601,10 +593,10 @@ export default function TaskManagerPage() {
               <Card className="md:col-span-4 border shadow-sm"><CardContent className="p-6">
                 <h3 className="font-bold text-lg mb-4">Overview KPIs</h3>
                 <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-muted/30 p-4 rounded-lg"><p className="text-xs text-muted-foreground font-bold">Total Tasks</p><p className="text-2xl font-black mt-1">{tasks.length}</p></div>
-                  <div className="bg-emerald-50 p-4 rounded-lg"><p className="text-xs text-emerald-700 font-bold">Completed</p><p className="text-2xl font-black text-emerald-800 mt-1">{tasks.filter(t=>t.status==='Done').length}</p></div>
-                  <div className="bg-amber-50 p-4 rounded-lg"><p className="text-xs text-amber-700 font-bold">In Progress</p><p className="text-2xl font-black text-amber-800 mt-1">{tasks.filter(t=>t.status==='In Progress').length}</p></div>
-                  <div className="bg-rose-50 p-4 rounded-lg"><p className="text-xs text-rose-700 font-bold">Urgent</p><p className="text-2xl font-black text-rose-800 mt-1">{tasks.filter(t=>t.priority==='Urgent').length}</p></div>
+                  <div className="bg-muted/30 p-4 rounded-lg"><p className="text-xs text-muted-foreground font-bold">Total Tasks</p><p className="text-2xl font-bold mt-1">{tasks.length}</p></div>
+                  <div className="bg-emerald-50 p-4 rounded-lg"><p className="text-xs text-emerald-700 font-bold">Completed</p><p className="text-2xl font-bold text-emerald-800 mt-1">{tasks.filter(t=>t.status==='Done').length}</p></div>
+                  <div className="bg-amber-50 p-4 rounded-lg"><p className="text-xs text-amber-700 font-bold">In Progress</p><p className="text-2xl font-bold text-amber-800 mt-1">{tasks.filter(t=>t.status==='In Progress').length}</p></div>
+                  <div className="bg-rose-50 p-4 rounded-lg"><p className="text-xs text-rose-700 font-bold">Urgent</p><p className="text-2xl font-bold text-rose-800 mt-1">{tasks.filter(t=>t.priority==='Urgent').length}</p></div>
                 </div>
               </CardContent></Card>
               <Card className="md:col-span-2 border shadow-sm"><CardContent className="p-6 h-[300px] flex flex-col items-center justify-center text-muted-foreground">
@@ -630,8 +622,8 @@ export default function TaskManagerPage() {
               <div className="w-12 text-center">Action</div>
             </div>
             {filteredTasks.map(task => (
-              <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-default ${selectedTaskIds.has(task.id) ? 'bg-purple-50 border-purple-300' : 'bg-card hover:border-primary/40 shadow-sm'}`}>
-                <div className="w-6 text-center"><input type="checkbox" className="rounded text-purple-600 focus:ring-purple-500" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></div>
+              <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-default ${selectedTaskIds.has(task.id) ? 'bg-primary/5 border-primary/30' : 'bg-card hover:border-primary/40 shadow-sm'}`}>
+                <div className="w-6 text-center"><input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></div>
                 <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setViewingTask(task)}>
                   <p className="font-bold text-sm text-foreground truncate">{task.title}</p>
                   <p className="text-xs text-muted-foreground truncate">{task.description}</p>
@@ -682,8 +674,8 @@ export default function TaskManagerPage() {
                 </thead>
                 <tbody className="divide-y divide-border">
                   {filteredTasks.map(task => (
-                    <tr key={task.id} className={`transition-colors ${selectedTaskIds.has(task.id) ? 'bg-purple-50/50' : 'hover:bg-muted/20 even:bg-muted/5'}`}>
-                      <td className="px-4 py-3 text-center"><input type="checkbox" className="rounded text-purple-600 focus:ring-purple-500" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></td>
+                    <tr key={task.id} className={`transition-colors ${selectedTaskIds.has(task.id) ? 'bg-primary/5' : 'hover:bg-muted/20 even:bg-muted/5'}`}>
+                      <td className="px-4 py-3 text-center"><input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></td>
                       <td className="px-4 py-3">
                         <p className="font-bold cursor-pointer hover:text-primary transition-colors" onClick={() => setViewingTask(task)}>{task.title}</p>
                         <p className="text-xs text-muted-foreground truncate max-w-sm mt-0.5">{task.description}</p>
@@ -738,10 +730,10 @@ export default function TaskManagerPage() {
                 return (
                   <div key={i} className={`border-b border-r p-1.5 flex flex-col gap-1 transition-colors hover:bg-muted/10 cursor-pointer ${day.isCurrentMonth ? 'bg-background' : 'bg-muted/20'}`} onClick={() => setIsNewTaskOpen(true)}>
                     <div className="text-right mb-1">
-                      <span className={`text-[10px] font-bold w-5 h-5 inline-flex items-center justify-center rounded-full ${day.dateStr === '2026-08-15' ? 'bg-purple-600 text-white' : 'text-muted-foreground'}`}>{day.dayNum}</span>
+                      <span className={`text-[10px] font-bold w-5 h-5 inline-flex items-center justify-center rounded-full ${day.dateStr === '2026-08-15' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{day.dayNum}</span>
                     </div>
                     {dayTasks.map(t => (
-                      <div key={t.id} className="bg-purple-100 text-purple-800 border border-purple-200 rounded px-1.5 py-1 text-[9px] font-bold truncate shadow-sm cursor-default" onClick={e=>{e.stopPropagation(); setViewingTask(t);}}>
+                      <div key={t.id} className="bg-primary/10 text-primary border border-primary/20 rounded px-1.5 py-1 text-[9px] font-bold truncate shadow-sm cursor-default" onClick={e=>{e.stopPropagation(); setViewingTask(t);}}>
                         {t.title}
                       </div>
                     ))}
@@ -758,39 +750,39 @@ export default function TaskManagerPage() {
       
       {/* New Task Modal */}
       <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
-        <DialogContent className="sm:max-w-[500px] p-8 bg-[#fdfcff] dark:bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6" hideCloseIcon>
+        <DialogContent className="sm:max-w-[500px] p-8 bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6" hideCloseIcon>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-black text-[#1e1a4f] dark:text-slate-100 tracking-tight font-serif">Schedule New Task</DialogTitle>
-            <button className="w-8 h-8 rounded-full bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center text-purple-600 dark:text-purple-400 hover:bg-purple-200 dark:hover:bg-purple-900/50 transition-colors" onClick={() => setIsNewTaskOpen(false)}>
+            <DialogTitle className="text-2xl font-bold text-foreground tracking-tight">Schedule New Task</DialogTitle>
+            <button className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors" onClick={() => setIsNewTaskOpen(false)}>
               <X className="w-4 h-4" />
             </button>
           </div>
           
           <div className="space-y-5">
             <div className="space-y-2">
-              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Task Title</Label>
-              <Input placeholder="e.g. Audit regional liabilities" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-medium focus-visible:ring-purple-500" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
+              <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Task Title</Label>
+              <Input placeholder="e.g. Audit regional liabilities" className="h-11 bg-background border-border text-foreground placeholder:text-muted-foreground rounded-xl px-4 font-medium focus-visible:ring-primary" value={formTitle} onChange={(e) => setFormTitle(e.target.value)} />
             </div>
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Initial Status</Label>
+                <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Initial Status</Label>
                 <Select value={formStatus} onValueChange={setFormStatus}>
-                  <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500"><SelectValue/></SelectTrigger>
+                  <SelectTrigger className="h-11 bg-background border-border text-foreground rounded-xl px-4 font-medium focus:ring-primary"><SelectValue/></SelectTrigger>
                   <SelectContent><SelectItem value="To Do">To Do</SelectItem><SelectItem value="In Progress">In Progress</SelectItem><SelectItem value="Review">Review</SelectItem><SelectItem value="Done">Done</SelectItem></SelectContent>
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Priority</Label>
+                <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Priority</Label>
                 <Select value={formPriority} onValueChange={(v: TaskPriority) => setFormPriority(v)}>
-                  <SelectTrigger className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium focus:ring-purple-500"><SelectValue/></SelectTrigger>
+                  <SelectTrigger className="h-11 bg-background border-border text-foreground rounded-xl px-4 font-medium focus:ring-primary"><SelectValue/></SelectTrigger>
                   <SelectContent><SelectItem value="Urgent">Urgent</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Low">Low</SelectItem></SelectContent>
                 </Select>
               </div>
             </div>
 
             <div className="space-y-2 pt-1">
-              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider block">Label Tags</Label>
+              <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider block">Label Tags</Label>
               <div className="flex items-center gap-3">
                 <div className="w-7 h-7 rounded-full bg-[#4f46e5] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#4f46e5]/50 transition-all"></div>
                 <div className="w-7 h-7 rounded-full bg-[#3b82f6] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#3b82f6]/50 transition-all"></div>
@@ -803,14 +795,14 @@ export default function TaskManagerPage() {
             
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Date</Label>
-                <Input type="date" className="h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl px-4 font-medium focus-visible:ring-purple-500" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
+                <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Date</Label>
+                <Input type="date" className="h-11 bg-background border-border text-foreground placeholder:text-muted-foreground rounded-xl px-4 font-medium focus-visible:ring-primary" value={formDate} onChange={(e) => setFormDate(e.target.value)} />
               </div>
               <div className="space-y-2">
-                <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Assignees</Label>
+                <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Assignees</Label>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="outline" className="w-full justify-between h-11 bg-purple-50/50 dark:bg-slate-900 border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 rounded-xl px-4 font-medium hover:bg-purple-100/50 dark:hover:bg-slate-800 focus:ring-purple-500">
+                    <Button variant="outline" className="w-full justify-between h-11 bg-background border-border text-foreground rounded-xl px-4 font-medium hover:bg-muted focus:ring-primary">
                       <div className="flex items-center gap-2 truncate">
                         {formAssigneeIds.length > 0 ? (
                           <div className="flex -space-x-2">
@@ -857,7 +849,7 @@ export default function TaskManagerPage() {
                         onKeyDown={e => e.stopPropagation()}
                         className="h-8 text-xs bg-muted/50 border-0 focus-visible:ring-1"
                       />
-                      <Button size="sm" onClick={(e) => handleAddNewMember(e, 'task')} className="h-8 shrink-0 bg-primary/90 text-white">Add</Button>
+                      <Button size="sm" onClick={(e) => handleAddNewMember(e, 'task')} className="h-8 shrink-0">Add</Button>
                     </div>
                   </DropdownMenuContent>
                 </DropdownMenu>
@@ -865,14 +857,14 @@ export default function TaskManagerPage() {
             </div>
             
             <div className="space-y-2">
-              <Label className="text-[11px] font-black uppercase text-purple-600 dark:text-white tracking-wider">Description</Label>
-              <textarea placeholder="Provide more details..." className="w-full min-h-[80px] bg-purple-50/50 dark:bg-slate-900 border border-purple-100 dark:border-slate-800 text-purple-900 dark:text-slate-100 placeholder:text-purple-400 dark:placeholder:text-slate-500 rounded-xl p-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-500 resize-none" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
+              <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider">Description</Label>
+              <textarea placeholder="Provide more details..." className="w-full min-h-[80px] bg-background border border-border text-foreground placeholder:text-muted-foreground rounded-xl p-4 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-primary resize-none" value={formDescription} onChange={(e) => setFormDescription(e.target.value)} />
             </div>
           </div>
           
           <div className="flex items-center justify-end gap-3 pt-2">
-            <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-purple-200 dark:border-slate-700 text-[#1e1a4f] dark:text-slate-200 font-bold hover:bg-purple-50 dark:hover:bg-slate-800 hover:text-[#1e1a4f] dark:hover:text-slate-100" onClick={() => setIsNewTaskOpen(false)}>Cancel</Button>
-            <Button className="h-11 px-6 rounded-[2rem] bg-[#8b5cf6] hover:bg-[#7c3aed] dark:bg-white dark:text-slate-900 dark:hover:bg-slate-200 text-white font-bold shadow-md" onClick={handleCreateTask}>Schedule Task</Button>
+            <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-border text-foreground font-bold hover:bg-muted hover:text-foreground" onClick={() => setIsNewTaskOpen(false)}>Cancel</Button>
+            <Button className="h-11 px-6 rounded-[2rem] bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md" onClick={handleCreateTask}>Schedule Task</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -882,34 +874,33 @@ export default function TaskManagerPage() {
         <DialogContent className="max-w-[90vw] md:max-w-[70vw] h-[85vh] p-0 bg-background shadow-2xl border-border/60 flex flex-col overflow-hidden rounded-2xl">
           {viewingTask && (
             <>
-              <DialogHeader className="p-8 border-b shrink-0 bg-gradient-to-r from-purple-500/10 to-blue-500/10 flex flex-col items-start justify-center relative overflow-hidden">
-                <div className="absolute top-0 right-0 w-64 h-64 bg-purple-500/20 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none" />
-                <div className="space-y-4 relative z-10 w-full">
+              <DialogHeader className="p-6 border-b shrink-0 flex flex-col items-start justify-center">
+                <div className="space-y-2 w-full">
                   <div className="flex gap-2">
-                    <Badge variant="secondary" className="bg-background/80 backdrop-blur text-foreground border-border uppercase tracking-widest text-[10px] font-bold px-3 py-1 shadow-sm">{viewingTask.status}</Badge>
-                    <Badge variant="secondary" className={`uppercase tracking-widest text-[10px] font-bold px-3 py-1 shadow-sm border ${PriorityStyle(viewingTask.priority)} bg-background/80 backdrop-blur`}>{viewingTask.priority} Priority</Badge>
+                    <Badge variant="secondary">{viewingTask.status}</Badge>
+                    <Badge variant="secondary">{viewingTask.priority} Priority</Badge>
                   </div>
-                  <DialogTitle className="text-3xl font-black leading-tight tracking-tight text-foreground">{viewingTask.title}</DialogTitle>
+                  <DialogTitle className="text-lg font-semibold">{viewingTask.title}</DialogTitle>
                 </div>
               </DialogHeader>
-              <div className="flex-1 overflow-y-auto p-8 flex flex-col md:flex-row gap-8 bg-muted/10">
+              <div className="flex-1 overflow-y-auto p-6 flex flex-col md:flex-row gap-6">
                 <div className="flex-1 space-y-10">
                   {viewingTask.description && (
-                    <div className="space-y-3">
-                      <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><LayoutList className="w-4 h-4"/> Description</h4>
-                      <div className="bg-card border border-border/50 rounded-xl p-5 text-[15px] leading-relaxed shadow-sm">
+                    <div className="space-y-2">
+                      <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2"><LayoutList className="h-4 w-4"/> Description</h4>
+                      <div className="bg-muted rounded-md p-4 text-sm leading-relaxed">
                         {viewingTask.description}
                       </div>
                     </div>
                   )}
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
-                      <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2"><CheckCircle2 className="w-4 h-4"/> Subtasks</h4>
-                      <Button variant="outline" size="sm" className="h-7 text-[11px] rounded-full px-4 border-dashed border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary" onClick={() => setIsAddingSubtask(true)}>
-                        <Plus className="w-3 h-3 mr-1"/> Add Subtask
+                      <h4 className="text-xs font-medium text-muted-foreground flex items-center gap-2"><CheckCircle2 className="h-4 w-4"/> Subtasks</h4>
+                      <Button variant="outline" size="sm" className="h-7 text-xs" onClick={() => setIsAddingSubtask(true)}>
+                        <Plus className="h-3 w-3 mr-1"/> Add Subtask
                       </Button>
                     </div>
-                    <div className="bg-card border border-border/50 rounded-xl shadow-sm overflow-hidden">
+                    <div className="bg-card border rounded-lg overflow-hidden">
                       {(viewingTask.subtasks?.length || 0) === 0 && !isAddingSubtask ? (
                         <div className="p-8 flex flex-col items-center justify-center text-center">
                           <CheckCircle2 className="w-10 h-10 text-muted-foreground/30 mb-2" />
@@ -932,7 +923,7 @@ export default function TaskManagerPage() {
                                     <div className="flex flex-col">
                                       <span className={`text-[15px] font-medium transition-all ${s.completed ? 'line-through text-muted-foreground opacity-70' : 'text-foreground'}`}>{s.title}</span>
                                       <div className="flex items-center gap-2 mt-1">
-                                        {s.dueDate && !isExpanded && <span className="text-[10px] text-muted-foreground font-semibold uppercase tracking-wider">{s.dueDate}</span>}
+                                        {s.dueDate && !isExpanded && <span className="text-[10px] text-muted-foreground font-medium">{s.dueDate}</span>}
                                         {s.assignees && s.assignees.length > 0 && !isExpanded && (
                                           <div className="flex -space-x-1.5 overflow-hidden">
                                             {s.assignees.slice(0, 3).map((a, i) => (
@@ -953,12 +944,12 @@ export default function TaskManagerPage() {
                                   <div className="px-12 pb-4 pt-1 space-y-3 animate-in slide-in-from-top-2">
                                     <div className="flex items-center gap-4 flex-wrap">
                                       {s.dueDate && (
-                                        <div className="flex items-center gap-2 text-xs font-semibold text-primary/80 bg-primary/10 w-fit px-2 py-1 rounded-md">
-                                          <CalendarIcon className="w-3 h-3" /> Due: {s.dueDate}
+                                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted w-fit px-2 py-1 rounded-md">
+                                          <CalendarIcon className="h-3 w-3" /> Due: {s.dueDate}
                                         </div>
                                       )}
                                       {s.assignees && s.assignees.length > 0 && (
-                                        <div className="flex items-center gap-2 text-xs font-semibold text-muted-foreground bg-muted/40 w-fit px-2 py-1 rounded-md">
+                                        <div className="flex items-center gap-2 text-xs font-medium text-muted-foreground bg-muted w-fit px-2 py-1 rounded-md">
                                           <div className="flex -space-x-1.5 overflow-hidden">
                                             {s.assignees.map((a, i) => (
                                               <Avatar key={a.id || i} className="h-4 w-4 border border-background" title={a.name}>
@@ -971,7 +962,7 @@ export default function TaskManagerPage() {
                                       )}
                                     </div>
                                     {s.description && (
-                                      <div className="text-[13px] text-muted-foreground leading-relaxed bg-muted/20 p-3 rounded-lg border border-border/30">
+                                      <div className="text-sm text-muted-foreground leading-relaxed bg-muted p-3 rounded-md">
                                         {s.description}
                                       </div>
                                     )}
@@ -983,7 +974,7 @@ export default function TaskManagerPage() {
                         </div>
                       )}
                       {isAddingSubtask && (
-                        <div className="p-4 flex flex-col gap-3 bg-primary/5 border-t border-primary/10">
+                        <div className="p-4 flex flex-col gap-3 bg-muted border-t">
                           <div className="flex items-center gap-4">
                             <input type="checkbox" disabled className="rounded border-primary/30 w-5 h-5 bg-background shrink-0" />
                             <Input 
@@ -991,7 +982,7 @@ export default function TaskManagerPage() {
                               value={newSubtaskTitle} 
                               onChange={e => setNewSubtaskTitle(e.target.value)} 
                               placeholder="What needs to be done?"
-                              className="h-10 text-[15px] bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 flex-1 rounded-lg"
+                              className="h-9 text-sm bg-background px-3 flex-1"
                               onKeyDown={e => {
                                 if (e.key === 'Escape') { setIsAddingSubtask(false); setNewSubtaskTitle(''); setNewSubtaskDescription(''); setNewSubtaskDueDate(''); }
                               }}
@@ -1000,12 +991,12 @@ export default function TaskManagerPage() {
                               type="date"
                               value={newSubtaskDueDate}
                               onChange={e => setNewSubtaskDueDate(e.target.value)}
-                              className="h-10 text-xs bg-background border-primary/20 focus-visible:ring-primary shadow-inner px-3 w-[140px] rounded-lg shrink-0"
+                              className="h-9 text-xs bg-background px-3 w-[140px] shrink-0"
                             />
                             
                             <DropdownMenu>
                               <DropdownMenuTrigger asChild>
-                                <Button variant="outline" className="h-10 border-primary/20 bg-background text-[11px] font-bold px-3 rounded-lg shadow-inner shrink-0">
+                                <Button variant="outline" className="h-9 text-xs px-3 shrink-0">
                                   {newSubtaskAssigneeIds.length > 0 ? (
                                     <div className="flex -space-x-2 mr-2">
                                       {members.filter(m => newSubtaskAssigneeIds.includes(m.id)).slice(0, 3).map(m => (
@@ -1018,33 +1009,33 @@ export default function TaskManagerPage() {
                                   {newSubtaskAssigneeIds.length > 0 ? `${newSubtaskAssigneeIds.length} Assigned` : "+ Assign"}
                                 </Button>
                               </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56 p-2 rounded-xl shadow-xl border-border/50">
+                              <DropdownMenuContent align="end" className="w-56 p-2">
                                 <div className="space-y-1 mb-2">
                                   {members.map(member => (
                                     <div 
                                       key={member.id}
-                                      className="flex items-center justify-between p-2 rounded-lg hover:bg-muted cursor-pointer transition-colors"
+                                      className="flex items-center justify-between p-2 rounded-md hover:bg-muted cursor-pointer transition-colors"
                                       onClick={() => setNewSubtaskAssigneeIds(prev => prev.includes(member.id) ? prev.filter(id => id !== member.id) : [...prev, member.id])}
                                     >
                                       <div className="flex items-center gap-2">
                                         <Avatar className="h-6 w-6">
-                                          <AvatarFallback className="text-[9px] bg-primary/10 text-primary">{member.avatar}</AvatarFallback>
+                                          <AvatarFallback className="text-[9px] bg-muted-foreground/10">{member.avatar}</AvatarFallback>
                                         </Avatar>
                                         <span className="text-sm font-medium">{member.name}</span>
                                       </div>
-                                      {newSubtaskAssigneeIds.includes(member.id) && <Check className="w-4 h-4 text-primary" />}
+                                      {newSubtaskAssigneeIds.includes(member.id) && <Check className="h-4 w-4 text-muted-foreground" />}
                                     </div>
                                   ))}
                                 </div>
-                                <div className="flex items-center gap-2 p-1 border-t border-border/50 mt-1 pt-2">
+                                <div className="flex items-center gap-2 p-1 border-t mt-1 pt-2">
                                   <Input 
                                     placeholder="New member..." 
                                     value={newMemberName}
                                     onChange={e => setNewMemberName(e.target.value)}
                                     onKeyDown={e => e.stopPropagation()}
-                                    className="h-8 text-xs bg-muted/50 border-0 focus-visible:ring-1"
+                                    className="h-8 text-xs bg-muted border-0 focus-visible:ring-1"
                                   />
-                                  <Button size="sm" onClick={(e) => handleAddNewMember(e, 'subtask')} className="h-8 shrink-0 bg-primary/90">Add</Button>
+                                  <Button size="sm" onClick={(e) => handleAddNewMember(e, 'subtask')} className="h-8 shrink-0">Add</Button>
                                 </div>
                               </DropdownMenuContent>
                             </DropdownMenu>
@@ -1054,10 +1045,10 @@ export default function TaskManagerPage() {
                               value={newSubtaskDescription}
                               onChange={e => setNewSubtaskDescription(e.target.value)}
                               placeholder="Add more details or context..."
-                              className="w-full min-h-[60px] text-sm bg-background border border-primary/20 focus:outline-none focus:ring-2 focus:ring-primary shadow-inner p-3 rounded-lg resize-none"
+                              className="w-full min-h-[60px] text-sm bg-background border p-3 rounded-md resize-none focus:outline-none focus:ring-1 focus:ring-ring"
                             />
-                            <Button size="icon" onClick={handleAddSubtask} className="h-10 w-10 shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 shadow-md rounded-xl">
-                              <Check className="w-5 h-5" />
+                            <Button size="icon" onClick={handleAddSubtask} className="h-9 w-9 shrink-0">
+                              <Check className="h-4 w-4" />
                             </Button>
                           </div>
                         </div>
@@ -1065,35 +1056,35 @@ export default function TaskManagerPage() {
                     </div>
                   </div>
                 </div>
-                <div className="w-full md:w-[320px] shrink-0 space-y-6">
-                  <div className="bg-card border border-border/50 rounded-2xl p-6 shadow-sm space-y-6 sticky top-0">
+                <div className="w-full md:w-[320px] shrink-0 space-y-4">
+                  <div className="bg-card border rounded-lg p-4 space-y-4">
                     <div className="space-y-2">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Assignees</span>
-                      <div className="flex flex-col gap-2 bg-muted/40 p-3 rounded-xl border border-border/50 max-h-48 overflow-y-auto">
+                      <span className="text-xs font-medium text-muted-foreground">Assignees</span>
+                      <div className="flex flex-col gap-2 bg-muted p-3 rounded-md max-h-48 overflow-y-auto">
                         {(viewingTask.assignees || (viewingTask.assignee ? [viewingTask.assignee] : [])).map(assignee => (
                           <div key={assignee.id} className="flex items-center gap-3">
-                            <Avatar className="w-8 h-8 border-2 border-background shadow-sm ring-1 ring-border/50">
-                              <AvatarFallback className="text-[10px] bg-gradient-to-br from-primary to-primary/60 text-white font-bold">{assignee.avatar}</AvatarFallback>
+                            <Avatar className="h-8 w-8">
+                              <AvatarFallback className="text-xs bg-muted-foreground/10">{assignee.avatar}</AvatarFallback>
                             </Avatar>
                             <div>
-                              <span className="text-[13px] font-bold block leading-tight">{assignee.name}</span>
-                              <span className="text-[9px] text-muted-foreground font-medium">Assignee</span>
+                              <span className="text-sm font-medium block leading-tight">{assignee.name}</span>
+                              <span className="text-[11px] text-muted-foreground">Assignee</span>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
-                    <div className="space-y-2 pt-4 border-t border-border/50">
-                      <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Due Date</span>
-                      <div className="flex items-center gap-3 text-sm font-bold bg-muted/40 p-3 rounded-xl border border-border/50">
-                        <CalendarIcon className="w-5 h-5 text-primary" />
+                    <div className="space-y-2 pt-3 border-t">
+                      <span className="text-xs font-medium text-muted-foreground">Due Date</span>
+                      <div className="flex items-center gap-2 text-sm font-medium bg-muted p-3 rounded-md">
+                        <CalendarIcon className="h-4 w-4 text-muted-foreground" />
                         {viewingTask.dueDate}
                       </div>
                     </div>
                     {viewingTask.dealReference && (
-                      <div className="space-y-2 pt-4 border-t border-border/50">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Linked Deal</span>
-                        <div className="bg-primary/10 border border-primary/20 rounded-xl p-3 text-primary text-sm font-bold flex items-center gap-2">
+                      <div className="space-y-2 pt-3 border-t">
+                        <span className="text-xs font-medium text-muted-foreground">Linked Deal</span>
+                        <div className="bg-muted rounded-md p-3 text-sm font-medium flex items-center gap-2">
                           <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
                           {viewingTask.dealReference.name}
                         </div>

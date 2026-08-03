@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -50,7 +50,8 @@ function formatDate(dateStr: string | undefined | null): string {
 }
 
 export default function ContactsPage() {
-  const { user } = useAuth();
+  const { workspace } = useAuth();
+  const workspaceId = workspace?.id || '';
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -62,22 +63,25 @@ export default function ContactsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
-  async function load() {
-    if (!user?.company_id) {
+  const load = useCallback(async () => {
+    if (!workspaceId) {
+      setContacts([]);
       setLoading(false);
       return;
     }
+    setLoading(true);
     try {
-      const data = await getContacts(user.company_id);
+      const data = await getContacts(workspaceId);
       setContacts(data);
-    } catch {
-      // ignore
+    } catch (error) {
+      console.error('Failed to load contacts:', error);
+      toast.error('Failed to load contacts');
     } finally {
       setLoading(false);
     }
-  }
+  }, [workspaceId]);
 
-  useEffect(() => { load(); }, [user?.company_id]);
+  useEffect(() => { load(); }, [load]);
 
   const filtered = useMemo(() => {
     return contacts.filter((c) => {
@@ -110,11 +114,11 @@ export default function ContactsPage() {
   }
 
   async function onDeleteConfirm() {
-    if (!confirmState.id || !user?.company_id) return;
+    if (!confirmState.id || !workspaceId) return;
     setDeleting(confirmState.id);
     setConfirmState((prev) => ({ ...prev, loading: true }));
     try {
-      await deleteContact(user.company_id, confirmState.id);
+      await deleteContact(workspaceId, confirmState.id);
       toast.success('Contact deleted successfully');
       load();
       setConfirmState({ open: false, loading: false });
@@ -138,14 +142,14 @@ export default function ContactsPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Contacts</h2>
           <p className="text-sm text-muted-foreground">Manage your contact relationships</p>
         </div>
-        <Button onClick={() => { setEditingContact(null); setDialogOpen(true); }} className="w-full sm:w-auto">
+        <Button onClick={() => { setEditingContact(null); setDialogOpen(true); }} disabled={!workspaceId} className="w-full sm:w-auto">
           <UserPlus size={16} className="mr-2" />
           Add Contact
         </Button>
       </div>
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
         <KpiCard
           title="Total Contacts"
           value={kpis.total.toLocaleString()}
@@ -173,7 +177,7 @@ export default function ContactsPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div className="flex flex-col sm:flex-row gap-3">
           <div className="relative flex-1 max-w-md">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
@@ -222,16 +226,16 @@ export default function ContactsPage() {
       {/* Content */}
       {filtered.length > 0 ? (
         view === 'table' ? (
-          <div className="rounded-md border">
-            <Table>
+          <div className="rounded-md border overflow-x-auto">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Name</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Phone</TableHead>
-                  <TableHead>Designation</TableHead>
+                  <TableHead className="hidden sm:table-cell">Email</TableHead>
+                  <TableHead className="hidden md:table-cell">Phone</TableHead>
+                  <TableHead className="hidden lg:table-cell">Designation</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Added</TableHead>
+                  <TableHead className="hidden sm:table-cell">Added</TableHead>
                   <TableHead className="w-[50px]"></TableHead>
                 </TableRow>
               </TableHeader>
@@ -249,9 +253,9 @@ export default function ContactsPage() {
                           <span className="font-medium text-sm">{contact.name}</span>
                         </div>
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{contact.email}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{contact.phone || '—'}</TableCell>
-                      <TableCell className="text-sm text-muted-foreground">{contact.designation || '—'}</TableCell>
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground">{contact.email}</TableCell>
+                      <TableCell className="hidden md:table-cell text-sm text-muted-foreground">{contact.phone || '—'}</TableCell>
+                      <TableCell className="hidden lg:table-cell text-sm text-muted-foreground">{contact.designation || '—'}</TableCell>
                       <TableCell>
                         {contact.is_primary ? (
                           <Badge variant="default" className="text-[10px]">Primary</Badge>
@@ -259,7 +263,7 @@ export default function ContactsPage() {
                           <span className="text-xs text-muted-foreground">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                      <TableCell className="hidden sm:table-cell text-sm text-muted-foreground whitespace-nowrap">
                         {formatDate(contact.created_at)}
                       </TableCell>
                       <TableCell>
@@ -294,11 +298,11 @@ export default function ContactsPage() {
             </Table>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             {filtered.map((contact) => {
               return (
                 <Card key={contact.contact_id} className="hover:shadow-sm transition-all duration-200 group">
-                  <CardContent className="p-5">
+                  <CardContent className="p-4 sm:p-5">
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex items-center gap-3">
                         <Avatar className="h-10 w-10">
@@ -347,7 +351,7 @@ export default function ContactsPage() {
                         </div>
                       )}
                       {contact.is_primary && (
-                        <div className="flex items-center gap-2 text-emerald-600">
+                        <div className="flex items-center gap-2 text-primary">
                           <Star size={14} />
                           <span>Primary Contact</span>
                         </div>
@@ -372,7 +376,7 @@ export default function ContactsPage() {
         onOpenChange={setDialogOpen}
         onSaved={load}
         contact={editingContact}
-        workspaceId={user?.company_id || ''}
+        workspaceId={workspaceId}
       />
 
       {/* Delete Confirm */}

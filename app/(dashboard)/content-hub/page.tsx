@@ -682,7 +682,7 @@ export default function ContentHubPage() {
               {approvalItems.length === 0 ? (
                 <div className="text-center py-20 bg-card rounded-xl border border-dashed text-muted-foreground">
                   <CheckCircle2 className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
-                  <p className="text-lg font-medium text-foreground">You're all caught up!</p>
+                  <p className="text-lg font-medium text-foreground">You&apos;re all caught up!</p>
                   <p className="text-sm">There are no assets currently waiting for review.</p>
                 </div>
               ) : (
@@ -705,7 +705,7 @@ export default function ContentHubPage() {
                         </div>
 
                         <div className="bg-muted/30 p-3 rounded-lg text-sm text-foreground/80 leading-relaxed flex-1 italic relative before:absolute before:left-0 before:top-0 before:bottom-0 before:w-1 before:bg-muted-foreground/20 before:rounded-l-lg">
-                          "{item.description || 'No description provided.'}"
+                          &quot;{item.description || 'No description provided.'}&quot;
                         </div>
 
                         <div className="flex items-center gap-2 pt-2">

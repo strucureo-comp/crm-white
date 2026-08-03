@@ -116,7 +116,7 @@ export default function QuotesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 sm:gap-4">
         <div>
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Quotes</h2>
@@ -128,13 +128,13 @@ export default function QuotesPage() {
         </Button>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-4">
+      <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
         <div className="relative flex-1 max-w-md">
           <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input placeholder="Search quotes..." className="pl-9" value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <Select value={statusFilter} onValueChange={setStatusFilter}>
-          <SelectTrigger className="w-[150px]">
+          <SelectTrigger className="w-full sm:w-[150px]">
             <SelectValue placeholder="Status" />
           </SelectTrigger>
           <SelectContent>
@@ -183,11 +183,13 @@ export default function QuotesPage() {
                 {
                   key: 'date',
                   header: 'Date',
+                  hideOnMobile: true,
                   render: (q) => <span className="text-sm text-muted-foreground">{new Date(q.created_at).toLocaleDateString()}</span>,
                 },
                 {
                   key: 'valid',
                   header: 'Valid Until',
+                  hideOnMobile: true,
                   render: (q) => <span className="text-sm text-muted-foreground">{q.valid_until ? new Date(q.valid_until).toLocaleDateString() : '—'}</span>,
                 },
                 {

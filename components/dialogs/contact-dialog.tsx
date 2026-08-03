@@ -69,6 +69,10 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, workspaceI
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!workspaceId) {
+      toast.error('Workspace is still loading');
+      return;
+    }
     if (!form.name.trim() || !form.email.trim() || !form.company_id.trim()) {
       toast.error('Name, email, and company ID are required');
       return;

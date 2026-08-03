@@ -21,7 +21,8 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 export default function PaymentsPage() {
-  const { user } = useAuth();
+  const { workspace } = useAuth();
+  const workspaceId = workspace?.id || '';
   const [payments, setPayments] = useState<NormalizedPayment[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -33,17 +34,19 @@ export default function PaymentsPage() {
   const [deleting, setDeleting] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user?.company_id) {
+    if (!workspaceId) {
+      setPayments([]);
       setLoading(false);
       return;
     }
-    const unsubscribe = subscribeToPayments(user.company_id, (data) => {
+    setLoading(true);
+    const unsubscribe = subscribeToPayments(workspaceId, (data) => {
       data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPayments(data);
       setLoading(false);
     });
     return () => unsubscribe();
-  }, [user?.company_id]);
+  }, [workspaceId]);
 
   // Form State
   const [form, setForm] = useState<{
@@ -104,7 +107,7 @@ export default function PaymentsPage() {
     if (!form.client || !form.amount) return;
 
     try {
-      if (!user?.company_id) throw new Error("No company ID found");
+      if (!workspaceId) throw new Error("No workspace found");
       const paymentData = {
         company_id: form.client,
         invoice_id: form.invoiceId,
@@ -121,10 +124,10 @@ export default function PaymentsPage() {
       };
 
       if (editingPaymentId) {
-        await updatePayment(user.company_id, editingPaymentId, paymentData);
+        await updatePayment(workspaceId, editingPaymentId, paymentData);
         toast.success('Payment updated successfully');
       } else {
-        await createPayment(user.company_id, paymentData);
+        await createPayment(workspaceId, paymentData);
         toast.success('Payment recorded successfully');
       }
       setModalOpen(false);
@@ -136,9 +139,9 @@ export default function PaymentsPage() {
   };
 
   const confirmDelete = async () => {
-    if (!deleting || !user?.company_id) return;
+    if (!deleting || !workspaceId) return;
     try {
-      await deletePayment(user.company_id, deleting);
+      await deletePayment(workspaceId, deleting);
       toast.success('Payment deleted successfully');
     } catch (error) {
       toast.error('Failed to delete payment');
@@ -152,12 +155,12 @@ export default function PaymentsPage() {
   };
 
   return (
-    <div className="space-y-8 pb-8">
+    <div className="space-y-6 sm:space-y-8 pb-8">
       {loading && <div className="flex justify-center p-8"><p className="text-muted-foreground">Loading payments...</p></div>}
       {/* A. Header Section */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight flex items-center gap-2">
+          <h2 className="text-xl sm:text-2xl font-bold tracking-tight flex items-center gap-2">
             <CreditCard className="text-amber-500 w-6 h-6" />
             Payments
           </h2>
@@ -177,56 +180,56 @@ export default function PaymentsPage() {
       </div>
 
       {/* B. KPI Cards Section */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <div className="bg-card rounded-xl border p-5 shadow-sm">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <div className="bg-card rounded-xl border p-4 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Collected</h3>
+            <h3 className="text-xs sm:text-sm font-medium text-emerald-700 dark:text-emerald-400">Collected</h3>
             <div className="w-8 h-8 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
               <Wallet className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">{formatCurrency(collected)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">{formatCurrency(collected)}</p>
           <p className="text-xs text-muted-foreground mt-1">All time</p>
         </div>
         
-        <div className="bg-card rounded-xl border p-5 shadow-sm">
+        <div className="bg-card rounded-xl border p-4 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-amber-700 dark:text-amber-400">Pending Collection</h3>
+            <h3 className="text-xs sm:text-sm font-medium text-amber-700 dark:text-amber-400">Pending Collection</h3>
             <div className="w-8 h-8 rounded-full bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
               <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-amber-700 dark:text-amber-400 mt-2">{formatCurrency(pendingCollection)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-amber-700 dark:text-amber-400 mt-2">{formatCurrency(pendingCollection)}</p>
           <p className="text-xs text-muted-foreground mt-1">Across {pendingCount} transactions</p>
         </div>
 
-        <div className="bg-card rounded-xl border p-5 shadow-sm">
+        <div className="bg-card rounded-xl border p-4 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-blue-700 dark:text-blue-400">Transactions</h3>
+            <h3 className="text-xs sm:text-sm font-medium text-blue-700 dark:text-blue-400">Transactions</h3>
             <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
               <TrendingUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{payments.length}</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{payments.length}</p>
           <p className="text-xs text-muted-foreground mt-1">All time</p>
         </div>
 
-        <div className="bg-card rounded-xl border p-5 shadow-sm">
+        <div className="bg-card rounded-xl border p-4 sm:p-5 shadow-sm">
           <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-rose-700 dark:text-rose-400">Failed / Returned</h3>
+            <h3 className="text-xs sm:text-sm font-medium text-rose-700 dark:text-rose-400">Failed / Returned</h3>
             <div className="w-8 h-8 rounded-full bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
             </div>
           </div>
-          <p className="text-2xl font-bold text-rose-700 dark:text-rose-400 mt-2">{failedCount}</p>
+          <p className="text-xl sm:text-2xl font-bold text-rose-700 dark:text-rose-400 mt-2">{failedCount}</p>
           <p className="text-xs text-muted-foreground mt-1">Needs follow-up</p>
         </div>
       </div>
 
       {/* C. Insights Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Left Column: Recent Activity */}
-        <div className="bg-card rounded-xl border p-5 shadow-sm">
+        <div className="bg-card rounded-xl border p-4 sm:p-5 shadow-sm">
           <h3 className="font-semibold mb-4">Recent Activity</h3>
           <div className="space-y-4">
             {recentActivity.map(txn => (
@@ -266,7 +269,7 @@ export default function PaymentsPage() {
 
         {/* Right Column: Collection by Method & Pending Follow-ups */}
         <div className="space-y-6">
-          <div className="bg-card rounded-xl border p-5 shadow-sm">
+          <div className="bg-card rounded-xl border p-4 sm:p-5 shadow-sm">
             <h3 className="font-semibold mb-4">Collection by Method</h3>
             <div className="space-y-4">
               <div>
@@ -304,7 +307,7 @@ export default function PaymentsPage() {
               <h3 className="font-semibold text-sm">Pending Follow-ups</h3>
             </div>
             <div className="overflow-auto flex-1 max-h-48">
-              <table className="w-full text-sm text-left">
+              <table className="w-full text-sm text-left min-w-[300px]">
                 <tbody>
                   {pendingFollowUps.map((p, i) => (
                     <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
@@ -334,7 +337,7 @@ export default function PaymentsPage() {
 
       {/* D. Filters Section */}
       <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+        <div className="relative flex-1 min-w-0">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground w-4 h-4" />
           <input 
             type="text" 
@@ -345,7 +348,7 @@ export default function PaymentsPage() {
           />
         </div>
         <select 
-          className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
           value={methodFilter}
           onChange={(e) => setMethodFilter(e.target.value as any)}
         >
@@ -356,7 +359,7 @@ export default function PaymentsPage() {
           <option value="pending">Pending</option>
         </select>
         <select 
-          className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20"
+          className="border rounded-md px-3 py-2 text-sm bg-background focus:outline-none focus:ring-2 focus:ring-primary/20 w-full sm:w-auto"
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value as any)}
         >
@@ -370,15 +373,15 @@ export default function PaymentsPage() {
       {/* E. Transactions Table */}
       <div className="bg-card border rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm text-left">
+          <table className="w-full text-sm text-left min-w-[600px]">
             <thead className="bg-muted/50 text-muted-foreground border-b">
               <tr>
-                <th className="px-4 py-3 font-medium whitespace-nowrap">Txn ID</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap hidden md:table-cell">Txn ID</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Client</th>
-                <th className="px-4 py-3 font-medium whitespace-nowrap">Invoice</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap hidden lg:table-cell">Invoice</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Amount</th>
-                <th className="px-4 py-3 font-medium whitespace-nowrap">Date</th>
-                <th className="px-4 py-3 font-medium whitespace-nowrap">Method</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap hidden sm:table-cell">Date</th>
+                <th className="px-4 py-3 font-medium whitespace-nowrap hidden md:table-cell">Method</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap">Status</th>
                 <th className="px-4 py-3 font-medium whitespace-nowrap text-right"></th>
               </tr>
@@ -386,12 +389,12 @@ export default function PaymentsPage() {
             <tbody className="divide-y divide-border">
               {filteredPayments.map(txn => (
                 <tr key={txn.payment_id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground">{txn.payment_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">{txn.payment_id}</td>
                   <td className="px-4 py-3 font-medium">{txn.company_id}</td>
-                  <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400">{txn.invoice_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400 hidden lg:table-cell">{txn.invoice_id}</td>
                   <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(txn.amount)}</td>
-                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">{new Date(txn.date).toLocaleDateString()}</td>
-                  <td className="px-4 py-3">
+                  <td className="px-4 py-3 text-muted-foreground whitespace-nowrap hidden sm:table-cell">{new Date(txn.date).toLocaleDateString()}</td>
+                  <td className="px-4 py-3 hidden md:table-cell">
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border">
                       {txn.method}
                     </span>
@@ -507,7 +510,7 @@ export default function PaymentsPage() {
                   onChange={(e) => setForm({...form, amount: e.target.value})}
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-muted-foreground uppercase tracking-wider mb-1.5">Method</label>
                   <select 
@@ -518,7 +521,8 @@ export default function PaymentsPage() {
                     <option value="upi">UPI</option>
                     <option value="bank_transfer">NEFT/Bank Transfer</option>
                     <option value="cheque">Cheque</option>
-                    <option value="pending">Pending</option>
+                    <option value="cash">Cash</option>
+                    <option value="other">Other</option>
                   </select>
                 </div>
                 <div>
@@ -570,7 +574,7 @@ export default function PaymentsPage() {
               </button>
             </div>
             <div className="p-5 space-y-4 text-sm">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
                   <p className="font-medium font-mono">{viewingPayment.payment_id}</p>

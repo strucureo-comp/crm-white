@@ -119,11 +119,11 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
+        <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Dashboard</h2>
         <p className="text-sm text-muted-foreground">Here&apos;s what&apos;s happening today.</p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <KpiCard title="Total Leads" value={String(totalLeads)} change={`${totalLeads} total`} trend="up" icon={Users} description="all time" />
         <KpiCard title="Active Deals" value={String(activeDeals)} change={`${activeDeals} in pipeline`} trend="up" icon={DollarSign} description="in progress" />
         <KpiCard title="Monthly Revenue" value={formatCurrency(monthlyRevenue)} change={`${invoices.filter((i) => i.status === 'paid' && i.created_at >= monthStart).length} paid`} trend={monthlyRevenue > 0 ? 'up' : 'neutral'} icon={TrendingUp} description="this month" />
@@ -131,13 +131,13 @@ export default function DashboardPage() {
         <KpiCard title="Email Clicked" value={`${emailClicked}%`} change="engagement" trend="up" icon={Mail} description="click rate" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg">Deal Pipeline</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Deal Pipeline</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-3 md:grid-cols-6 gap-3">
+            <div className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3">
               {pipelineStages.map((stage) => (
                 <div key={stage.name} className="space-y-2">
                   <div className="flex items-center gap-2">
@@ -164,7 +164,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Conversion Funnel</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Conversion Funnel</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
@@ -193,23 +193,23 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
-            <CardTitle className="text-lg">Recent Leads</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Recent Leads</CardTitle>
           </CardHeader>
           <CardContent>
             {recentLeads.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+              <div className="overflow-x-auto -mx-4 sm:mx-0">
+                <table className="w-full text-sm min-w-[600px]">
                   <thead>
                     <tr className="border-b text-left text-muted-foreground">
                       <th className="pb-2 font-medium">Name</th>
-                      <th className="pb-2 font-medium">Company</th>
-                      <th className="pb-2 font-medium">Source</th>
+                      <th className="pb-2 font-medium hidden sm:table-cell">Company</th>
+                      <th className="pb-2 font-medium hidden md:table-cell">Source</th>
                       <th className="pb-2 font-medium">Stage</th>
-                      <th className="pb-2 font-medium">Score</th>
-                      <th className="pb-2 font-medium">Owner</th>
+                      <th className="pb-2 font-medium hidden lg:table-cell">Score</th>
+                      <th className="pb-2 font-medium hidden lg:table-cell">Owner</th>
                       <th className="pb-2 font-medium">Arrived</th>
                     </tr>
                   </thead>
@@ -226,14 +226,14 @@ export default function DashboardPage() {
                             <span className="font-medium">{lead.name}</span>
                           </div>
                         </td>
-                        <td className="py-3 text-muted-foreground">{lead.company || '—'}</td>
-                        <td className="py-3 text-muted-foreground">{lead.source || '—'}</td>
+                        <td className="py-3 text-muted-foreground hidden sm:table-cell">{lead.company || '—'}</td>
+                        <td className="py-3 text-muted-foreground hidden md:table-cell">{lead.source || '—'}</td>
                         <td className="py-3">
                           <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${statusColors[lead.status] || ''}`}>
                             {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
                           </Badge>
                         </td>
-                        <td className="py-3">
+                        <td className="py-3 hidden lg:table-cell">
                           <div className="flex items-center gap-1">
                             <div className="w-8 h-1.5 bg-muted rounded-full overflow-hidden">
                               <div className="h-full bg-primary rounded-full" style={{ width: `${0 || 0}%` }} />
@@ -241,7 +241,7 @@ export default function DashboardPage() {
                             <span className="text-xs text-muted-foreground">{0 || 0}</span>
                           </div>
                         </td>
-                        <td className="py-3 text-muted-foreground">—</td>
+                        <td className="py-3 text-muted-foreground hidden lg:table-cell">—</td>
                         <td className="py-3 text-muted-foreground text-xs">{new Date(lead.created_at).toLocaleDateString()}</td>
                       </tr>
                     ))}
@@ -256,7 +256,7 @@ export default function DashboardPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-lg">Activity Feed</CardTitle>
+            <CardTitle className="text-base sm:text-lg">Activity Feed</CardTitle>
           </CardHeader>
           <CardContent>
             {activityLogs.length > 0 ? (
@@ -286,7 +286,7 @@ export default function DashboardPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Urgent Tasks</CardTitle>
+          <CardTitle className="text-base sm:text-lg">Urgent Tasks</CardTitle>
         </CardHeader>
         <CardContent>
           {urgentTasks.length > 0 ? (

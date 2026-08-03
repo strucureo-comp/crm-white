@@ -438,9 +438,9 @@ export default function DocsPage() {
       <Card>
         <CardContent className="p-6 text-center">
           <HelpCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-          <h3 className="text-lg font-medium mb-2">Can't find what you're looking for?</h3>
+          <h3 className="text-lg font-medium mb-2">Can&apos;t find what you&apos;re looking for?</h3>
           <p className="text-muted-foreground mb-4">
-            Our support team is here to help. Send us a message and we'll get back to you within 24 hours.
+            Our support team is here to help. Send us a message and we&apos;ll get back to you within 24 hours.
           </p>
           <Button>
             <Mail size={16} className="mr-2" />

@@ -562,7 +562,7 @@ export default function PipelinePage() {
                                 ref={provided.innerRef}
                                 {...provided.draggableProps}
                                 {...provided.dragHandleProps}
-                                className={`hover:shadow-sm transition-shadow ${snapshot.isDragging ? 'shadow-md rotate-2 ring-1 ring-primary/20' : ''}`}
+                                className={`border transition-shadow ${snapshot.isDragging ? 'rotate-2 ring-1 ring-primary/20' : ''}`}
                                 style={provided.draggableProps.style}
                               >
                                 <CardContent className="p-4">
@@ -609,7 +609,7 @@ export default function PipelinePage() {
                                   </div>
                                   <div className="mt-2 flex items-center justify-between">
                                     <Avatar className="h-6 w-6">
-                                      <AvatarFallback className="text-[9px] bg-primary/10 text-primary">
+                                      <AvatarFallback className="text-[9px]">
                                         {getInitials(lead.name)}
                                       </AvatarFallback>
                                     </Avatar>
@@ -650,17 +650,17 @@ export default function PipelinePage() {
         <Card>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
-              <table className="w-full text-sm">
+              <table className="w-full text-sm min-w-[600px]">
                 <thead>
                   <tr className="border-b text-left text-muted-foreground">
                     <th className="p-3 font-medium">Deal Name</th>
-                    <th className="p-3 font-medium">Client</th>
-                    <th className="p-3 font-medium">Tags</th>
+                    <th className="p-3 font-medium hidden sm:table-cell">Client</th>
+                    <th className="p-3 font-medium hidden md:table-cell">Tags</th>
                     <th className="p-3 font-medium">Value</th>
-                    <th className="p-3 font-medium">Stage</th>
-                    <th className="p-3 font-medium">Days</th>
-                    <th className="p-3 font-medium">Owner</th>
-                    <th className="p-3 font-medium" />
+                    <th className="p-3 font-medium hidden sm:table-cell">Stage</th>
+                    <th className="p-3 font-medium hidden lg:table-cell">Days</th>
+                    <th className="p-3 font-medium hidden lg:table-cell">Owner</th>
+                    <th className="p-3 font-medium hidden sm:table-cell" />
                   </tr>
                 </thead>
                 <tbody>
@@ -677,8 +677,8 @@ export default function PipelinePage() {
                             <span className="font-medium">{lead.name}</span>
                           </div>
                         </td>
-                        <td className="p-3 text-muted-foreground">{lead.company || '—'}</td>
-                        <td className="p-3">
+                        <td className="p-3 text-muted-foreground hidden sm:table-cell">{lead.company || '—'}</td>
+                        <td className="p-3 hidden md:table-cell">
                           <div className="flex gap-1">
                             {lead.tags?.slice(0, 2).map((tag) => (
                               <Badge key={tag} variant="secondary" className="text-[10px] px-1 py-0">{tag}</Badge>
@@ -686,22 +686,22 @@ export default function PipelinePage() {
                           </div>
                         </td>
                         <td className="p-3 font-medium">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</td>
-                        <td className="p-3">
-                          <Badge className="text-[10px] px-1.5 py-0" style={{ backgroundColor: stageColors[lead.status] ? undefined : undefined }}>
+                        <td className="p-3 hidden sm:table-cell">
+                          <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                             {stageLabels[lead.status] || lead.status}
                           </Badge>
                         </td>
-                        <td className="p-3 text-muted-foreground">
+                        <td className="p-3 text-muted-foreground hidden lg:table-cell">
                           {lead.created_at ? Math.floor((Date.now() - new Date(lead.created_at).getTime()) / 86400000) : '—'}d
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 hidden lg:table-cell">
                           <Avatar className="h-7 w-7">
-                            <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
+                            <AvatarFallback className="text-[10px]">
                               {getInitials(lead.name)}
                             </AvatarFallback>
                           </Avatar>
                         </td>
-                        <td className="p-3">
+                        <td className="p-3 hidden sm:table-cell">
                           <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDelete(lead)}>
                             <Trash2 size={12} />
                           </Button>
@@ -752,7 +752,7 @@ export default function PipelinePage() {
                 </Select>
               </div>
             </div>
-            <div className="border-l pl-4">
+            <div className="border-t pt-4 md:border-t-0 md:border-l md:pt-0 md:pl-4">
               <div className="flex items-center gap-2 mb-3">
                 <Bot size={16} className="text-emerald-500" />
                 <span className="text-sm font-medium">WhatsApp Activity</span>
@@ -939,11 +939,11 @@ export default function PipelinePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                 <div>
-                  <p className="text-lg font-bold">{viewDeal.estimated_value ? formatCurrency(viewDeal.estimated_value) : '—'}</p>
+                  <p className="text-base sm:text-lg font-semibold">{viewDeal.estimated_value ? formatCurrency(viewDeal.estimated_value) : '—'}</p>
                   <p className="text-xs text-muted-foreground">Deal Value</p>
                 </div>
                 <div className="text-right">
-                  <p className="text-lg font-bold">{viewDeal.priority || '—'}</p>
+                  <p className="text-base sm:text-lg font-semibold">{viewDeal.priority || '—'}</p>
                   <p className="text-xs text-muted-foreground">Priority</p>
                 </div>
               </div>

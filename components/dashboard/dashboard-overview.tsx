@@ -51,7 +51,7 @@ export function DashboardOverview() {
         <h1 className="text-2xl font-bold tracking-tight">
           {companyName ? `${companyName} Dashboard` : 'Dashboard'}
         </h1>
-        <p className="text-muted-foreground">Welcome back! Here's what's happening.</p>
+        <p className="text-muted-foreground">Welcome back! Here&apos;s what&apos;s happening.</p>
       </div>
 
       {/* KPI Cards */}
