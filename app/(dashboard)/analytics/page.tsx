@@ -548,7 +548,7 @@ export default function AnalyticsDashboard() {
               <div
                 {...provided.droppableProps}
                 ref={provided.innerRef}
-                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"
+                className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 overflow-hidden"
               >
                 {widgets.map((w, index) => (
                   <Draggable key={w.id} draggableId={w.id} index={index} isDragDisabled={!isEditMode}>
@@ -561,7 +561,7 @@ export default function AnalyticsDashboard() {
                           ...provided.draggableProps.style,
                           opacity: snapshot.isDragging ? 0.8 : 1,
                         }}
-                        className={`${getWidgetGridClass(w.type)} ${isEditMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
+                        className={`${getWidgetGridClass(w.type)} min-w-0 ${isEditMode ? 'cursor-grab active:cursor-grabbing' : ''}`}
                       >
                         <Card className={`h-full ${isEditMode && selectedWidgetId === w.id ? 'ring-2 ring-primary' : ''}`}>
                           <CardHeader className="flex flex-row items-center justify-between pb-2">
