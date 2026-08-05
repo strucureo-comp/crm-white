@@ -475,7 +475,7 @@ export default function AnalyticsDashboard() {
     switch (type) {
       case 'kpi': return 'col-span-1';
       case 'donut': return 'col-span-1 md:col-span-2';
-      case 'funnel': return 'col-span-1';
+      case 'funnel': return 'col-span-1 md:col-span-2';
       default: return 'col-span-1 md:col-span-2';
     }
   };
@@ -582,7 +582,7 @@ export default function AnalyticsDashboard() {
                             )}
                           </CardHeader>
                           <CardContent className="pt-0">
-                            <div className="h-[200px]">
+                            <div className={w.type === 'funnel' ? 'h-[280px]' : 'h-[200px]'}>
                               <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
                             </div>
                           </CardContent>
