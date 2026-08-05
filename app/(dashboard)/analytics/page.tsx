@@ -479,7 +479,7 @@ export default function AnalyticsDashboard() {
   if (!isClient) return null;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 overflow-hidden">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
@@ -543,7 +543,7 @@ export default function AnalyticsDashboard() {
         </div>
       ) : (
         <DragDropContext onDragEnd={handleDragEnd}>
-          <Droppable droppableId="dashboard" direction="horizontal" isDropDisabled={!isEditMode}>
+          <Droppable droppableId="dashboard" direction="vertical" isDropDisabled={!isEditMode}>
             {(provided) => (
               <div
                 {...provided.droppableProps}
