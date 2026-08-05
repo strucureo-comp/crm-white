@@ -190,7 +190,7 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget; data: any }) => {
                   <span>{step.value}</span>
                 </div>
                 <div
-                  className="h-5 rounded-md transition-all duration-500 flex items-center justify-center relative overflow-hidden"
+                  className="h-4 rounded transition-all duration-500 flex items-center justify-center relative overflow-hidden"
                   style={{ width: `${width}%`, backgroundColor: palette[i % palette.length] }}
                 >
                   <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -582,7 +582,7 @@ export default function AnalyticsDashboard() {
                             )}
                           </CardHeader>
                           <CardContent className="pt-0">
-                            <div className={w.type === 'funnel' ? 'h-[200px] overflow-hidden' : 'h-[200px]'}>
+                            <div className={w.type === 'funnel' ? 'h-[260px] overflow-hidden' : 'h-[200px]'}>
                               <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
                             </div>
                           </CardContent>
