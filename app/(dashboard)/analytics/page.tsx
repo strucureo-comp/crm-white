@@ -180,24 +180,24 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget; data: any }) => {
     case 'funnel':
       const maxVal = Math.max(...data.map((d: any) => d.value));
       return (
-        <div className="flex flex-col h-full justify-center gap-1">
+        <div className="flex flex-col h-full justify-center gap-0.5">
           {data.map((step: any, i: number) => {
             const width = maxVal > 0 ? Math.max((step.value / maxVal) * 100, 10) : 100;
             return (
               <div key={i} className="flex flex-col items-center group w-full">
-                <div className="w-full flex justify-between text-xs font-medium text-muted-foreground mb-1 px-4">
+                <div className="w-full flex justify-between text-xs font-medium text-muted-foreground mb-0.5 px-4">
                   <span>{step.name}</span>
                   <span>{step.value}</span>
                 </div>
                 <div
-                  className="h-8 rounded-lg transition-all duration-500 flex items-center justify-center relative overflow-hidden"
+                  className="h-6 rounded-lg transition-all duration-500 flex items-center justify-center relative overflow-hidden"
                   style={{ width: `${width}%`, backgroundColor: palette[i % palette.length] }}
                 >
                   <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 {i < data.length - 1 && (
-                  <div className="flex flex-col items-center my-1">
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-muted-foreground">
+                  <div className="flex flex-col items-center my-0.5">
+                    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-muted-foreground">
                       <path d="M8 3v8M4.5 7.5L8 11l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
                     </svg>
                   </div>
@@ -582,7 +582,7 @@ export default function AnalyticsDashboard() {
                             )}
                           </CardHeader>
                           <CardContent className="pt-0">
-                            <div className={w.type === 'funnel' ? 'h-[280px]' : 'h-[200px]'}>
+                            <div className={w.type === 'funnel' ? 'h-[240px]' : 'h-[200px]'}>
                               <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
                             </div>
                           </CardContent>
