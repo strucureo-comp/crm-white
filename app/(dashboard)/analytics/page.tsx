@@ -180,7 +180,7 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget; data: any }) => {
     case 'funnel':
       const maxVal = Math.max(...data.map((d: any) => d.value));
       return (
-        <div className="flex flex-col h-full justify-center gap-3">
+        <div className="flex flex-col h-full justify-center gap-1">
           {data.map((step: any, i: number) => {
             const width = Math.max((step.value / maxVal) * 100, 10);
             return (
@@ -196,7 +196,11 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget; data: any }) => {
                   <div className="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 {i < data.length - 1 && (
-                  <ArrowRight className="w-4 h-4 text-muted-foreground mt-2 rotate-90" />
+                  <div className="flex flex-col items-center my-1">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-muted-foreground">
+                      <path d="M8 3v8M4.5 7.5L8 11l3.5-3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
+                  </div>
                 )}
               </div>
             );
