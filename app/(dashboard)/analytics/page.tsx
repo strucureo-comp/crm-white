@@ -182,7 +182,7 @@ const WidgetRenderer = ({ widget, data }: { widget: Widget; data: any }) => {
       return (
         <div className="flex flex-col h-full justify-center gap-1">
           {data.map((step: any, i: number) => {
-            const width = Math.max((step.value / maxVal) * 100, 10);
+            const width = maxVal > 0 ? Math.max((step.value / maxVal) * 100, 10) : 100;
             return (
               <div key={i} className="flex flex-col items-center group w-full">
                 <div className="w-full flex justify-between text-xs font-medium text-muted-foreground mb-1 px-4">
