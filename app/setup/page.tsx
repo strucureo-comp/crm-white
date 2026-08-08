@@ -76,10 +76,15 @@ export default function SetupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
-          <CardContent className="pt-6 text-center">
-            <p className="text-muted-foreground">No workspace found. Please register first.</p>
-            <Button className="mt-4" onClick={() => router.push('/register')}>
-              Go to Register
+          <CardContent className="pt-6 text-center space-y-4">
+            <p className="text-muted-foreground">No workspace found. Your account setup might have been interrupted.</p>
+            <Button className="w-full" onClick={async () => {
+              const { auth } = await import('@/lib/firebase/config');
+              const { signOut: firebaseSignOut } = await import('firebase/auth');
+              await firebaseSignOut(auth);
+              router.push('/login');
+            }}>
+              Sign Out & Try Again
             </Button>
           </CardContent>
         </Card>

@@ -158,7 +158,7 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
             <img src={companyLogo} alt={companyName} className="w-8 h-8 rounded-lg object-contain shrink-0" />
           ) : (
             <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center shrink-0">
-              <span className="text-primary-foreground font-bold text-sm">{companyName.charAt(0)}</span>
+              <span className="text-primary-foreground font-bold text-sm">{(companyName || 'C').charAt(0)}</span>
             </div>
           )}
           {!collapsed && (
@@ -341,7 +341,7 @@ export function AppSidebar() {
                 <img src={logoUrl} alt={companyName} className="w-8 h-8 rounded-lg object-contain" />
               ) : (
                 <div className="w-8 h-8 rounded-lg bg-primary flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-sm">{companyName.charAt(0)}</span>
+                  <span className="text-primary-foreground font-bold text-sm">{(companyName || 'C').charAt(0)}</span>
                 </div>
               )}
               <SheetTitle className="font-semibold text-lg tracking-tight">

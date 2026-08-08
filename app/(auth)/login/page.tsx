@@ -24,7 +24,7 @@ export default function LoginPage() {
       // If workspace exists and setup is complete, go to dashboard
       if (workspace?.setup_completed) {
         router.replace('/dashboard');
-      } else if (workspace) {
+      } else {
         router.replace('/setup');
       }
     }

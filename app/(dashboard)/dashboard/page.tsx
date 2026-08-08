@@ -220,7 +220,7 @@ export default function DashboardPage() {
                           <div className="flex items-center gap-2">
                             <Avatar className="h-7 w-7">
                               <AvatarFallback className="text-[10px] bg-primary/10 text-primary">
-                                {lead.name.split(' ').map((n) => n[0]).join('')}
+                                {(lead.name || 'Unknown').split(' ').map((n) => n[0] || '').join('')}
                               </AvatarFallback>
                             </Avatar>
                             <span className="font-medium">{lead.name}</span>
@@ -230,7 +230,7 @@ export default function DashboardPage() {
                         <td className="py-3 text-muted-foreground hidden md:table-cell">{lead.source || '—'}</td>
                         <td className="py-3">
                           <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${statusColors[lead.status] || ''}`}>
-                            {lead.status.charAt(0).toUpperCase() + lead.status.slice(1)}
+                            {(lead.status || 'new').charAt(0).toUpperCase() + (lead.status || 'new').slice(1)}
                           </Badge>
                         </td>
                         <td className="py-3 hidden lg:table-cell">
