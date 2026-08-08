@@ -313,6 +313,7 @@ export interface SalaryPayment {
 export interface Notification {
   id: string;
   user_id: string;
+  company_id: string;
   title: string;
   message: string;
   type: NotificationType;
@@ -616,6 +617,7 @@ export interface Pipeline {
   is_active?: boolean;
   entity_type?: "deal";
   created_by?: string;
+  company_id?: string;
 }
 
 export type ActivityAction =

@@ -54,12 +54,13 @@ import { formatCurrency } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 
 const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
-  { id: 'qualified', name: 'Qualified', color: '#8b5cf6', order: 0 },
-  { id: 'contacted', name: 'Contacted', color: '#f59e0b', order: 1 },
-  { id: "proposal", name: 'Proposal', color: '#a855f7', order: 2 },
-  { id: 'negotiation', name: 'Negotiation', color: '#10b981', order: 3 },
-  { id: 'won', name: 'Closed Won', color: '#22c55e', order: 4 },
-  { id: 'lost', name: 'Closed Lost', color: '#ef4444', order: 5 },
+  { id: 'new', name: 'New', color: '#3b82f6', order: 0 },
+  { id: 'qualified', name: 'Qualified', color: '#8b5cf6', order: 1 },
+  { id: 'contacted', name: 'Contacted', color: '#f59e0b', order: 2 },
+  { id: "proposal", name: 'Proposal', color: '#a855f7', order: 3 },
+  { id: 'negotiation', name: 'Negotiation', color: '#10b981', order: 4 },
+  { id: 'won', name: 'Closed Won', color: '#22c55e', order: 5 },
+  { id: 'lost', name: 'Closed Lost', color: '#ef4444', order: 6 },
 ];
 
 const stageLabels: Record<string, string> = {
@@ -147,7 +148,7 @@ export default function PipelinePage() {
     try {
       const [leadData, pipelineData] = await Promise.all([
         getLeads(user.company_id),
-        getPipelines()
+        getPipelines(user.company_id)
       ]);
       setLeads(leadData);
       setPipelines(pipelineData);
@@ -213,7 +214,7 @@ export default function PipelinePage() {
         await createLead({
           name: dealFormName,
           company: dealFormCompany,
-          company_id: '',
+          company_id: user?.company_id || '',
           estimated_value: dealFormValue === '' ? 0 : Number(dealFormValue),
           status: dealFormStage,
           email: 'placeholder@example.com',
@@ -259,13 +260,14 @@ export default function PipelinePage() {
   }
 
   async function handleBoardSubmit() {
+    if (!user?.company_id) return;
     if (!boardNameInput.trim()) {
       toast.error('Pipeline name is required');
       return;
     }
     try {
       if (boardDialogMode === 'create') {
-        await createPipeline({ 
+        await createPipeline(user.company_id, { 
           name: boardNameInput.trim(), 
           description: boardDescInput.trim(),
           is_active: boardIsActiveInput,
@@ -275,7 +277,7 @@ export default function PipelinePage() {
         } as any);
         toast.success('Pipeline created');
       } else if (boardDialogMode === 'rename' && activePipelineId) {
-        await updatePipeline(activePipelineId, { 
+        await updatePipeline(user.company_id, activePipelineId, { 
           name: boardNameInput.trim(),
           description: boardDescInput.trim(),
           is_active: boardIsActiveInput,
@@ -292,8 +294,9 @@ export default function PipelinePage() {
 
   async function handleDeletePipeline() {
     if (!activePipelineId) return;
+    if (!user?.company_id) return;
     try {
-      await deletePipeline(activePipelineId);
+      await deletePipeline(user.company_id, activePipelineId);
       setActivePipelineId(null);
       toast.success('Pipeline deleted');
       setBoardDialogOpen(false);
@@ -331,6 +334,7 @@ export default function PipelinePage() {
       return;
     }
     if (!activePipelineId || !activePipeline) return;
+    if (!user?.company_id) return;
     try {
       let updatedStages = [...activePipeline.stages];
       if (stageDialogMode === 'create') {
@@ -358,7 +362,7 @@ export default function PipelinePage() {
           } : s
         );
       }
-      await updatePipeline(activePipelineId, { stages: updatedStages });
+      await updatePipeline(user.company_id, activePipelineId, { stages: updatedStages });
       toast.success(stageDialogMode === 'create' ? 'Stage created' : 'Stage updated');
       setStageDialogOpen(false);
       load();
@@ -369,9 +373,10 @@ export default function PipelinePage() {
 
   async function handleDeleteStage(stageId: string) {
     if (!activePipelineId || !activePipeline) return;
+    if (!user?.company_id) return;
     try {
       const updatedStages = activePipeline.stages.filter((s) => s.id !== stageId);
-      await updatePipeline(activePipelineId, { stages: updatedStages });
+      await updatePipeline(user.company_id, activePipelineId, { stages: updatedStages });
       toast.success('Stage deleted');
       load();
     } catch {

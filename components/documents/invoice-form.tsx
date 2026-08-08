@@ -107,13 +107,13 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
     settings.branding.tax_igst || 0
   );
 
-  // Update payment balance
+  // Update payment balance (clamped at zero so overpayment never goes negative)
   useEffect(() => {
     setPayment((prev) => ({
       ...prev,
-      balance_due: pricing.grand_total - prev.amount_paid,
+      balance_due: Math.max(0, Math.round((pricing.grand_total - prev.amount_paid) * 100) / 100),
     }));
-  }, [pricing.grand_total]);
+  }, [pricing.grand_total, payment.amount_paid]);
 
   const handleSave = useCallback(
     async (status: InvoiceStatus = 'pending') => {

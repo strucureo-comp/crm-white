@@ -36,3 +36,7 @@ env.text
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# local tooling
+.claude/
+.tmp-browser-mcp/

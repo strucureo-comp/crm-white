@@ -14,7 +14,8 @@ interface PaymentSectionProps {
 }
 
 export function PaymentSection({ payment, onPaymentChange, grandTotal, currency }: PaymentSectionProps) {
-  const balanceDue = grandTotal - payment.amount_paid;
+  const overpaid = payment.amount_paid > grandTotal;
+  const balanceDue = Math.max(0, Math.round((grandTotal - payment.amount_paid) * 100) / 100);
 
   return (
     <div className="space-y-4">
@@ -74,13 +75,14 @@ export function PaymentSection({ payment, onPaymentChange, grandTotal, currency 
             min="0"
             step="0.01"
             value={payment.amount_paid}
-            onChange={(e) => onPaymentChange({ amount_paid: parseFloat(e.target.value) || 0 })}
+            onChange={(e) => onPaymentChange({ amount_paid: Math.max(0, parseFloat(e.target.value) || 0) })}
           />
         </div>
         <div className="space-y-2">
           <Label>Balance Due</Label>
-          <div className={`h-10 flex items-center text-sm font-semibold border rounded-md px-3 ${balanceDue > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
+          <div className={`h-10 flex items-center text-sm font-semibold border rounded-md px-3 ${overpaid ? 'bg-blue-50 text-blue-700 border-blue-200' : balanceDue > 0 ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
             {formatDocumentCurrency(balanceDue, currency)}
+            {overpaid && <span className="ml-2 text-xs font-normal text-blue-600">overpaid</span>}
           </div>
         </div>
       </div>

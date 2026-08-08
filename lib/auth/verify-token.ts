@@ -1,13 +1,14 @@
-import { createVerify } from 'crypto';
+import { createVerify, createPublicKey } from 'crypto';
 
 interface TokenPayload {
-  uid: string;
+  uid?: string;
+  user_id?: string;
+  sub?: string;
   email: string;
   exp: number;
   iat: number;
   aud: string;
   iss: string;
-  sub: string;
 }
 
 let cachedKeys: { [kid: string]: string } | null = null;
@@ -38,8 +39,6 @@ function base64UrlDecode(str: string): string {
   return Buffer.from(str, 'base64').toString('utf-8');
 }
 
-
-
 export async function verifyAuthToken(token: string): Promise<TokenPayload | null> {
   try {
     const parts = token.split('.');
@@ -68,15 +67,18 @@ export async function verifyAuthToken(token: string): Promise<TokenPayload | nul
     const verifier = createVerify('RSA-SHA256');
     verifier.update(`${parts[0]}.${parts[1]}`);
 
+    // Keys served by Google are x.509 certificates; createPublicKey extracts the
+    // SPKI public key so signature verification succeeds.
     const isValid = verifier.verify(
-      publicKeyPem,
-      signature,
-      'base64url'
+      createPublicKey(publicKeyPem),
+      Buffer.from(signature, 'base64url')
     );
 
     if (!isValid) return null;
 
-    return payload;
+    // Firebase ID tokens expose the user id as `user_id` (and `sub`), not `uid`.
+    // Normalize to `uid` so consumers (session cookie, Bearer auth) work uniformly.
+    return { ...payload, uid: payload.uid || payload.user_id || payload.sub || '' };
   } catch {
     return null;
   }

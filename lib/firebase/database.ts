@@ -138,7 +138,8 @@ export async function createProject(project: Omit<Project, 'id' | 'project_id' |
         message: `Your project "${project.title}" has been created and is now active.`,
         type: 'project',
         link: `/projects/${newProjectRef.key}`,
-        read: false
+        read: false,
+        company_id: project.company_id,
       });
     }
 
@@ -167,7 +168,8 @@ export async function updateProject(projectId: string, updates: Partial<Project>
         message: `Your project "${project.title}" has been updated.`,
         type: 'project',
         link: `/projects/${projectId}`,
-        read: false
+        read: false,
+        company_id: project.company_id,
       });
 
       const admins = await getAdmins(project.company_id);
@@ -178,7 +180,8 @@ export async function updateProject(projectId: string, updates: Partial<Project>
           message: `Project "${project.title}" has been updated.`,
           type: 'project',
           link: `/projects/${projectId}`,
-          read: false
+          read: false,
+          company_id: project.company_id,
         });
       }
     }
@@ -266,7 +269,8 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
           message: `Invoice ${invoice.invoice_number} has been marked as paid.`,
           type: 'payment',
           link: `/admin/invoices`,
-          read: false
+          read: false,
+          company_id: invoice.company_id,
         });
       }
 
@@ -276,7 +280,8 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
         message: `We have received your payment for Invoice ${invoice.invoice_number}. Thank you!`,
         type: 'payment',
         link: `/invoices/${invoiceId}`,
-        read: false
+        read: false,
+        company_id: invoice.company_id,
       });
     } else if (invoice) {
       await createNotification({
@@ -285,7 +290,8 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
         message: `Invoice ${invoice.invoice_number} has been updated.`,
         type: 'payment',
         link: `/invoices/${invoiceId}`,
-        read: false
+        read: false,
+        company_id: invoice.company_id,
       });
     }
 
@@ -316,7 +322,8 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
       message: `A new invoice ${invoice.invoice_number} for $${invoice.amount} has been issued.`,
       type: 'payment',
       link: `/invoices`,
-      read: false
+      read: false,
+      company_id: invoice.company_id,
     });
 
     return newInvoiceRef.key;
@@ -400,7 +407,8 @@ export async function updateSupportRequest(requestId: string, updates: Partial<S
         message: `Your ticket "${request.subject}" has been marked as ${updates.status.replace('_', ' ')}.`,
         type: 'support',
         link: `/support/${requestId}`,
-        read: false
+        read: false,
+        company_id: request.company_id,
       });
     }
 
@@ -432,7 +440,8 @@ export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 
         message: `A new ticket "${request.subject}" has been submitted.`,
         type: 'support',
         link: `/admin/support/${newRequestRef.key}`,
-        read: false
+        read: false,
+        company_id: request.company_id,
       });
     }
 
@@ -510,7 +519,8 @@ export async function createUser(userId: string, userData: Omit<User, 'id'>): Pr
         message: `${userData.full_name} has registered as a ${userData.role}.`,
         type: 'system',
         link: `/admin/users`,
-        read: false
+        read: false,
+        company_id: userData.company_id,
       });
     }
 
@@ -557,11 +567,15 @@ async function getAdmins(companyId?: string): Promise<User[]> {
   return allUsers.filter(u => u.role === 'admin');
 }
 
-// ===== Notification Functions (global) =====
+// ===== Notification Functions (workspace-scoped) =====
 
 export async function createNotification(notification: Omit<Notification, 'id' | 'notification_id' | 'created_at'>): Promise<string | null> {
   try {
-    const notificationsRef = ref(database, 'notifications');
+    if (!notification.company_id) {
+      console.error('createNotification requires company_id');
+      return null;
+    }
+    const notificationsRef = wsRef(notification.company_id, 'notifications');
     const newNotificationRef = push(notificationsRef);
 
     const notificationData = cleanData({
@@ -599,9 +613,11 @@ export async function createNotification(notification: Omit<Notification, 'id' |
   }
 }
 
-export async function getNotifications(userId: string): Promise<Notification[]> {
+export async function getNotifications(userId: string, companyId?: string): Promise<Notification[]> {
   try {
-    const notificationsRef = ref(database, 'notifications');
+    const notificationsRef = companyId
+      ? wsRef(companyId, 'notifications')
+      : ref(database, 'notifications');
     const snapshot = await get(notificationsRef);
 
     if (!snapshot.exists()) return [];
@@ -621,9 +637,11 @@ export async function getNotifications(userId: string): Promise<Notification[]> 
   }
 }
 
-export async function markNotificationAsRead(notificationId: string): Promise<boolean> {
+export async function markNotificationAsRead(notificationId: string, companyId?: string): Promise<boolean> {
   try {
-    const notificationRef = ref(database, `notifications/${notificationId}`);
+    const notificationRef = companyId
+      ? wsItemRef(companyId, 'notifications', notificationId)
+      : ref(database, `notifications/${notificationId}`);
     await update(notificationRef, { read: true });
     return true;
   } catch (error) {
@@ -702,7 +720,8 @@ export async function createMeetingRequest(meeting: Omit<MeetingRequest, 'id' | 
         message: `A new meeting for "${meeting.purpose}" has been requested.`,
         type: 'meeting',
         link: `/admin/meetings`,
-        read: false
+        read: false,
+        company_id: meeting.company_id,
       });
     }
 
@@ -746,7 +765,8 @@ export async function updateMeeting(meetingId: string, updates: Partial<MeetingR
         message: `Your meeting request for "${meeting.purpose}" has been ${updates.status}.`,
         type: 'meeting',
         link: `/meetings`,
-        read: false
+        read: false,
+        company_id: meeting.company_id,
       });
     }
 
@@ -970,7 +990,8 @@ export async function createQuotation(quotation: Omit<Quotation, 'id' | 'quote_i
       message: `You have received a new quotation ${quotation.quotation_number}.`,
       type: 'payment',
       link: `/quotations`,
-      read: false
+      read: false,
+      company_id: quotation.company_id,
     });
 
     return newQuotationRef.key;
@@ -1853,7 +1874,7 @@ export async function createTeamMember(data: Omit<TeamMember, 'id' | 'team_membe
     const now = new Date().toISOString();
     await set(newRef, cleanData({ ...data, created_at: now, updated_at: now }));
 
-    const admins = await getAdmins();
+    const admins = await getAdmins(data.company_id);
     for (const admin of admins) {
       await createNotification({
         user_id: admin.id,
@@ -1861,7 +1882,8 @@ export async function createTeamMember(data: Omit<TeamMember, 'id' | 'team_membe
         message: `${data.name} has been added as a team member.`,
         type: 'system',
         link: `/admin/team`,
-        read: false
+        read: false,
+        company_id: data.company_id,
       });
     }
 
@@ -2133,6 +2155,7 @@ export async function createCampaign(data: Omit<Campaign, 'id' | 'campaign_id' |
     await createNotification({
       user_id: 'system', title: 'Campaign Created', message: `Campaign "${data.name}" created`,
       type: 'system', link: '/campaigns', read: false,
+      company_id: data.company_id,
     });
     return newRef.key;
   } catch { return null; }
@@ -2398,9 +2421,9 @@ export async function createEmailLog(data: Omit<EmailLog, 'id'>): Promise<string
 
 // ===== Pipeline Functions (global) =====
 
-export async function getPipelines(): Promise<Pipeline[]> {
+export async function getPipelines(companyId: string): Promise<Pipeline[]> {
   try {
-    const refPath = ref(database, 'pipelines');
+    const refPath = ref(database, `workspaces/${companyId}/pipelines`);
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: Pipeline[] = [];
@@ -2411,33 +2434,33 @@ export async function getPipelines(): Promise<Pipeline[]> {
   } catch { return []; }
 }
 
-export async function getPipeline(id: string): Promise<Pipeline | null> {
+export async function getPipeline(companyId: string, id: string): Promise<Pipeline | null> {
   try {
-    const snapshot = await get(ref(database, `pipelines/${id}`));
+    const snapshot = await get(ref(database, `workspaces/${companyId}/pipelines/${id}`));
     if (!snapshot.exists()) return null;
     return { id: snapshot.key, ...snapshot.val() } as Pipeline;
   } catch { return null; }
 }
 
-export async function createPipeline(data: Omit<Pipeline, 'id' | 'pipeline_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createPipeline(companyId: string, data: Omit<Pipeline, 'id' | 'pipeline_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const newRef = push(ref(database, 'pipelines'));
-    await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', entity_id: newRef.key || '', user_id: 'system', user_name: 'System', title: 'Pipeline Created', metadata: {} });
+    const newRef = push(ref(database, `workspaces/${companyId}/pipelines`));
+    await set(newRef, { ...data, company_id: companyId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', entity_id: newRef.key || '', user_id: 'system', user_name: 'System', title: 'Pipeline Created', metadata: {}, company_id: companyId });
     return newRef.key;
   } catch { return null; }
 }
 
-export async function updatePipeline(id: string, updates: Partial<Pipeline>): Promise<boolean> {
+export async function updatePipeline(companyId: string, id: string, updates: Partial<Pipeline>): Promise<boolean> {
   try {
-    await update(ref(database, `pipelines/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    await update(ref(database, `workspaces/${companyId}/pipelines/${id}`), { ...updates, updated_at: new Date().toISOString() });
     return true;
   } catch { return false; }
 }
 
-export async function deletePipeline(id: string): Promise<boolean> {
+export async function deletePipeline(companyId: string, id: string): Promise<boolean> {
   try {
-    await remove(ref(database, `pipelines/${id}`));
+    await remove(ref(database, `workspaces/${companyId}/pipelines/${id}`));
     return true;
   } catch { return false; }
 }

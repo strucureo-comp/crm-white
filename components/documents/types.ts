@@ -74,7 +74,7 @@ export function createEmptyItem(): DocumentItem {
 }
 
 export function calculateItemTotal(item: DocumentItem): number {
-  return item.quantity * item.unit_price;
+  return Math.round(item.quantity * item.unit_price * 100) / 100;
 }
 
 export function calculatePricing(
@@ -84,14 +84,15 @@ export function calculatePricing(
   sgstPercent: number,
   igstPercent: number = 0
 ): DocumentPricing {
-  const subtotal = items.reduce((sum, item) => sum + item.total, 0);
-  const discountAmount = (subtotal * discountPercent) / 100;
-  const afterDiscount = subtotal - discountAmount;
-  const cgstAmount = (afterDiscount * cgstPercent) / 100;
-  const sgstAmount = (afterDiscount * sgstPercent) / 100;
-  const igstAmount = (afterDiscount * igstPercent) / 100;
-  const taxAmount = cgstAmount + sgstAmount + igstAmount;
-  const grandTotal = afterDiscount + taxAmount;
+  const round2 = (n: number) => Math.round((n + Number.EPSILON) * 100) / 100;
+  const subtotal = round2(items.reduce((sum, item) => sum + item.total, 0));
+  const discountAmount = round2((subtotal * discountPercent) / 100);
+  const afterDiscount = round2(subtotal - discountAmount);
+  const cgstAmount = round2((afterDiscount * cgstPercent) / 100);
+  const sgstAmount = round2((afterDiscount * sgstPercent) / 100);
+  const igstAmount = round2((afterDiscount * igstPercent) / 100);
+  const taxAmount = round2(cgstAmount + sgstAmount + igstAmount);
+  const grandTotal = round2(afterDiscount + taxAmount);
 
   return {
     discount_percent: discountPercent,

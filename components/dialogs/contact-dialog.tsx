@@ -15,7 +15,7 @@ interface ContactDialogProps {
   onOpenChange: (open: boolean) => void;
   onSaved: () => void;
   contact?: Contact | null;
-  workspaceId: string;
+  companyId: string;
 }
 
 interface ContactForm {
@@ -50,7 +50,7 @@ function contactToForm(c: Contact): ContactForm {
   };
 }
 
-export function ContactDialog({ open, onOpenChange, onSaved, contact, workspaceId }: ContactDialogProps) {
+export function ContactDialog({ open, onOpenChange, onSaved, contact, companyId }: ContactDialogProps) {
   const { user } = useAuth();
   const [form, setForm] = useState<ContactForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
@@ -69,7 +69,7 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, workspaceI
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!workspaceId) {
+    if (!companyId) {
       toast.error('Workspace is still loading');
       return;
     }
@@ -84,17 +84,17 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, workspaceI
         name: form.name,
         email: form.email,
         company_id: form.company_id,
-        phone: form.phone || undefined,
-        designation: form.designation || undefined,
+        phone: form.phone || '',
+        designation: form.designation || '',
         is_primary: form.is_primary,
-        notes: form.notes || undefined,
+        notes: form.notes || '',
       };
 
       if (contact) {
-        await updateContact(workspaceId, contact.contact_id, payload);
+        await updateContact(companyId, contact.contact_id, payload);
         toast.success('Contact updated');
       } else {
-        await createContact(workspaceId, payload);
+        await createContact(companyId, payload);
         toast.success('Contact created');
       }
       onSaved();

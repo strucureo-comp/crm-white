@@ -163,7 +163,7 @@ export function LivePreview({
               <div className="flex justify-between">
                 <span className="text-muted-foreground">Balance Due</span>
                 <span className={`font-semibold ${pricing.grand_total - payment.amount_paid > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                  {formatDocumentCurrency(pricing.grand_total - payment.amount_paid, meta.currency)}
+                  {formatDocumentCurrency(Math.max(0, Math.round((pricing.grand_total - payment.amount_paid) * 100) / 100), meta.currency)}
                 </span>
               </div>
             </div>

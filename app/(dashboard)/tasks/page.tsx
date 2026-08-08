@@ -104,22 +104,59 @@ export default function TaskManagerPage() {
   const [formDate, setFormDate] = useState('');
   const [formAssigneeIds, setFormAssigneeIds] = useState<string[]>([]);
   const [formDescription, setFormDescription] = useState('');
+  const [formLabels, setFormLabels] = useState<string[]>([]);
   const [newMemberName, setNewMemberName] = useState('');
 
-  // Filters
+  // Filters & Sorting
   const [filterOwner, setFilterOwner] = useState('All');
   const [filterPriority, setFilterPriority] = useState('All');
+  const [filterTag, setFilterTag] = useState('All');
+  const [sortBy, setSortBy] = useState('None');
 
-  // Derived
+  // Calendar State
+  const [calendarCurrentDate, setCalendarCurrentDate] = useState(new Date());
+
+  // Helper: Extract assignees consistently
+  const getTaskAssignees = (task: Task): Assignee[] => {
+    if (task.assignees && task.assignees.length > 0) return task.assignees;
+    if (task.assignee) return [task.assignee];
+    return [];
+  };
+
+  // Helper: Available Labels
+  const AVAILABLE_LABELS = [
+    { name: 'Feature', color: 'bg-indigo-500' },
+    { name: 'Bug', color: 'bg-blue-500' },
+    { name: 'Design', color: 'bg-emerald-500' },
+    { name: 'Urgent', color: 'bg-amber-500' },
+    { name: 'Critical', color: 'bg-rose-500' },
+    { name: 'Marketing', color: 'bg-pink-500' }
+  ];
+
+  // Derived filtered & sorted tasks
   const filteredTasks = useMemo(() => {
-    return tasks.filter(t => {
+    let result = tasks.filter(t => {
       const matchesSearch = t.title.toLowerCase().includes(search.toLowerCase()) || t.description.toLowerCase().includes(search.toLowerCase());
-      const taskAssignees = t.assignees || (t.assignee ? [t.assignee] : []);
+      const taskAssignees = getTaskAssignees(t);
       const matchesOwner = filterOwner === 'All' || taskAssignees.some(a => a.name === filterOwner);
       const matchesPriority = filterPriority === 'All' || t.priority === filterPriority;
-      return matchesSearch && matchesOwner && matchesPriority;
+      const matchesTag = filterTag === 'All' || (t.labels && t.labels.includes(filterTag));
+      return matchesSearch && matchesOwner && matchesPriority && matchesTag;
     });
-  }, [tasks, search, filterOwner, filterPriority]);
+
+    if (sortBy === 'Due') {
+      result = [...result].sort((a, b) => (a.dueDate || '').localeCompare(b.dueDate || ''));
+    }
+
+    return result;
+  }, [tasks, search, filterOwner, filterPriority, filterTag, sortBy]);
+
+  // Unique labels in system
+  const allLabels = useMemo(() => {
+    const set = new Set<string>();
+    tasks.forEach(t => t.labels?.forEach(l => set.add(l)));
+    return Array.from(set);
+  }, [tasks]);
 
   // Handlers
   const handleCreateTask = async () => {
@@ -143,7 +180,7 @@ export default function TaskManagerPage() {
       dueDate: formDate || new Date().toISOString().split('T')[0],
       subtasks: [],
       comments: [],
-      labels: [],
+      labels: formLabels,
       dealReference: null,
       attachments: []
     };
@@ -160,6 +197,7 @@ export default function TaskManagerPage() {
       setFormDate('');
       setFormAssigneeIds([]);
       setFormDescription('');
+      setFormLabels([]);
     } catch (e) {
       toast.error('Failed to create task');
     }
@@ -215,6 +253,16 @@ export default function TaskManagerPage() {
     const next = new Set(selectedTaskIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedTaskIds(next);
+  };
+
+  const handleDeleteSingleTask = async (taskId: string) => {
+    if (!user?.company_id) return;
+    try {
+      await deleteTask(user.company_id, taskId);
+      toast.success('Task deleted successfully');
+    } catch (e) {
+      toast.error('Failed to delete task');
+    }
   };
 
   const handleBulkDelete = async () => {
@@ -330,13 +378,18 @@ export default function TaskManagerPage() {
   };
 
   const getCalendarDays = () => {
-    return Array.from({length: 35}, (_, i) => {
-      const date = new Date(2026, 7, i - 3);
+    const year = calendarCurrentDate.getFullYear();
+    const month = calendarCurrentDate.getMonth();
+    const firstDayOfMonth = new Date(year, month, 1).getDay();
+    
+    return Array.from({ length: 35 }, (_, i) => {
+      const date = new Date(year, month, i - firstDayOfMonth + 1);
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
       return { 
         date, 
-        dateStr: date.toISOString().split('T')[0],
+        dateStr,
         dayNum: date.getDate(),
-        isCurrentMonth: date.getMonth() === 7
+        isCurrentMonth: date.getMonth() === month
       };
     });
   };
@@ -408,11 +461,25 @@ export default function TaskManagerPage() {
             </div>
             <div className="space-y-1">
               <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Tag</span>
-              <Select defaultValue="All"><SelectTrigger className="h-8 text-xs w-[140px] bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="All">All Tags</SelectItem></SelectContent></Select>
+              <Select value={filterTag} onValueChange={setFilterTag}>
+                <SelectTrigger className="h-8 text-xs w-[140px] bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="All">All Tags</SelectItem>
+                  {allLabels.map(l => (
+                    <SelectItem key={l} value={l}>{l}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
             <div className="space-y-1">
               <span className="text-[9px] uppercase font-bold text-muted-foreground tracking-wider">Sort</span>
-              <Select defaultValue="None"><SelectTrigger className="h-8 text-xs w-[140px] bg-background"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="None">None</SelectItem><SelectItem value="Due">Due Date</SelectItem></SelectContent></Select>
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="h-8 text-xs w-[140px] bg-background"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="None">None</SelectItem>
+                  <SelectItem value="Due">Due Date</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
         )}
@@ -490,6 +557,7 @@ export default function TaskManagerPage() {
                                   Urgent: 'bg-red-600 animate-pulse'
                                 };
                                 const pColor = priorityColors[task.priority as keyof typeof priorityColors] || 'bg-slate-500';
+                                const taskAssignees = getTaskAssignees(task);
 
                                 return (
                                   <Card
@@ -497,15 +565,11 @@ export default function TaskManagerPage() {
                                     {...provided.draggableProps}
                                     {...provided.dragHandleProps}
                                     onClick={() => setViewingTask(task)}
-                                    className={`cursor-pointer transition-all duration-200 border-l-4 bg-background group overflow-hidden
+                                    className={`cursor-pointer transition-all duration-200 bg-background group overflow-hidden relative
                                       ${snapshot.isDragging ? 'shadow-2xl rotate-3 ring-2 ring-primary/30' : 'shadow-sm hover:shadow-md hover:border-primary/40'}
                                     `}
-                                    style={{
-                                      ...provided.draggableProps.style,
-                                      borderLeftColor: 'transparent'
-                                    }}
                                   >
-                                    <div className={`absolute left-0 top-0 bottom-0 w-1 ${pColor} opacity-80 group-hover:opacity-100 transition-opacity`} />
+                                    <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${pColor} opacity-80 group-hover:opacity-100 transition-opacity`} />
                                     <CardContent className="p-4 pl-5 space-y-3 relative">
                                       <div className="flex gap-1 flex-wrap">
                                         {task.labels?.map(l => <Badge key={l} variant="outline" className="text-[9px] px-2 py-0 border-primary/20 text-primary bg-primary/5">{l}</Badge>)}
@@ -529,14 +593,14 @@ export default function TaskManagerPage() {
                                           <span className="text-[10px] font-medium text-muted-foreground flex items-center gap-1"><CalendarIcon className="w-3 h-3"/>{task.dueDate}</span>
                                         </div>
                                         <div className="flex -space-x-2 overflow-hidden">
-                                          {(task.assignees || (task.assignee ? [task.assignee] : [])).slice(0, 3).map((a, i) => (
+                                          {taskAssignees.slice(0, 3).map((a, i) => (
                                             <Avatar key={a.id || i} className="h-7 w-7 border-2 border-background shadow-sm ring-1 ring-border/50" title={a.name}>
                                               <AvatarFallback className="text-[9px] bg-primary/10 text-primary font-bold">{a.avatar}</AvatarFallback>
                                             </Avatar>
                                           ))}
-                                          {(task.assignees?.length || 0) > 3 && (
+                                          {taskAssignees.length > 3 && (
                                             <div className="h-7 w-7 rounded-full bg-muted border-2 border-background flex items-center justify-center text-[9px] font-bold text-muted-foreground ring-1 ring-border/50">
-                                              +{(task.assignees?.length || 0) - 3}
+                                              +{taskAssignees.length - 3}
                                             </div>
                                           )}
                                         </div>
@@ -588,22 +652,78 @@ export default function TaskManagerPage() {
 
         {/* B. Dashboard View */}
         {view === 'Dashboard' && (
-          <div className="h-full overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-1">
-              <Card className="md:col-span-4 border shadow-sm"><CardContent className="p-6">
-                <h3 className="font-bold text-lg mb-4">Overview KPIs</h3>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="bg-muted/30 p-4 rounded-lg"><p className="text-xs text-muted-foreground font-bold">Total Tasks</p><p className="text-2xl font-bold mt-1">{tasks.length}</p></div>
-                  <div className="bg-emerald-50 p-4 rounded-lg"><p className="text-xs text-emerald-700 font-bold">Completed</p><p className="text-2xl font-bold text-emerald-800 mt-1">{tasks.filter(t=>t.status==='Done').length}</p></div>
-                  <div className="bg-amber-50 p-4 rounded-lg"><p className="text-xs text-amber-700 font-bold">In Progress</p><p className="text-2xl font-bold text-amber-800 mt-1">{tasks.filter(t=>t.status==='In Progress').length}</p></div>
-                  <div className="bg-rose-50 p-4 rounded-lg"><p className="text-xs text-rose-700 font-bold">Urgent</p><p className="text-2xl font-bold text-rose-800 mt-1">{tasks.filter(t=>t.priority==='Urgent').length}</p></div>
+          <div className="h-full overflow-y-auto space-y-4 p-1">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <Card className="border shadow-sm bg-gradient-to-br from-card to-muted/20"><CardContent className="p-5">
+                <p className="text-xs text-muted-foreground font-bold uppercase tracking-wider">Total Tasks</p>
+                <p className="text-3xl font-extrabold text-foreground mt-2">{tasks.length}</p>
+              </CardContent></Card>
+              
+              <Card className="border shadow-sm bg-gradient-to-br from-emerald-500/5 to-emerald-500/10 border-emerald-500/20"><CardContent className="p-5">
+                <p className="text-xs text-emerald-600 font-bold uppercase tracking-wider">Completed</p>
+                <p className="text-3xl font-extrabold text-emerald-700 dark:text-emerald-400 mt-2">{tasks.filter(t=>t.status==='Done').length}</p>
+              </CardContent></Card>
+
+              <Card className="border shadow-sm bg-gradient-to-br from-amber-500/5 to-amber-500/10 border-amber-500/20"><CardContent className="p-5">
+                <p className="text-xs text-amber-600 font-bold uppercase tracking-wider">In Progress</p>
+                <p className="text-3xl font-extrabold text-amber-700 dark:text-amber-400 mt-2">{tasks.filter(t=>t.status==='In Progress').length}</p>
+              </CardContent></Card>
+
+              <Card className="border shadow-sm bg-gradient-to-br from-rose-500/5 to-rose-500/10 border-rose-500/20"><CardContent className="p-5">
+                <p className="text-xs text-rose-600 font-bold uppercase tracking-wider">Urgent Tasks</p>
+                <p className="text-3xl font-extrabold text-rose-700 dark:text-rose-400 mt-2">{tasks.filter(t=>t.priority==='Urgent').length}</p>
+              </CardContent></Card>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Dynamic Status Breakdown */}
+              <Card className="border shadow-sm"><CardContent className="p-6">
+                <h3 className="font-bold text-base text-foreground mb-4">Status Distribution</h3>
+                <div className="space-y-4">
+                  {columns.map(col => {
+                    const count = tasks.filter(t => t.status === col).length;
+                    const pct = tasks.length > 0 ? Math.round((count / tasks.length) * 100) : 0;
+                    return (
+                      <div key={col} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-foreground">{col}</span>
+                          <span className="text-muted-foreground">{count} ({pct}%)</span>
+                        </div>
+                        <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+                          <div className="h-full bg-primary transition-all duration-500" style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </CardContent></Card>
-              <Card className="md:col-span-2 border shadow-sm"><CardContent className="p-6 h-[300px] flex flex-col items-center justify-center text-muted-foreground">
-                <p className="font-bold mb-2">Status Pie Chart</p><div className="w-32 h-32 rounded-full bg-muted border-4 border-dashed" />
-              </CardContent></Card>
-              <Card className="md:col-span-2 border shadow-sm"><CardContent className="p-6 h-[300px] flex flex-col items-center justify-center text-muted-foreground">
-                <p className="font-bold mb-2">Team Activity Bar Chart</p><div className="w-full h-32 bg-muted/50 rounded-lg flex items-end justify-around px-4 pb-2 pt-10 border-b border-l"><div className="w-8 bg-primary/20 h-full rounded-t-sm"/><div className="w-8 bg-primary/50 h-3/4 rounded-t-sm"/><div className="w-8 bg-primary/80 h-1/2 rounded-t-sm"/></div>
+
+              {/* Dynamic Priority Breakdown */}
+              <Card className="border shadow-sm"><CardContent className="p-6">
+                <h3 className="font-bold text-base text-foreground mb-4">Priority Breakdown</h3>
+                <div className="space-y-4">
+                  {(['Urgent', 'High', 'Medium', 'Low'] as TaskPriority[]).map(p => {
+                    const count = tasks.filter(t => t.priority === p).length;
+                    const pct = tasks.length > 0 ? Math.round((count / tasks.length) * 100) : 0;
+                    const colors: Record<TaskPriority, string> = {
+                      Urgent: 'bg-rose-600',
+                      High: 'bg-amber-500',
+                      Medium: 'bg-blue-500',
+                      Low: 'bg-slate-400'
+                    };
+                    return (
+                      <div key={p} className="space-y-1.5">
+                        <div className="flex justify-between text-xs font-semibold">
+                          <span className="text-foreground">{p}</span>
+                          <span className="text-muted-foreground">{count} ({pct}%)</span>
+                        </div>
+                        <div className="w-full h-2.5 bg-muted rounded-full overflow-hidden">
+                          <div className={`h-full ${colors[p]} transition-all duration-500`} style={{ width: `${pct}%` }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </CardContent></Card>
             </div>
           </div>
@@ -621,37 +741,40 @@ export default function TaskManagerPage() {
               <div className="w-32">Assignee</div>
               <div className="w-12 text-center">Action</div>
             </div>
-            {filteredTasks.map(task => (
-              <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-default ${selectedTaskIds.has(task.id) ? 'bg-primary/5 border-primary/30' : 'bg-card hover:border-primary/40 shadow-sm'}`}>
-                <div className="w-6 text-center"><input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></div>
-                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setViewingTask(task)}>
-                  <p className="font-bold text-sm text-foreground truncate">{task.title}</p>
-                  <p className="text-xs text-muted-foreground truncate">{task.description}</p>
+            {filteredTasks.map(task => {
+              const primaryAssignee = getTaskAssignees(task)[0];
+              return (
+                <div key={task.id} className={`flex items-center gap-4 p-3 rounded-xl border transition-all cursor-default ${selectedTaskIds.has(task.id) ? 'bg-primary/5 border-primary/30' : 'bg-card hover:border-primary/40 shadow-sm'}`}>
+                  <div className="w-6 text-center"><input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></div>
+                  <div className="flex-1 min-w-0 cursor-pointer" onClick={() => setViewingTask(task)}>
+                    <p className="font-bold text-sm text-foreground truncate">{task.title}</p>
+                    <p className="text-xs text-muted-foreground truncate">{task.description}</p>
+                  </div>
+                  <div className="w-32">
+                    <Select value={task.status} onValueChange={(v) => updateTaskField(task.id, 'status', v)}>
+                      <SelectTrigger className="h-8 text-xs bg-muted/50 border-0"><SelectValue /></SelectTrigger>
+                      <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-32">
+                    <Select value={task.priority} onValueChange={(v) => updateTaskField(task.id, 'priority', v)}>
+                      <SelectTrigger className="h-8 text-xs bg-muted/50 border-0"><SelectValue /></SelectTrigger>
+                      <SelectContent><SelectItem value="Urgent">Urgent</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Low">Low</SelectItem></SelectContent>
+                    </Select>
+                  </div>
+                  <div className="w-32">
+                    <input type="date" value={task.dueDate} onChange={(e) => updateTaskField(task.id, 'dueDate', e.target.value)} className="h-8 w-full text-xs rounded-md border-0 bg-muted/50 px-2 outline-none focus:ring-1 focus:ring-primary" />
+                  </div>
+                  <div className="w-32 flex items-center gap-2">
+                    <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{primaryAssignee?.avatar || 'U'}</AvatarFallback></Avatar>
+                    <span className="text-xs font-semibold truncate">{primaryAssignee?.name || 'Unassigned'}</span>
+                  </div>
+                  <div className="w-12 text-center">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteSingleTask(task.id)}><Trash2 className="w-4 h-4" /></Button>
+                  </div>
                 </div>
-                <div className="w-32">
-                  <Select value={task.status} onValueChange={(v) => updateTaskField(task.id, 'status', v)}>
-                    <SelectTrigger className="h-8 text-xs bg-muted/50 border-0"><SelectValue /></SelectTrigger>
-                    <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                  </Select>
-                </div>
-                <div className="w-32">
-                  <Select value={task.priority} onValueChange={(v) => updateTaskField(task.id, 'priority', v)}>
-                    <SelectTrigger className="h-8 text-xs bg-muted/50 border-0"><SelectValue /></SelectTrigger>
-                    <SelectContent><SelectItem value="Urgent">Urgent</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Low">Low</SelectItem></SelectContent>
-                  </Select>
-                </div>
-                <div className="w-32">
-                  <input type="date" value={task.dueDate} onChange={(e) => updateTaskField(task.id, 'dueDate', e.target.value)} className="h-8 w-full text-xs rounded-md border-0 bg-muted/50 px-2 outline-none focus:ring-1 focus:ring-primary" />
-                </div>
-                <div className="w-32 flex items-center gap-2">
-                  <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{task.assignee?.avatar}</AvatarFallback></Avatar>
-                  <span className="text-xs font-semibold truncate">{task.assignee?.name}</span>
-                </div>
-                <div className="w-12 text-center">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600" onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))}><Trash2 className="w-4 h-4" /></Button>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
 
@@ -673,43 +796,46 @@ export default function TaskManagerPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {filteredTasks.map(task => (
-                    <tr key={task.id} className={`transition-colors ${selectedTaskIds.has(task.id) ? 'bg-primary/5' : 'hover:bg-muted/20 even:bg-muted/5'}`}>
-                      <td className="px-4 py-3 text-center"><input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></td>
-                      <td className="px-4 py-3">
-                        <p className="font-bold cursor-pointer hover:text-primary transition-colors" onClick={() => setViewingTask(task)}>{task.title}</p>
-                        <p className="text-xs text-muted-foreground truncate max-w-sm mt-0.5">{task.description}</p>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Select value={task.status} onValueChange={(v) => updateTaskField(task.id, 'status', v)}>
-                          <SelectTrigger className="h-7 text-xs bg-transparent border-border/50 hover:bg-muted/50"><SelectValue /></SelectTrigger>
-                          <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Select value={task.priority} onValueChange={(v) => updateTaskField(task.id, 'priority', v)}>
-                          <SelectTrigger className="h-7 text-xs bg-transparent border-border/50 hover:bg-muted/50">
-                            <span className={PriorityStyle(task.priority)}><SelectValue /></span>
-                          </SelectTrigger>
-                          <SelectContent><SelectItem value="Urgent">Urgent</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Low">Low</SelectItem></SelectContent>
-                        </Select>
-                      </td>
-                      <td className="px-4 py-3">
-                        <input type="date" value={task.dueDate} onChange={(e) => updateTaskField(task.id, 'dueDate', e.target.value)} className="h-7 w-full text-xs rounded-md border border-border/50 bg-transparent px-2 hover:bg-muted/50 focus:bg-background outline-none focus:ring-1" />
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-2"><Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-primary/10">{task.assignee?.avatar}</AvatarFallback></Avatar><span className="text-xs font-semibold">{task.assignee?.name}</span></div>
-                      </td>
-                      <td className="px-4 py-3">
-                        {task.dealReference ? (
-                          <div className="flex flex-col"><span className="text-xs font-bold text-blue-600 truncate">{task.dealReference.name}</span><span className="text-[10px] text-muted-foreground">{task.dealReference.value} &bull; {task.dealReference.stage}</span></div>
-                        ) : <span className="text-xs text-muted-foreground italic">No context</span>}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600" onClick={() => setTasks(prev => prev.filter(t => t.id !== task.id))}><Trash2 className="w-3.5 h-3.5" /></Button>
-                      </td>
-                    </tr>
-                  ))}
+                  {filteredTasks.map(task => {
+                    const primaryAssignee = getTaskAssignees(task)[0];
+                    return (
+                      <tr key={task.id} className={`transition-colors ${selectedTaskIds.has(task.id) ? 'bg-primary/5' : 'hover:bg-muted/20 even:bg-muted/5'}`}>
+                        <td className="px-4 py-3 text-center"><input type="checkbox" className="rounded text-primary focus:ring-primary" checked={selectedTaskIds.has(task.id)} onChange={() => toggleTaskSelection(task.id)} /></td>
+                        <td className="px-4 py-3">
+                          <p className="font-bold cursor-pointer hover:text-primary transition-colors" onClick={() => setViewingTask(task)}>{task.title}</p>
+                          <p className="text-xs text-muted-foreground truncate max-w-sm mt-0.5">{task.description}</p>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Select value={task.status} onValueChange={(v) => updateTaskField(task.id, 'status', v)}>
+                            <SelectTrigger className="h-7 text-xs bg-transparent border-border/50 hover:bg-muted/50"><SelectValue /></SelectTrigger>
+                            <SelectContent>{columns.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}</SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <Select value={task.priority} onValueChange={(v) => updateTaskField(task.id, 'priority', v)}>
+                            <SelectTrigger className="h-7 text-xs bg-transparent border-border/50 hover:bg-muted/50">
+                              <span className={PriorityStyle(task.priority)}><SelectValue /></span>
+                            </SelectTrigger>
+                            <SelectContent><SelectItem value="Urgent">Urgent</SelectItem><SelectItem value="High">High</SelectItem><SelectItem value="Medium">Medium</SelectItem><SelectItem value="Low">Low</SelectItem></SelectContent>
+                          </Select>
+                        </td>
+                        <td className="px-4 py-3">
+                          <input type="date" value={task.dueDate} onChange={(e) => updateTaskField(task.id, 'dueDate', e.target.value)} className="h-7 w-full text-xs rounded-md border border-border/50 bg-transparent px-2 hover:bg-muted/50 focus:bg-background outline-none focus:ring-1" />
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-2"><Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-primary/10">{primaryAssignee?.avatar || 'U'}</AvatarFallback></Avatar><span className="text-xs font-semibold">{primaryAssignee?.name || 'Unassigned'}</span></div>
+                        </td>
+                        <td className="px-4 py-3">
+                          {task.dealReference ? (
+                            <div className="flex flex-col"><span className="text-xs font-bold text-blue-600 truncate">{task.dealReference.name}</span><span className="text-[10px] text-muted-foreground">{task.dealReference.value} &bull; {task.dealReference.stage}</span></div>
+                          ) : <span className="text-xs text-muted-foreground italic">No context</span>}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteSingleTask(task.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </CardContent></Card>
@@ -719,18 +845,35 @@ export default function TaskManagerPage() {
         {/* E. Calendar View */}
         {view === 'Calendar' && (
           <div className="h-full bg-card border shadow-sm rounded-xl overflow-hidden flex flex-col">
-            <div className="grid grid-cols-7 border-b bg-muted/30 shrink-0">
+            <div className="p-3 bg-muted/40 border-b flex items-center justify-between">
+              <h3 className="font-bold text-sm text-foreground">
+                {calendarCurrentDate.toLocaleString('default', { month: 'long', year: 'numeric' })}
+              </h3>
+              <div className="flex items-center gap-2">
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCalendarCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() - 1, 1))}>
+                  Previous
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCalendarCurrentDate(new Date())}>
+                  Today
+                </Button>
+                <Button size="sm" variant="outline" className="h-7 text-xs" onClick={() => setCalendarCurrentDate(prev => new Date(prev.getFullYear(), prev.getMonth() + 1, 1))}>
+                  Next
+                </Button>
+              </div>
+            </div>
+            <div className="grid grid-cols-7 border-b bg-muted/20 shrink-0">
               {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
-                <div key={day} className="px-2 py-3 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">{day}</div>
+                <div key={day} className="px-2 py-2 text-center text-xs font-bold uppercase tracking-wider text-muted-foreground">{day}</div>
               ))}
             </div>
             <div className="grid grid-cols-7 flex-1 min-h-0 overflow-y-auto auto-rows-fr">
               {getCalendarDays().map((day, i) => {
                 const dayTasks = filteredTasks.filter(t => t.dueDate === day.dateStr);
+                const isToday = new Date().toISOString().split('T')[0] === day.dateStr;
                 return (
                   <div key={i} className={`border-b border-r p-1.5 flex flex-col gap-1 transition-colors hover:bg-muted/10 cursor-pointer ${day.isCurrentMonth ? 'bg-background' : 'bg-muted/20'}`} onClick={() => setIsNewTaskOpen(true)}>
                     <div className="text-right mb-1">
-                      <span className={`text-[10px] font-bold w-5 h-5 inline-flex items-center justify-center rounded-full ${day.dateStr === '2026-08-15' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{day.dayNum}</span>
+                      <span className={`text-[10px] font-bold w-5 h-5 inline-flex items-center justify-center rounded-full ${isToday ? 'bg-primary text-primary-foreground' : 'text-muted-foreground'}`}>{day.dayNum}</span>
                     </div>
                     {dayTasks.map(t => (
                       <div key={t.id} className="bg-primary/10 text-primary border border-primary/20 rounded px-1.5 py-1 text-[9px] font-bold truncate shadow-sm cursor-default" onClick={e=>{e.stopPropagation(); setViewingTask(t);}}>
@@ -783,13 +926,20 @@ export default function TaskManagerPage() {
 
             <div className="space-y-2 pt-1">
               <Label className="text-[11px] font-bold uppercase text-muted-foreground tracking-wider block">Label Tags</Label>
-              <div className="flex items-center gap-3">
-                <div className="w-7 h-7 rounded-full bg-[#4f46e5] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#4f46e5]/50 transition-all"></div>
-                <div className="w-7 h-7 rounded-full bg-[#3b82f6] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#3b82f6]/50 transition-all"></div>
-                <div className="w-7 h-7 rounded-full bg-[#10b981] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#10b981]/50 transition-all"></div>
-                <div className="w-7 h-7 rounded-full bg-[#f59e0b] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#f59e0b]/50 transition-all"></div>
-                <div className="w-7 h-7 rounded-full bg-[#ef4444] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#ef4444]/50 transition-all"></div>
-                <div className="w-7 h-7 rounded-full bg-[#ec4899] cursor-pointer ring-2 ring-offset-2 ring-transparent dark:ring-offset-background hover:ring-[#ec4899]/50 transition-all"></div>
+              <div className="flex items-center gap-2 flex-wrap">
+                {AVAILABLE_LABELS.map(lbl => {
+                  const isSelected = formLabels.includes(lbl.name);
+                  return (
+                    <button
+                      key={lbl.name}
+                      type="button"
+                      onClick={() => setFormLabels(prev => isSelected ? prev.filter(l => l !== lbl.name) : [...prev, lbl.name])}
+                      className={`text-xs px-2.5 py-1 rounded-full font-bold transition-all border ${isSelected ? 'ring-2 ring-primary ring-offset-1 border-primary text-primary bg-primary/10' : 'border-border text-muted-foreground bg-muted/40 hover:bg-muted'}`}
+                    >
+                      {lbl.name}
+                    </button>
+                  );
+                })}
               </div>
             </div>
             

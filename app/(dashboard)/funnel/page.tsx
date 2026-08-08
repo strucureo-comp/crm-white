@@ -73,7 +73,7 @@ export default function FunnelPage() {
     try {
       const [leadsData, pipelinesData] = await Promise.all([
         getLeads(user.company_id),
-        getPipelines(),
+        getPipelines(user.company_id),
       ]);
       setLeads(leadsData);
       setPipelines(pipelinesData);

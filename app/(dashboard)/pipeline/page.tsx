@@ -102,7 +102,7 @@ export default function DealsPage() {
     try {
       const [leadData, pipelineData] = await Promise.all([
         getLeads(user.company_id),
-        getPipelines(),
+        getPipelines(user.company_id),
       ]);
       setLeads(leadData);
       setPipelines(pipelineData);

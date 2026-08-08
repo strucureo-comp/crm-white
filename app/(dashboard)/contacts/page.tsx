@@ -50,8 +50,8 @@ function formatDate(dateStr: string | undefined | null): string {
 }
 
 export default function ContactsPage() {
-  const { workspace } = useAuth();
-  const workspaceId = workspace?.id || '';
+  const { user, workspace } = useAuth();
+  const companyId = user?.company_id || workspace?.id || '';
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -64,14 +64,14 @@ export default function ContactsPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   const load = useCallback(async () => {
-    if (!workspaceId) {
+    if (!companyId) {
       setContacts([]);
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const data = await getContacts(workspaceId);
+      const data = await getContacts(companyId);
       setContacts(data);
     } catch (error) {
       console.error('Failed to load contacts:', error);
@@ -79,7 +79,7 @@ export default function ContactsPage() {
     } finally {
       setLoading(false);
     }
-  }, [workspaceId]);
+  }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -114,11 +114,11 @@ export default function ContactsPage() {
   }
 
   async function onDeleteConfirm() {
-    if (!confirmState.id || !workspaceId) return;
+    if (!confirmState.id || !companyId) return;
     setDeleting(confirmState.id);
     setConfirmState((prev) => ({ ...prev, loading: true }));
     try {
-      await deleteContact(workspaceId, confirmState.id);
+      await deleteContact(companyId, confirmState.id);
       toast.success('Contact deleted successfully');
       load();
       setConfirmState({ open: false, loading: false });
@@ -142,7 +142,7 @@ export default function ContactsPage() {
           <h2 className="text-xl sm:text-2xl font-bold tracking-tight">Contacts</h2>
           <p className="text-sm text-muted-foreground">Manage your contact relationships</p>
         </div>
-        <Button onClick={() => { setEditingContact(null); setDialogOpen(true); }} disabled={!workspaceId} className="w-full sm:w-auto">
+        <Button onClick={() => { setEditingContact(null); setDialogOpen(true); }} disabled={!companyId} className="w-full sm:w-auto">
           <UserPlus size={16} className="mr-2" />
           Add Contact
         </Button>
@@ -376,7 +376,7 @@ export default function ContactsPage() {
         onOpenChange={setDialogOpen}
         onSaved={load}
         contact={editingContact}
-        workspaceId={workspaceId}
+        companyId={companyId}
       />
 
       {/* Delete Confirm */}

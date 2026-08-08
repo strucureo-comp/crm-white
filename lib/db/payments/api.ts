@@ -187,7 +187,12 @@ export async function recordPayment(
   if (!invoice) {
     throw new Error('Invoice not found');
   }
-  
+
+  const amount = Math.max(0, Math.round((paymentData.amount || 0) * 100) / 100);
+  if (amount <= 0) {
+    throw new Error('Payment amount must be greater than zero');
+  }
+
   // Create payment
   const payment = await createPayment(workspaceId, {
     company_id: invoice.company_id,
@@ -195,7 +200,7 @@ export async function recordPayment(
     invoice_id: invoiceId,
     deal_id: invoice.deal_id,
     quote_id: invoice.quote_id,
-    amount: paymentData.amount,
+    amount,
     currency: invoice.currency,
     method: paymentData.method,
     reference: paymentData.reference || '',
@@ -203,10 +208,11 @@ export async function recordPayment(
     date: paymentData.date || new Date().toISOString(),
     notes: paymentData.notes || '',
   });
-  
-  // Update invoice
-  const newAmountPaid = (invoice.amount_paid || 0) + paymentData.amount;
-  const newAmountDue = invoice.total - newAmountPaid;
+
+  // Update invoice — clamp amount_due at zero so overpayments never
+  // produce a negative balance due (credit balance).
+  const newAmountPaid = Math.round(((invoice.amount_paid || 0) + amount) * 100) / 100;
+  const newAmountDue = Math.max(0, Math.round((invoice.total - newAmountPaid) * 100) / 100);
   const newStatus = newAmountDue <= 0 ? 'paid' : 'partially_paid';
   
   await updateInvoice(workspaceId, invoiceId, {

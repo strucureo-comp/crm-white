@@ -13,6 +13,25 @@
 import type { CurrencyCode, TaxRate, EntityConfig, FinanceConfiguration } from './finance-config';
 
 export type AccountType = 'asset' | 'liability' | 'equity' | 'income' | 'expense';
+
+/**
+ * Round a monetary value to 2 decimal places to prevent floating-point dust.
+ * Negative values are not clamped here — clamping is the caller's decision.
+ */
+export function roundMoney(value: number): number {
+  if (!Number.isFinite(value)) return 0;
+  return Math.round((value + Number.EPSILON) * 100) / 100;
+}
+
+/**
+ * Return the ISO date (YYYY-MM-DD) one day before the given date.
+ */
+function dayBefore(date: string): string {
+  const d = new Date(`${date}T00:00:00`);
+  if (Number.isNaN(d.getTime())) return date;
+  d.setDate(d.getDate() - 1);
+  return d.toISOString().split('T')[0];
+}
 export type AccountGroup = 
   | 'Bank'
   | 'Cash'
@@ -182,7 +201,12 @@ export class TallyEngine {
       return false;
     }
 
-    const baseAmount = meta?.exchange_rate ? amount * meta.exchange_rate : amount;
+    if (amount <= 0) return false;
+
+    const baseAmount = roundMoney(meta?.exchange_rate ? amount * meta.exchange_rate : amount);
+    if (baseAmount <= 0) return false;
+
+    const now = new Date().toISOString();
 
     // Debit entry
     this.ledger.push({
@@ -193,8 +217,8 @@ export class TallyEngine {
       credit: 0,
       reference_id,
       reference_type,
-      running_balance: this.calculateAccountBalance(debit_account_id, date),
-      created_at: new Date().toISOString(),
+      running_balance: 0,
+      created_at: now,
       currency: meta?.currency,
       base_currency_amount: baseAmount,
       exchange_rate: meta?.exchange_rate,
@@ -212,8 +236,8 @@ export class TallyEngine {
       credit: baseAmount,
       reference_id,
       reference_type,
-      running_balance: this.calculateAccountBalance(credit_account_id, date),
-      created_at: new Date().toISOString(),
+      running_balance: 0,
+      created_at: now,
       currency: meta?.currency,
       base_currency_amount: baseAmount,
       exchange_rate: meta?.exchange_rate,
@@ -221,6 +245,13 @@ export class TallyEngine {
       tax_rate_id: meta?.tax_rate_id,
       entity_id: meta?.entity_id,
     });
+
+    // Running balance is computed AFTER the entries are in the ledger so each
+    // line's running balance includes the transaction it represents.
+    const debitIdx = this.ledger.length - 2;
+    const creditIdx = this.ledger.length - 1;
+    this.ledger[debitIdx].running_balance = this.calculateAccountBalance(debit_account_id, date);
+    this.ledger[creditIdx].running_balance = this.calculateAccountBalance(credit_account_id, date);
 
     this.clearCache();
     return true;
@@ -317,7 +348,7 @@ export class TallyEngine {
       return isAccount && isUptoDate;
     });
 
-    let balance = opening;
+    let balance = roundMoney(opening);
     entries.forEach(entry => {
       if (account.type === 'asset' || account.type === 'expense') {
         balance += entry.debit - entry.credit;
@@ -326,6 +357,7 @@ export class TallyEngine {
       }
     });
 
+    balance = roundMoney(balance);
     this.balanceCache.set(cacheKey, balance);
     return balance;
   }
@@ -364,18 +396,27 @@ export class TallyEngine {
    * Generate financial statements
    */
   generateFinancialStatement(from_date: string, to_date: string): FinancialStatement {
-    const trialBalance = this.getTrialBalance();
+    const periodStart = dayBefore(from_date);
+
+    // Position accounts (Assets/Liabilities/Equity): balance as of the end of the period
+    const position = (accountId: string) =>
+      this.calculateAccountBalance(accountId, to_date);
+
+    // Flow accounts (Income/Expense): activity within [from_date, to_date]
+    const flow = (accountId: string) =>
+      roundMoney(this.calculateAccountBalance(accountId, to_date) -
+                 this.calculateAccountBalance(accountId, periodStart));
 
     const balance_sheet = {
       assets: Array.from(this.accounts.values())
         .filter(a => a.type === 'asset' && a.is_active)
-        .map(a => ({ name: a.name, amount: this.calculateAccountBalance(a.id) })),
+        .map(a => ({ name: a.name, amount: position(a.id) })),
       liabilities: Array.from(this.accounts.values())
         .filter(a => a.type === 'liability' && a.is_active)
-        .map(a => ({ name: a.name, amount: this.calculateAccountBalance(a.id) })),
+        .map(a => ({ name: a.name, amount: position(a.id) })),
       equity: Array.from(this.accounts.values())
         .filter(a => a.type === 'equity' && a.is_active)
-        .map(a => ({ name: a.name, amount: this.calculateAccountBalance(a.id) })),
+        .map(a => ({ name: a.name, amount: position(a.id) })),
       total_assets: 0,
       total_liabilities: 0,
       total_equity: 0,
@@ -388,10 +429,10 @@ export class TallyEngine {
     const income_statement = {
       revenue: Array.from(this.accounts.values())
         .filter(a => a.type === 'income' && a.is_active)
-        .map(a => ({ name: a.name, amount: this.calculateAccountBalance(a.id) })),
+        .map(a => ({ name: a.name, amount: flow(a.id) })),
       expenses: Array.from(this.accounts.values())
         .filter(a => a.type === 'expense' && a.is_active)
-        .map(a => ({ name: a.name, amount: this.calculateAccountBalance(a.id) })),
+        .map(a => ({ name: a.name, amount: flow(a.id) })),
       total_revenue: 0,
       total_expenses: 0,
       net_income: 0,
@@ -401,19 +442,21 @@ export class TallyEngine {
     income_statement.total_expenses = income_statement.expenses.reduce((sum, e) => sum + e.amount, 0);
     income_statement.net_income = income_statement.total_revenue - income_statement.total_expenses;
 
-    const bank_account = this.calculateAccountBalance('acc_bank');
-    const cash_account = this.calculateAccountBalance('acc_cash');
-    const opening_balance = (this.accounts.get('acc_bank')?.opening_balance || 0) +
-                           (this.accounts.get('acc_cash')?.opening_balance || 0);
+    const bank_account = this.calculateAccountBalance('acc_bank', to_date);
+    const cash_account = this.calculateAccountBalance('acc_cash', to_date);
+    const opening_balance = roundMoney(
+      this.calculateAccountBalance('acc_bank', periodStart) +
+      this.calculateAccountBalance('acc_cash', periodStart)
+    );
 
     const cash_flow = {
       opening_balance,
       inflows: Array.from(this.accounts.values())
         .filter(a => a.type === 'income' && a.is_active)
-        .map(a => ({ name: a.name, amount: Math.max(0, this.calculateAccountBalance(a.id)) })),
+        .map(a => ({ name: a.name, amount: Math.max(0, flow(a.id)) })),
       outflows: Array.from(this.accounts.values())
         .filter(a => a.type === 'expense' && a.is_active)
-        .map(a => ({ name: a.name, amount: Math.max(0, this.calculateAccountBalance(a.id)) })),
+        .map(a => ({ name: a.name, amount: Math.max(0, flow(a.id)) })),
       closing_balance: bank_account + cash_account,
     };
 
@@ -458,7 +501,7 @@ export class TallyEngine {
    */
   reconcileAccount(account_id: string, manual_balance: number, notes?: string): AccountReconciliation {
     const system_balance = this.calculateAccountBalance(account_id);
-    const variance = system_balance - manual_balance;
+    const variance = roundMoney(system_balance - manual_balance);
 
     return {
       account_id,
@@ -466,8 +509,8 @@ export class TallyEngine {
       system_balance,
       manual_balance,
       variance,
-      is_reconciled: variance === 0,
-      reconciled_at: variance === 0 ? new Date().toISOString() : undefined,
+      is_reconciled: Math.abs(variance) < 0.01,
+      reconciled_at: Math.abs(variance) < 0.01 ? new Date().toISOString() : undefined,
       notes,
     };
   }
@@ -508,6 +551,7 @@ export class TallyEngine {
   addAccount(account: Account): boolean {
     if (this.accounts.has(account.id)) return false;
     this.accounts.set(account.id, account);
+    this.clearCache();
     return true;
   }
 
@@ -631,15 +675,14 @@ export class TallyEngineWithAudit extends TallyEngine {
       .filter(a => a.is_active)
       .map(account => {
         const ledger = this.getAccountLedger(account.id, from_date, to_date);
-        const balance = this.calculateAccountBalance(account.id);
 
         return {
           account_id: account.id,
           account_name: account.name,
           account_code: account.code,
           account_type: account.type,
-          opening_balance: account.opening_balance,
-          closing_balance: balance,
+          opening_balance: this.calculateAccountBalance(account.id, dayBefore(from_date)),
+          closing_balance: this.calculateAccountBalance(account.id, to_date),
           transactions_count: ledger.length,
           largest_transaction: ledger.length > 0 
             ? Math.max(...ledger.map(l => Math.max(l.debit, l.credit)))
