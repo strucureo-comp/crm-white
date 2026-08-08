@@ -38,15 +38,7 @@ function base64UrlDecode(str: string): string {
   return Buffer.from(str, 'base64').toString('utf-8');
 }
 
-function pemToBuffer(pem: string): Buffer {
-  const b64 = pem
-    .replace('-----BEGIN CERTIFICATE-----', '')
-    .replace('-----END CERTIFICATE-----', '')
-    .replace('-----BEGIN PUBLIC KEY-----', '')
-    .replace('-----END PUBLIC KEY-----', '')
-    .replace(/\s/g, '');
-  return Buffer.from(b64, 'base64');
-}
+
 
 export async function verifyAuthToken(token: string): Promise<TokenPayload | null> {
   try {
@@ -77,8 +69,9 @@ export async function verifyAuthToken(token: string): Promise<TokenPayload | nul
     verifier.update(`${parts[0]}.${parts[1]}`);
 
     const isValid = verifier.verify(
-      { key: pemToBuffer(publicKeyPem), format: 'der', type: 'spki' },
-      Buffer.from(signature, 'base64url')
+      publicKeyPem,
+      signature,
+      'base64url'
     );
 
     if (!isValid) return null;
