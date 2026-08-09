@@ -15,7 +15,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/lib/firebase/auth-context';
 
 export default function FieldMonitoringPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [agents, setAgents] = useState<FieldAgent[]>([]);
   const [alerts, setAlerts] = useState<FieldAlert[]>([]);
@@ -26,10 +26,10 @@ export default function FieldMonitoringPage() {
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
 
   const load = useCallback(async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     setLoading(true);
     try {
-      const [a, al] = await Promise.all([getFieldAgents(user.company_id), getFieldAlerts(user.company_id)]);
+      const [a, al] = await Promise.all([getFieldAgents(workspace?.id), getFieldAlerts(workspace?.id)]);
       setAgents(a);
       setAlerts(al);
     } catch {
@@ -37,7 +37,7 @@ export default function FieldMonitoringPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   useEffect(() => { load(); }, [load]);
 

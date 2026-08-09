@@ -22,7 +22,7 @@ import {
 async function checkCompanyContacts(companyId: string, workspaceId: string): Promise<number> {
   try {
     const contactsRef = ref(db, `workspaces/${workspaceId}/contacts`);
-    const q = query(contactsRef, orderByChild('company_id'), equalTo(companyId));
+    const q = query(contactsRef, orderByChild('workspace_id'), equalTo(companyId));
     const snapshot = await get(q);
     return snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
   } catch (error) {
@@ -37,7 +37,7 @@ async function checkCompanyContacts(companyId: string, workspaceId: string): Pro
 async function checkCompanyDeals(companyId: string, workspaceId: string): Promise<number> {
   try {
     const dealsRef = ref(db, `workspaces/${workspaceId}/deals`);
-    const q = query(dealsRef, orderByChild('company_id'), equalTo(companyId));
+    const q = query(dealsRef, orderByChild('workspace_id'), equalTo(companyId));
     const snapshot = await get(q);
     return snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
   } catch (error) {
@@ -52,7 +52,7 @@ async function checkCompanyDeals(companyId: string, workspaceId: string): Promis
 async function checkCompanyQuotes(companyId: string, workspaceId: string): Promise<number> {
   try {
     const quotesRef = ref(db, `workspaces/${workspaceId}/quotes`);
-    const q = query(quotesRef, orderByChild('company_id'), equalTo(companyId));
+    const q = query(quotesRef, orderByChild('workspace_id'), equalTo(companyId));
     const snapshot = await get(q);
     return snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
   } catch (error) {
@@ -67,7 +67,7 @@ async function checkCompanyQuotes(companyId: string, workspaceId: string): Promi
 async function checkCompanyInvoices(companyId: string, workspaceId: string): Promise<number> {
   try {
     const invoicesRef = ref(db, `workspaces/${workspaceId}/invoices`);
-    const q = query(invoicesRef, orderByChild('company_id'), equalTo(companyId));
+    const q = query(invoicesRef, orderByChild('workspace_id'), equalTo(companyId));
     const snapshot = await get(q);
     return snapshot.exists() ? Object.keys(snapshot.val()).length : 0;
   } catch (error) {

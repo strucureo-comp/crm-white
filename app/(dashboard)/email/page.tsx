@@ -55,8 +55,8 @@ const EMPTY_ENGAGEMENT_TREND = [
 ];
 
 export default function EmailCampaignsPage() {
-  const { user } = useAuth();
-  const companyId = user?.company_id;
+  const { workspace, user } = useAuth();
+  const companyId = workspace?.id;
 
   const [activeType, setActiveType] = useState<CampaignType>('all');
   const [isLoading, setIsLoading] = useState(true);

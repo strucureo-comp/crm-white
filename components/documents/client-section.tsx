@@ -16,14 +16,14 @@ interface ClientSectionProps {
 }
 
 export function ClientSection({ client, onClientChange }: ClientSectionProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
 
   useEffect(() => {
-    if (user?.company_id) {
-      getLeads(user.company_id).then(setLeads);
+    if (workspace?.id) {
+      getLeads(workspace?.id).then(setLeads);
     }
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   const options = Array.from(
     new Map(

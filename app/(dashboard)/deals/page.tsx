@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -52,6 +52,7 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { formatCurrency } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
+import { DataPagination } from '@/components/ui/data-pagination';
 
 const DEFAULT_PIPELINE_STAGES: PipelineStage[] = [
   { id: 'new', name: 'New', color: '#3b82f6', order: 0 },
@@ -83,6 +84,8 @@ const stageColors: Record<string, string> = {
   new: 'bg-blue-500',
 };
 
+const PAGE_SIZE = 25;
+
 function getInitials(name: string) {
   return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 }
@@ -95,7 +98,7 @@ const mockWhatsAppMessages = [
 ];
 
 export default function PipelinePage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
@@ -135,20 +138,21 @@ export default function PipelinePage() {
   const [waReply, setWaReply] = useState('');
   const [waMessages, setWaMessages] = useState(mockWhatsAppMessages);
   const [isMounted, setIsMounted] = useState(false);
+  const [page, setPage] = useState(1);
 
   const activePipeline = pipelines.find((p) => p.id === activePipelineId);
   const stages = activePipeline?.stages || DEFAULT_PIPELINE_STAGES;
 
   const load = useCallback(async () => {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const [leadData, pipelineData] = await Promise.all([
-        getLeads(user.company_id),
-        getPipelines(user.company_id)
+        getLeads(workspace?.id),
+        getPipelines(workspace?.id)
       ]);
       setLeads(leadData);
       setPipelines(pipelineData);
@@ -160,17 +164,24 @@ export default function PipelinePage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.company_id, activePipelineId]);
+  }, [workspace?.id, activePipelineId]);
 
   useEffect(() => {
     load();
   }, [load]);
   useEffect(() => { setIsMounted(true); }, []);
+  useEffect(() => { setPage(1); }, [viewMode, activePipelineId]);
 
   const grouped: Record<string, Lead[]> = {};
   for (const stage of stages) {
     grouped[stage.id] = leads.filter((l) => l.status === stage.id);
   }
+
+  const listLeads = useMemo(() => leads.filter((l) => l.status !== 'lost'), [leads]);
+  const paginatedListLeads = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return listLeads.slice(start, start + PAGE_SIZE);
+  }, [listLeads, page]);
 
   const totalPipelineValue = leads.filter((l) => l.status !== 'lost').reduce((sum, l) => sum + (l.estimated_value || 0), 0);
   const confirmedOrders = leads.filter((l) => l.status === 'won').reduce((sum, l) => sum + (l.estimated_value || 0), 0);
@@ -214,7 +225,7 @@ export default function PipelinePage() {
         await createLead({
           name: dealFormName,
           company: dealFormCompany,
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
           estimated_value: dealFormValue === '' ? 0 : Number(dealFormValue),
           status: dealFormStage,
           email: 'placeholder@example.com',
@@ -260,14 +271,14 @@ export default function PipelinePage() {
   }
 
   async function handleBoardSubmit() {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!boardNameInput.trim()) {
       toast.error('Pipeline name is required');
       return;
     }
     try {
       if (boardDialogMode === 'create') {
-        await createPipeline(user.company_id, { 
+        await createPipeline(workspace?.id, { 
           name: boardNameInput.trim(), 
           description: boardDescInput.trim(),
           is_active: boardIsActiveInput,
@@ -277,7 +288,7 @@ export default function PipelinePage() {
         } as any);
         toast.success('Pipeline created');
       } else if (boardDialogMode === 'rename' && activePipelineId) {
-        await updatePipeline(user.company_id, activePipelineId, { 
+        await updatePipeline(workspace?.id, activePipelineId, { 
           name: boardNameInput.trim(),
           description: boardDescInput.trim(),
           is_active: boardIsActiveInput,
@@ -294,9 +305,9 @@ export default function PipelinePage() {
 
   async function handleDeletePipeline() {
     if (!activePipelineId) return;
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await deletePipeline(user.company_id, activePipelineId);
+      await deletePipeline(workspace?.id, activePipelineId);
       setActivePipelineId(null);
       toast.success('Pipeline deleted');
       setBoardDialogOpen(false);
@@ -334,7 +345,7 @@ export default function PipelinePage() {
       return;
     }
     if (!activePipelineId || !activePipeline) return;
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
       let updatedStages = [...activePipeline.stages];
       if (stageDialogMode === 'create') {
@@ -362,7 +373,7 @@ export default function PipelinePage() {
           } : s
         );
       }
-      await updatePipeline(user.company_id, activePipelineId, { stages: updatedStages });
+      await updatePipeline(workspace?.id, activePipelineId, { stages: updatedStages });
       toast.success(stageDialogMode === 'create' ? 'Stage created' : 'Stage updated');
       setStageDialogOpen(false);
       load();
@@ -373,10 +384,10 @@ export default function PipelinePage() {
 
   async function handleDeleteStage(stageId: string) {
     if (!activePipelineId || !activePipeline) return;
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
       const updatedStages = activePipeline.stages.filter((s) => s.id !== stageId);
-      await updatePipeline(user.company_id, activePipelineId, { stages: updatedStages });
+      await updatePipeline(workspace?.id, activePipelineId, { stages: updatedStages });
       toast.success('Stage deleted');
       load();
     } catch {
@@ -669,12 +680,12 @@ export default function PipelinePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {leads.filter((l) => l.status !== 'lost').length === 0 ? (
+                  {paginatedListLeads.length === 0 ? (
                     <tr>
                       <td colSpan={8} className="p-8 text-center text-muted-foreground">No deals yet</td>
                     </tr>
                   ) : (
-                    leads.filter((l) => l.status !== 'lost').map((lead) => (
+                    paginatedListLeads.map((lead) => (
                       <tr key={lead.id} className="border-b last:border-0 hover:bg-muted/30">
                         <td className="p-3">
                           <div className="flex items-center gap-2">
@@ -719,6 +730,15 @@ export default function PipelinePage() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {viewMode === 'list' && listLeads.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={listLeads.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
       )}
 
       <Dialog open={dealDialogOpen} onOpenChange={setDealDialogOpen}>

@@ -17,6 +17,7 @@ import {
   FileText,
   Mic,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getConnectedApps } from '@/lib/db/automation/api';
 import { ref, onValue, push, set, query, orderByChild, equalTo } from 'firebase/database';
@@ -31,7 +32,7 @@ interface WhatsAppMessage {
   to: string;
   body: string;
   type: string;
-  company_id: string;
+  workspace_id: string;
   direction: 'incoming' | 'outgoing';
   status?: string;
   timestamp: string;
@@ -48,7 +49,7 @@ interface Conversation {
 
 export default function WhatsAppChatsPage() {
   const { workspace, user } = useAuth();
-  const companyId = user?.company_id || '';
+  const companyId = workspace?.id || '';
   const [connected, setConnected] = useState(false);
   const [loading, setLoading] = useState(true);
   const [conversations, setConversations] = useState<Conversation[]>([]);
@@ -60,26 +61,26 @@ export default function WhatsAppChatsPage() {
 
   // Check if WhatsApp is connected
   useEffect(() => {
-    if (!workspace?.id) return;
+    if (!companyId) return;
     const check = async () => {
       try {
-        const apps = await getConnectedApps(workspace.id);
+        const apps = await getConnectedApps(companyId);
         setConnected(apps.some((a) => a.platform === 'whatsapp' && a.status === 'connected'));
       } catch (e) {
-        console.error('Failed to check connection:', e);
+        toast.error('Failed to check WhatsApp connection');
       } finally {
         setLoading(false);
       }
     };
     check();
-  }, [workspace?.id]);
+  }, [companyId]);
 
   // Subscribe to WhatsApp messages
   useEffect(() => {
     if (!companyId || !connected) return;
 
-    const messagesRef = ref(database, 'whatsapp_messages');
-    const companyQuery = query(messagesRef, orderByChild('company_id'), equalTo(companyId));
+    const messagesRef = ref(database, `workspaces/${companyId}/whatsapp_messages`);
+    const companyQuery = query(messagesRef);
 
     const unsubscribe = onValue(companyQuery, (snapshot) => {
       if (!snapshot.exists()) {
@@ -149,13 +150,15 @@ export default function WhatsAppChatsPage() {
       const res = await fetch('/api/connectors/whatsapp/send', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ to: selectedPhone, message: newMessage.trim(), company_id: companyId }),
+        body: JSON.stringify({ to: selectedPhone, message: newMessage.trim(), workspace_id: companyId }),
       });
       if (res.ok) {
         setNewMessage('');
+      } else {
+        toast.error('Failed to send message');
       }
     } catch (e) {
-      console.error('Failed to send:', e);
+      toast.error('Failed to send message');
     } finally {
       setSending(false);
     }

@@ -40,7 +40,7 @@ const defaultForm = {
 };
 
 export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: AutomationRuleDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -77,7 +77,7 @@ export function AutomationRuleDialog({ open, onOpenChange, onSaved, rule }: Auto
         await createAutomationRule({
           ...form,
           workspace_id: '',
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
           description: '',
           trigger_config: {},
           conditions: [],

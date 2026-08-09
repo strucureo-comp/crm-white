@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,7 +28,9 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { generateQuotationPdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
+import { getCompanySettings, preloadLogo } from '@/lib/pdf-engine/helpers';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { DataPagination } from '@/components/ui/data-pagination';
 
 const statusStyles: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400',
@@ -38,24 +40,29 @@ const statusStyles: Record<string, string> = {
   expired: 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400',
 };
 
+const PAGE_SIZE = 25;
+
 export default function QuotesPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [quotations, setQuotations] = useState<Quotation[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [page, setPage] = useState(1);
 
   async function load() {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
-      const data = await getQuotations(user.company_id);
+      const data = await getQuotations(workspace?.id);
       setQuotations(data);
+      // Preload logo in background so PDF generation is instant
+      getCompanySettings().then(s => { if (s.logo_url) preloadLogo(s.logo_url); });
     } catch {
       toast.error('Failed to load quotes');
     } finally {
@@ -63,7 +70,9 @@ export default function QuotesPage() {
     }
   }
 
-  useEffect(() => { load(); }, [user?.company_id]);
+  useEffect(() => { load(); }, [workspace?.id]);
+
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
 
   const filtered = quotations.filter((q) => {
     if (statusFilter !== 'all' && q.status !== statusFilter) return false;
@@ -77,6 +86,11 @@ export default function QuotesPage() {
     }
     return true;
   });
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   async function handleConvertToInvoice(q: Quotation) {
     const toastId = toast.loading('Converting quote to invoice...');
@@ -152,7 +166,7 @@ export default function QuotesPage() {
         <Card>
           <CardContent className="p-0">
             <ResponsiveTable
-              data={filtered}
+              data={paginatedData}
               keyExtractor={(q) => q.id}
               mobileCardTitle={(q) => q.quotation_number}
               columns={[
@@ -208,20 +222,23 @@ export default function QuotesPage() {
                           <Pencil size={14} className="mr-2" /> Edit
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={async () => {
+                          const id = toast.loading('Generating PDF…');
                           try {
                             const pdf = await generateQuotationPdf(q, null);
                             await downloadPdf(pdf, `${q.quotation_number}.pdf`);
-                            toast.success('Quote downloaded');
-                          } catch { toast.error('Failed to generate PDF'); }
+                            toast.success('Quote downloaded', { id });
+                          } catch { toast.error('Failed to generate PDF', { id }); }
                         }}>
                           <Download size={14} className="mr-2" /> Download
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={async () => {
+                          const id = toast.loading('Generating preview…');
                           try {
                             const pdf = await generateQuotationPdf(q, null);
                             const url = await openPdfPreview(pdf);
                             window.open(url, '_blank');
-                          } catch { toast.error('Failed to generate preview'); }
+                            toast.dismiss(id);
+                          } catch { toast.error('Failed to generate preview', { id }); }
                         }}>
                           <Eye size={14} className="mr-2" /> Preview
                         </DropdownMenuItem>
@@ -253,6 +270,15 @@ export default function QuotesPage() {
         description="Are you sure you want to delete this quote? This action cannot be undone."
         onConfirm={onDeleteConfirm}
       />
+
+      {filtered.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

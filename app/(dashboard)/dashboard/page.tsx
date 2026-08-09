@@ -30,7 +30,7 @@ const priorityColors: Record<string, string> = {
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
@@ -40,17 +40,17 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function load() {
-      if (!user?.company_id) {
+      if (!workspace?.id) {
         setLoading(false);
         return;
       }
       try {
         const [leadData, invoiceData, activityData, ruleData, emailData] = await Promise.all([
-          getLeads(user.company_id),
-          getInvoices(user.company_id),
-          getActivityLogs(user.company_id, 10),
-          getAutomationRules(user.company_id),
-          getEmailCampaigns(user.company_id),
+          getLeads(workspace?.id),
+          getInvoices(workspace?.id),
+          getActivityLogs(workspace?.id, 10),
+          getAutomationRules(workspace?.id),
+          getEmailCampaigns(workspace?.id),
         ]);
         setLeads(leadData);
         setInvoices(invoiceData);
@@ -64,7 +64,7 @@ export default function DashboardPage() {
       }
     }
     load();
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   const totalLeads = leads.length;
   const activeDeals = leads.filter((l) => l.status !== 'won' && l.status !== 'lost').length;

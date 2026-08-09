@@ -105,6 +105,44 @@ export function PaymentSection({ payment, onPaymentChange, grandTotal, currency 
           />
         </div>
       </div>
+
+      <div className="pt-4 border-t">
+        <h4 className="text-sm font-semibold mb-4 text-muted-foreground">Custom Bank Details (Optional)</h4>
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label>Bank Name</Label>
+            <Input
+              value={payment.custom_bank_name || ''}
+              onChange={(e) => onPaymentChange({ custom_bank_name: e.target.value })}
+              placeholder="e.g. HDFC Bank"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>Account Number</Label>
+            <Input
+              value={payment.custom_bank_account || ''}
+              onChange={(e) => onPaymentChange({ custom_bank_account: e.target.value })}
+              placeholder="Account #"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>IFSC Code</Label>
+            <Input
+              value={payment.custom_bank_ifsc || ''}
+              onChange={(e) => onPaymentChange({ custom_bank_ifsc: e.target.value })}
+              placeholder="IFSC"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label>UPI ID</Label>
+            <Input
+              value={payment.custom_upi_id || ''}
+              onChange={(e) => onPaymentChange({ custom_upi_id: e.target.value })}
+              placeholder="example@upi"
+            />
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

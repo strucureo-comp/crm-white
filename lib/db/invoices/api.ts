@@ -135,7 +135,7 @@ export async function getCompanyInvoices(
   workspaceId: string, 
   companyId: string
 ): Promise<NormalizedInvoice[]> {
-  const q = query(invoicesRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(invoicesRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
@@ -420,7 +420,7 @@ export function subscribeToCompanyInvoices(
   companyId: string,
   callback: (invoices: NormalizedInvoice[]) => void
 ): () => void {
-  const q = query(invoicesRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(invoicesRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {

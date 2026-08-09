@@ -226,23 +226,23 @@ export default function AnalyticsDashboard() {
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [deals, setDeals] = useState<Lead[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
 
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubDeals = subscribeToLeads(user.company_id, setDeals);
-    const unsubMembers = subscribeToProjectsData(user.company_id, (data) => setMembers(data.members || []));
-    const unsubCampaigns = subscribeToCampaigns(user.company_id, setCampaigns);
+    if (!workspace?.id) return;
+    const unsubDeals = subscribeToLeads(workspace?.id, setDeals);
+    const unsubMembers = subscribeToProjectsData(workspace?.id, (data) => setMembers(data.members || []));
+    const unsubCampaigns = subscribeToCampaigns(workspace?.id, setCampaigns);
     return () => { unsubDeals(); unsubMembers(); unsubCampaigns(); };
   }, [user]);
 
   // Load dashboard settings from Firebase
   useEffect(() => {
-    if (!user?.company_id || settingsLoaded) return;
-    const unsub = subscribeToDashboardSettings(user.company_id, (settings) => {
+    if (!workspace?.id || settingsLoaded) return;
+    const unsub = subscribeToDashboardSettings(workspace?.id, (settings) => {
       if (settings) {
         if (settings.widgets && settings.widgets.length > 0) {
           setWidgets(settings.widgets as Widget[]);
@@ -254,20 +254,20 @@ export default function AnalyticsDashboard() {
       setSettingsLoaded(true);
     });
     return () => unsub();
-  }, [user?.company_id, settingsLoaded]);
+  }, [workspace?.id, settingsLoaded]);
 
   // Persist dashboard settings to Firebase when widgets or filters change
   const persistSettings = useCallback(async () => {
-    if (!user?.company_id || !settingsLoaded) return;
+    if (!workspace?.id || !settingsLoaded) return;
     try {
-      await saveDashboardSettings(user.company_id, {
+      await saveDashboardSettings(workspace?.id, {
         widgets: widgets as WidgetLayout[],
         globalFilters,
       });
     } catch (e) {
       console.error('Failed to save dashboard settings:', e);
     }
-  }, [user?.company_id, widgets, globalFilters, settingsLoaded]);
+  }, [workspace?.id, widgets, globalFilters, settingsLoaded]);
 
   // Auto-save when exiting edit mode
   useEffect(() => {

@@ -45,11 +45,57 @@ export async function middleware(req: NextRequest) {
     if (isPublicApiPath) {
       return NextResponse.next();
     }
+
+    // Programmatic API Access (e.g., /api/v1/*)
+    if (pathname.startsWith('/api/v1/')) {
+      const apiKey = req.headers.get('x-api-key') || req.headers.get('authorization')?.replace('Bearer ', '');
+      const wsId = req.headers.get('x-workspace-id');
+
+      if (!apiKey || !wsId) {
+        return NextResponse.json({ error: 'Missing x-api-key or x-workspace-id header' }, { status: 401 });
+      }
+
+      try {
+        const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+        const url = `https://${projectId}-default-rtdb.firebaseio.com/workspaces/${wsId}/settings/api/keys.json`;
+        const res = await fetch(url);
+        
+        if (!res.ok) {
+          return NextResponse.json({ error: 'Failed to validate API key' }, { status: 500 });
+        }
+        
+        const keys = await res.json();
+        
+        if (!keys || !Array.isArray(keys)) {
+          return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        }
+
+        const validKey = keys.find((k: any) => k.key === apiKey);
+        
+        if (!validKey) {
+          return NextResponse.json({ error: 'Invalid API key' }, { status: 401 });
+        }
+
+        // Key is valid, inject company_id
+        const requestHeaders = new Headers(req.headers);
+        requestHeaders.set('x-company-id', wsId);
+        requestHeaders.set('x-api-permission', validKey.permission || 'read');
+
+        return NextResponse.next({
+          request: {
+            headers: requestHeaders,
+          }
+        });
+      } catch (error) {
+        return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 });
+      }
+    }
+
     if (!sessionValid) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     
-    // Inject company_id into headers for the API to consume
+    // Inject company_id into headers for the internal API to consume
     const requestHeaders = new Headers(req.headers);
     if (companyId) {
       requestHeaders.set('x-company-id', companyId);
@@ -77,6 +123,35 @@ export async function middleware(req: NextRequest) {
   // But /setup needs session to work, so don't redirect away from it
   if (isPublicPath && sessionValid && pathname !== '/setup') {
     return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
+
+  // IP Whitelisting Check for protected routes
+  if (isProtectedRoute && sessionValid && companyId) {
+    try {
+      const projectId = process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID;
+      const url = `https://${projectId}-default-rtdb.firebaseio.com/workspaces/${companyId}/settings/security/ip_whitelist.json`;
+      const res = await fetch(url);
+      
+      if (res.ok) {
+        const ipWhitelist = await res.json();
+        if (ipWhitelist && Array.isArray(ipWhitelist) && ipWhitelist.length > 0) {
+          // Get client IP
+          const clientIp = req.ip || req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip');
+          
+          if (clientIp) {
+            // Check if IP matches any in whitelist (simple match for now)
+            const isAllowed = ipWhitelist.includes(clientIp);
+            if (!isAllowed) {
+              // Redirect to a 403 or logout, or return plain response
+              return new NextResponse('Forbidden: Your IP address is not whitelisted for this workspace.', { status: 403 });
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('IP Whitelist check failed', error);
+      // Fail open to avoid locking users out on DB error
+    }
   }
 
   const response = NextResponse.next();

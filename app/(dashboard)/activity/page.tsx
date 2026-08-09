@@ -118,7 +118,7 @@ function getMotivationLabel(pct: number): { label: string; icon: React.ElementTy
 }
 
 export default function ActivityPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [logs, setLogs] = useState<ActivityLog[]>([]);
   const [rawTasks, setRawTasks] = useState<TaskItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -145,7 +145,7 @@ export default function ActivityPage() {
         entity_type: formState.type,
         user_id: user?.id || 'demo-user',
         user_name: user?.full_name || 'Demo User',
-        company_id: user?.company_id || '',
+        workspace_id: workspace?.id || '',
         title: formState.title,
         date: formState.date,
         time: formState.time,
@@ -163,14 +163,14 @@ export default function ActivityPage() {
   }
 
   async function load() {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     try {
       const [activityLogs, tasks] = await Promise.all([
-        getActivityLogs(user.company_id, 100),
-        getTasks(user.company_id),
+        getActivityLogs(workspace?.id, 100),
+        getTasks(workspace?.id),
       ]);
       setLogs(activityLogs);
       setRawTasks(tasks);
@@ -181,7 +181,7 @@ export default function ActivityPage() {
     }
   }
 
-  useEffect(() => { load(); }, [user?.company_id]);
+  useEffect(() => { load(); }, [workspace?.id]);
 
   const allActivities = useMemo(() => {
     const fromTasks = rawTasks
@@ -302,7 +302,7 @@ export default function ActivityPage() {
                 <CalendarIcon size={16} />
                 <span className="font-semibold">TODAY&apos;S SCHEDULE</span>
                 <span className="text-muted-foreground">({format(date, 'MMM d, yyyy')})</span>
-                <span className="text-xs ml-2 text-red-500">Debug Company ID: {user?.company_id || 'EMPTY'}</span>
+                <span className="text-xs ml-2 text-red-500">Debug Company ID: {workspace?.id || 'EMPTY'}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

@@ -32,7 +32,7 @@ interface InvoiceDialogProps {
 }
 
 export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [form, setForm] = useState({
     project_id: '',
@@ -48,8 +48,8 @@ export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceD
 
   useEffect(() => {
     if (open) {
-      if (user?.company_id) {
-        getProjects(user.company_id).then(setProjects).catch(() => {});
+      if (workspace?.id) {
+        getProjects(workspace?.id).then(setProjects).catch(() => {});
       }
       if (invoice) {
         setForm({
@@ -95,7 +95,7 @@ export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceD
       } else {
         await createInvoice({
           ...form,
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
         });
         toast.success('Invoice created');
       }
@@ -149,7 +149,7 @@ export function InvoiceDialog({ open, onOpenChange, onSaved, invoice }: InvoiceD
             </div>
             <div>
               <Label htmlFor="project">Project</Label>
-              <Select value={form.project_id} onValueChange={(v) => set('project_id', v)}>
+              <Select value={form.project_id || 'none'} onValueChange={(v) => set('project_id', v === 'none' ? '' : v)}>
                 <SelectTrigger id="project"><SelectValue placeholder="None" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None</SelectItem>

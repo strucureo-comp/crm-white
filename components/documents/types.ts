@@ -43,6 +43,10 @@ export interface DocumentPayment {
   balance_due: number;
   payment_date: string;
   transaction_id: string;
+  custom_bank_name?: string;
+  custom_bank_account?: string;
+  custom_bank_ifsc?: string;
+  custom_upi_id?: string;
 }
 
 export interface DocumentNotes {

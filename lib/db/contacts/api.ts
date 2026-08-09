@@ -85,7 +85,7 @@ export async function getCompanyContacts(
   workspaceId: string, 
   companyId: string
 ): Promise<Contact[]> {
-  const q = query(contactsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(contactsRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
@@ -224,7 +224,7 @@ export function subscribeToCompanyContacts(
   companyId: string,
   callback: (contacts: Contact[]) => void
 ): () => void {
-  const q = query(contactsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(contactsRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {

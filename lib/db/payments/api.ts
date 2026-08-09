@@ -88,7 +88,7 @@ export async function getCompanyPayments(
   workspaceId: string, 
   companyId: string
 ): Promise<NormalizedPayment[]> {
-  const q = query(paymentsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(paymentsRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
@@ -195,7 +195,6 @@ export async function recordPayment(
 
   // Create payment
   const payment = await createPayment(workspaceId, {
-    company_id: invoice.company_id,
     contact_id: invoice.contact_id,
     invoice_id: invoiceId,
     deal_id: invoice.deal_id,
@@ -401,7 +400,7 @@ export function subscribeToCompanyPayments(
   companyId: string,
   callback: (payments: NormalizedPayment[]) => void
 ): () => void {
-  const q = query(paymentsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(paymentsRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {

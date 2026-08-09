@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,6 +22,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { CONTRACT_TEMPLATES } from '@/components/documents/contract-templates';
+import { DataPagination } from '@/components/ui/data-pagination';
 import jsPDF from 'jspdf';
 
 const statusStyles: Record<string, string> = {
@@ -32,9 +33,11 @@ const statusStyles: Record<string, string> = {
   terminated: 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400',
 };
 
+const PAGE_SIZE = 25;
+
 export default function ContractsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -42,21 +45,26 @@ export default function ContractsPage() {
   const [templateFilter, setTemplateFilter] = useState('all');
   const [selectedContract, setSelectedContract] = useState<Contract | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string }>({ open: false });
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    const data = await getContracts(user.company_id);
+    const data = await getContracts(workspace?.id);
     setContracts(data);
     setLoading(false);
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [search, statusFilter, templateFilter]);
 
   const filtered = contracts.filter((c) => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
@@ -71,6 +79,11 @@ export default function ContractsPage() {
     }
     return true;
   });
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const handleDelete = (c: Contract, e: React.MouseEvent) => {
     e.stopPropagation();
@@ -254,7 +267,7 @@ export default function ContractsPage() {
             <Card className="border-border shadow-sm rounded-xl overflow-hidden bg-card">
               <CardContent className="p-0">
                 <ResponsiveTable
-                  data={filtered}
+                  data={paginatedData}
                   keyExtractor={(c) => c.id}
                   onRowClick={(c) => setSelectedContract(c)}
                   mobileCardTitle={(c) => c.contract_number}
@@ -396,6 +409,15 @@ export default function ContractsPage() {
         onConfirm={onDeleteConfirm}
         onCancel={() => setConfirmState({ open: false })}
       />
+
+      {filtered.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

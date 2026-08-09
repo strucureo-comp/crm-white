@@ -39,7 +39,7 @@ const defaultForm = {
 };
 
 export function ContentItemDialog({ open, onOpenChange, onSaved, item }: ContentItemDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -74,7 +74,7 @@ export function ContentItemDialog({ open, onOpenChange, onSaved, item }: Content
       } else {
         await createContentItem({
           ...form,
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
         });
         toast.success('Content created');
       }

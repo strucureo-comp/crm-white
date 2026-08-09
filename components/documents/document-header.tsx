@@ -4,23 +4,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import type { DocumentTemplate, DocumentMeta } from './types';
+import type { DocumentMeta } from './types';
 
 interface DocumentHeaderProps {
   meta: DocumentMeta;
   onMetaChange: (meta: Partial<DocumentMeta>) => void;
-  template: DocumentTemplate;
-  onTemplateChange: (template: DocumentTemplate) => void;
   docType: 'quote' | 'invoice';
   statusColor?: string;
 }
-
-const TEMPLATE_OPTIONS: { value: DocumentTemplate; label: string; description: string }[] = [
-  { value: 'modern', label: 'Modern', description: 'Clean, minimal design with accent colors' },
-  { value: 'corporate', label: 'Corporate', description: 'Professional, traditional layout' },
-  { value: 'minimal', label: 'Minimal', description: 'Simple, distraction-free design' },
-  { value: 'creative', label: 'Creative', description: 'Bold colors with gradient accents' },
-];
 
 const STATUS_COLORS: Record<string, string> = {
   draft: 'bg-gray-100 text-gray-700',
@@ -39,8 +30,6 @@ const STATUS_COLORS: Record<string, string> = {
 export function DocumentHeader({
   meta,
   onMetaChange,
-  template,
-  onTemplateChange,
   docType,
   statusColor,
 }: DocumentHeaderProps) {
@@ -49,7 +38,7 @@ export function DocumentHeader({
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">{docType === 'quote' ? 'Quotation Details' : 'Invoice Details'}</h2>
-          <p className="text-sm text-muted-foreground">Configure the document number, dates, and template.</p>
+          <p className="text-sm text-muted-foreground">Configure the document number and dates.</p>
         </div>
         {meta.status && (
           <Badge className={statusColor || STATUS_COLORS[meta.status] || 'bg-gray-100 text-gray-700'}>
@@ -66,24 +55,6 @@ export function DocumentHeader({
             onChange={(e) => onMetaChange({ document_number: e.target.value })}
             placeholder="QTE-2024-001"
           />
-        </div>
-        <div className="space-y-2">
-          <Label>Template</Label>
-          <Select value={template} onValueChange={(v) => onTemplateChange(v as DocumentTemplate)}>
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {TEMPLATE_OPTIONS.map((opt) => (
-                <SelectItem key={opt.value} value={opt.value}>
-                  <div>
-                    <div className="font-medium">{opt.label}</div>
-                    <div className="text-xs text-muted-foreground">{opt.description}</div>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
       </div>
 

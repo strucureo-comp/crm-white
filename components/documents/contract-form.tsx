@@ -32,7 +32,7 @@ interface ContractFormProps {
 export function ContractForm({ existingContract }: ContractFormProps) {
   const router = useRouter();
   const { settings } = useWorkspace();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [saving, setSaving] = useState(false);
 
   // Core metadata fields
@@ -58,10 +58,10 @@ export function ContractForm({ existingContract }: ContractFormProps) {
   const [leads, setLeads] = useState<Lead[]>([]);
 
   useEffect(() => {
-    if (user?.company_id) {
-      getLeads(user.company_id).then(setLeads);
+    if (workspace?.id) {
+      getLeads(workspace?.id).then(setLeads);
     }
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   const clientOptions = Array.from(
     new Map(
@@ -138,7 +138,7 @@ export function ContractForm({ existingContract }: ContractFormProps) {
       toast.error('Counterparty / Client Name is required');
       return;
     }
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       toast.error('Not authenticated');
       return;
     }
@@ -163,7 +163,7 @@ export function ContractForm({ existingContract }: ContractFormProps) {
       status,
       variables: safeVariables,
       content: renderedContent,
-      company_id: user.company_id,
+      workspace_id: workspace?.id,
     };
 
     try {
@@ -594,13 +594,9 @@ export function ContractForm({ existingContract }: ContractFormProps) {
           </Button>
         </div>
       </div>
-
-      <DocumentLayout
-        leftColumn={leftColumn}
-        rightColumn={rightColumn}
-        leftLabel="Contract Details"
-        rightLabel="Live Document Preview"
-      />
+      <div className="max-w-4xl mx-auto w-full mt-8 pb-24 space-y-8">
+        {leftColumn}
+      </div>
     </div>
   );
 }

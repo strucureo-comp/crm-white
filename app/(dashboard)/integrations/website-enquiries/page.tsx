@@ -18,13 +18,14 @@ import {
   Shield,
   Webhook as WebhookIcon,
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getConnectedApps, connectApp } from '@/lib/db/automation/api';
 
 export default function WebsiteEnquiriesPage() {
   const { workspace, user } = useAuth();
   const workspaceId = workspace?.id || '';
-  const companyId = user?.company_id || '';
+  const companyId = workspace?.id || '';
 
   const [app, setApp] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,7 @@ export default function WebsiteEnquiriesPage() {
         setApp(whApp || null);
         if (whApp?.api_key) setApiKey(whApp.api_key);
       } catch (e) {
-        console.error('Failed to load data:', e);
+        toast.error('Failed to load integration data');
       } finally {
         setLoading(false);
       }
@@ -68,7 +69,7 @@ export default function WebsiteEnquiriesPage() {
       setApiKey(generatedKey);
       setApp({ status: 'connected' });
     } catch (e) {
-      console.error('Enable failed:', e);
+      toast.error('Failed to enable webhook');
     } finally {
       setConnecting(false);
     }
@@ -81,7 +82,7 @@ export default function WebsiteEnquiriesPage() {
   const sampleCurl = `curl -X POST ${webhookUrl} \\
   -H "Content-Type: application/json" \\
   -d '{
-    "company_id": "${companyId}",
+    "workspace_id": "${companyId}",
     "name": "John Doe",
     "email": "john@example.com",
     "phone": "+91 98765 43210",
@@ -90,7 +91,7 @@ export default function WebsiteEnquiriesPage() {
   }'`;
 
   const sampleHtml = `<form action="${webhookUrl}" method="POST">
-  <input type="hidden" name="company_id" value="${companyId}" />
+  <input type="hidden" name="workspace_id" value="${companyId}" />
   <input name="name" placeholder="Your Name" required />
   <input name="email" type="email" placeholder="Email" required />
   <input name="phone" placeholder="Phone (optional)" />
@@ -242,7 +243,7 @@ export default function WebsiteEnquiriesPage() {
                       </tr>
                     </thead>
                     <tbody className="text-muted-foreground">
-                      <tr className="border-b"><td className="py-1.5 font-mono">company_id</td><td>string</td><td>Yes</td><td>—</td></tr>
+                      <tr className="border-b"><td className="py-1.5 font-mono">workspace_id</td><td>string</td><td>Yes</td><td>—</td></tr>
                       <tr className="border-b"><td className="py-1.5 font-mono">name</td><td>string</td><td>Yes</td><td>100</td></tr>
                       <tr className="border-b"><td className="py-1.5 font-mono">email</td><td>string</td><td>Yes</td><td>254</td></tr>
                       <tr className="border-b"><td className="py-1.5 font-mono">phone</td><td>string</td><td>No</td><td>30</td></tr>
@@ -318,7 +319,7 @@ export default function WebsiteEnquiriesPage() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      company_id: '${companyId}',
+      workspace_id: '${companyId}',
       ...data,
     }),
   });

@@ -39,7 +39,7 @@ const defaultForm = {
 };
 
 export function CalendarEventDialog({ open, onOpenChange, onSaved, event }: CalendarEventDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -74,7 +74,7 @@ export function CalendarEventDialog({ open, onOpenChange, onSaved, event }: Cale
       } else {
         await createCalendarEvent({
           ...form,
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
         });
         toast.success('Event created');
       }

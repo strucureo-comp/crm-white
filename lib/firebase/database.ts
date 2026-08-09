@@ -1,5 +1,5 @@
 import { ref, get, set, update, push, remove, query, orderByChild, equalTo, limitToLast, onValue, off } from 'firebase/database';
-import { database } from './config';
+import { database, auth } from './config';
 import {
   sendWelcomeEmail,
   sendProjectUpdateEmail,
@@ -63,23 +63,23 @@ function cleanData(data: any) {
 }
 
 // ===== Workspace-scoped path helpers =====
-// All entities live under workspaces/${companyId}/${entity}
-// companyId IS the workspace ID (confirmed by event bridge pattern)
+// All entities live under workspaces/${workspaceId}/${entity}
+// workspaceId IS the workspace ID (confirmed by event bridge pattern)
 
-function wsRef(companyId: string, entity: string) {
-  return ref(database, `workspaces/${companyId}/${entity}`);
+function wsRef(workspaceId: string, entity: string) {
+  return ref(database, `workspaces/${workspaceId}/${entity}`);
 }
 
-function wsItemRef(companyId: string, entity: string, id: string) {
-  return ref(database, `workspaces/${companyId}/${entity}/${id}`);
+function wsItemRef(workspaceId: string, entity: string, id: string) {
+  return ref(database, `workspaces/${workspaceId}/${entity}/${id}`);
 }
 
 // ===== Project Functions =====
 
-export async function getProjects(companyId?: string, clientId?: string): Promise<Project[]> {
+export async function getProjects(workspaceId?: string, clientId?: string): Promise<Project[]> {
   try {
-    if (!companyId) return [];
-    const projectsRef = wsRef(companyId, 'projects');
+    if (!workspaceId) return [];
+    const projectsRef = wsRef(workspaceId, 'projects');
     const snapshot = await get(projectsRef);
 
     if (!snapshot.exists()) return [];
@@ -88,7 +88,7 @@ export async function getProjects(companyId?: string, clientId?: string): Promis
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
       if (val && typeof val === 'object') {
-        if (companyId && (val as any).company_id !== companyId) continue;
+        if (workspaceId && (val as any).workspace_id !== workspaceId) continue;
         const project = { id: key, ...val } as Project;
         if (!clientId || project.client_id === clientId) {
           projects.push(project);
@@ -120,7 +120,7 @@ export async function getProject(projectId: string): Promise<Project | null> {
 
 export async function createProject(project: Omit<Project, 'id' | 'project_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const projectsRef = wsRef(project.company_id, 'projects');
+    const projectsRef = wsRef(project.workspace_id, 'projects');
     const newProjectRef = push(projectsRef);
 
     const projectData = cleanData({
@@ -139,7 +139,7 @@ export async function createProject(project: Omit<Project, 'id' | 'project_id' |
         type: 'project',
         link: `/projects/${newProjectRef.key}`,
         read: false,
-        company_id: project.company_id,
+        workspace_id: project.workspace_id,
       });
     }
 
@@ -155,7 +155,7 @@ export async function updateProject(projectId: string, updates: Partial<Project>
     const project = await getProject(projectId);
     if (!project) return false;
 
-    const projectRef = wsItemRef(project.company_id, 'projects', projectId);
+    const projectRef = wsItemRef(project.workspace_id, 'projects', projectId);
     await update(projectRef, cleanData({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -169,10 +169,10 @@ export async function updateProject(projectId: string, updates: Partial<Project>
         type: 'project',
         link: `/projects/${projectId}`,
         read: false,
-        company_id: project.company_id,
+        workspace_id: project.workspace_id,
       });
 
-      const admins = await getAdmins(project.company_id);
+      const admins = await getAdmins(project.workspace_id);
       for (const admin of admins) {
         await createNotification({
           user_id: admin.id,
@@ -181,7 +181,7 @@ export async function updateProject(projectId: string, updates: Partial<Project>
           type: 'project',
           link: `/projects/${projectId}`,
           read: false,
-          company_id: project.company_id,
+          workspace_id: project.workspace_id,
         });
       }
     }
@@ -197,7 +197,7 @@ export async function deleteProject(id: string): Promise<boolean> {
   try {
     const project = await getProject(id);
     if (!project) return false;
-    const refPath = wsItemRef(project.company_id, 'projects', id);
+    const refPath = wsItemRef(project.workspace_id, 'projects', id);
     await remove(refPath);
     return true;
   } catch (error) {
@@ -208,10 +208,10 @@ export async function deleteProject(id: string): Promise<boolean> {
 
 // ===== Invoice Functions =====
 
-export async function getInvoices(companyId: string, clientId?: string): Promise<Invoice[]> {
+export async function getInvoices(workspaceId: string, clientId?: string): Promise<Invoice[]> {
   try {
-    if (!companyId) return [];
-    const invoicesRef = wsRef(companyId, 'invoices');
+    if (!workspaceId) return [];
+    const invoicesRef = wsRef(workspaceId, 'invoices');
     const snapshot = await get(invoicesRef);
 
     if (!snapshot.exists()) return [];
@@ -219,7 +219,7 @@ export async function getInvoices(companyId: string, clientId?: string): Promise
     const invoices: Invoice[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         const invoice = { id: key, ...val } as Invoice;
         if (!clientId || invoice.client_id === clientId) {
           invoices.push(invoice);
@@ -252,25 +252,45 @@ export async function getInvoice(invoiceId: string): Promise<Invoice | null> {
 export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>): Promise<boolean> {
   try {
     const invoice = await getInvoice(invoiceId);
-    if (!invoice || !invoice.company_id) return false;
+    if (!invoice || !invoice.workspace_id) return false;
 
-    const invoiceRef = wsItemRef(invoice.company_id, 'invoices', invoiceId);
+    const invoiceRef = wsItemRef(invoice.workspace_id, 'invoices', invoiceId);
     await update(invoiceRef, cleanData({
       ...updates,
       updated_at: new Date().toISOString(),
     }));
 
-    if (invoice && updates.status && updates.status === 'paid') {
-      const admins = await getAdmins(invoice.company_id);
+    await logActivity({
+      workspace_id: invoice.workspace_id,
+      action: 'update_invoice',
+      description: `Invoice ${updates.invoice_number || invoiceId} updated`,
+      title: 'Invoice Updated',
+      entity_id: invoiceId,
+      entity_type: 'invoice',
+      metadata: updates
+    }).catch(console.error);
+
+    let diffAmount = 0;
+    if (updates.amount_paid !== undefined) {
+      diffAmount = updates.amount_paid - (invoice.amount_paid || 0);
+    } else if (updates.status === 'paid' && invoice.status !== 'paid') {
+      diffAmount = (invoice.amount || 0) - (invoice.amount_paid || 0);
+    }
+
+    const becamePaid = updates.status === 'paid' && invoice.status !== 'paid';
+    const becamePartiallyPaid = updates.status === 'partially_paid' && invoice.status !== 'partially_paid';
+
+    if (invoice && (becamePaid || becamePartiallyPaid)) {
+      const admins = await getAdmins(invoice.workspace_id);
       for (const admin of admins) {
         await createNotification({
           user_id: admin.id,
-          title: 'Invoice Paid',
-          message: `Invoice ${invoice.invoice_number} has been marked as paid.`,
+          title: becamePaid ? 'Invoice Paid' : 'Invoice Partially Paid',
+          message: `Invoice ${invoice.invoice_number} has been marked as ${becamePaid ? 'paid' : 'partially paid'}.`,
           type: 'payment',
           link: `/admin/invoices`,
           read: false,
-          company_id: invoice.company_id,
+          workspace_id: invoice.workspace_id,
         });
       }
 
@@ -281,7 +301,7 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
         type: 'payment',
         link: `/invoices/${invoiceId}`,
         read: false,
-        company_id: invoice.company_id,
+        workspace_id: invoice.workspace_id,
       });
     } else if (invoice) {
       await createNotification({
@@ -291,7 +311,26 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
         type: 'payment',
         link: `/invoices/${invoiceId}`,
         read: false,
-        company_id: invoice.company_id,
+        workspace_id: invoice.workspace_id,
+      });
+    }
+
+    if (diffAmount > 0) {
+      // Auto-create payment record for the difference
+      const paymentsRef = ref(database, `workspaces/${invoice.workspace_id}/payments`);
+      const newPaymentRef = push(paymentsRef);
+      await set(newPaymentRef, {
+        payment_id: newPaymentRef.key,
+        workspace_id: invoice.workspace_id,
+        invoice_id: invoiceId,
+        amount: diffAmount,
+        currency: 'INR',
+        method: updates.payment_method || invoice.payment_method || 'bank_transfer',
+        status: 'completed',
+        date: new Date().toISOString(),
+        payment_type: 'income',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       });
     }
 
@@ -304,8 +343,8 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
 
 export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    if (!invoice.company_id) return null;
-    const invoicesRef = wsRef(invoice.company_id, 'invoices');
+    if (!invoice.workspace_id) return null;
+    const invoicesRef = wsRef(invoice.workspace_id, 'invoices');
     const newInvoiceRef = push(invoicesRef);
 
     const invoiceData = cleanData({
@@ -316,6 +355,16 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
 
     await set(newInvoiceRef, invoiceData);
 
+    await logActivity({
+      workspace_id: invoice.workspace_id,
+      action: 'create_invoice',
+      description: `Invoice ${invoice.invoice_number} created for ${invoice.client_name}`,
+      title: 'Invoice Created',
+      entity_id: newInvoiceRef.key || '',
+      entity_type: 'invoice',
+      metadata: invoice
+    }).catch(console.error);
+
     await createNotification({
       user_id: invoice.contact_id || '',
       title: 'New Invoice Issued',
@@ -323,8 +372,26 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
       type: 'payment',
       link: `/invoices`,
       read: false,
-      company_id: invoice.company_id,
+      workspace_id: invoice.workspace_id,
     });
+
+    if (invoice.amount_paid && invoice.amount_paid > 0) {
+      const paymentsRef = ref(database, `workspaces/${invoice.workspace_id}/payments`);
+      const newPaymentRef = push(paymentsRef);
+      await set(newPaymentRef, {
+        payment_id: newPaymentRef.key,
+        workspace_id: invoice.workspace_id,
+        invoice_id: newInvoiceRef.key,
+        amount: invoice.amount_paid,
+        currency: 'INR',
+        method: invoice.payment_method || 'bank_transfer',
+        status: 'completed',
+        date: new Date().toISOString(),
+        payment_type: 'income',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      });
+    }
 
     return newInvoiceRef.key;
   } catch (error) {
@@ -336,8 +403,8 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
 export async function deleteInvoice(invoiceId: string): Promise<boolean> {
   try {
     const invoice = await getInvoice(invoiceId);
-    if (!invoice || !invoice.company_id) return false;
-    const invoiceRef = wsItemRef(invoice.company_id, 'invoices', invoiceId);
+    if (!invoice || !invoice.workspace_id) return false;
+    const invoiceRef = wsItemRef(invoice.workspace_id, 'invoices', invoiceId);
     await remove(invoiceRef);
     return true;
   } catch (error) {
@@ -348,10 +415,10 @@ export async function deleteInvoice(invoiceId: string): Promise<boolean> {
 
 // ===== Support Request Functions =====
 
-export async function getSupportRequests(companyId: string, clientId?: string): Promise<SupportRequest[]> {
+export async function getSupportRequests(workspaceId: string, clientId?: string): Promise<SupportRequest[]> {
   try {
-    if (!companyId) return [];
-    const supportRef = wsRef(companyId, 'support_requests');
+    if (!workspaceId) return [];
+    const supportRef = wsRef(workspaceId, 'support_requests');
     const snapshot = await get(supportRef);
 
     if (!snapshot.exists()) return [];
@@ -359,7 +426,7 @@ export async function getSupportRequests(companyId: string, clientId?: string): 
     const requests: SupportRequest[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         const request = { id: key, ...val } as SupportRequest;
         if (!clientId || request.client_id === clientId) {
           requests.push(request);
@@ -394,7 +461,7 @@ export async function updateSupportRequest(requestId: string, updates: Partial<S
     const request = await getSupportRequest(requestId);
     if (!request) return false;
 
-    const supportRef = wsItemRef(request.company_id, 'support_requests', requestId);
+    const supportRef = wsItemRef(request.workspace_id, 'support_requests', requestId);
     await update(supportRef, cleanData({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -408,7 +475,7 @@ export async function updateSupportRequest(requestId: string, updates: Partial<S
         type: 'support',
         link: `/support/${requestId}`,
         read: false,
-        company_id: request.company_id,
+        workspace_id: request.workspace_id,
       });
     }
 
@@ -421,7 +488,7 @@ export async function updateSupportRequest(requestId: string, updates: Partial<S
 
 export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 'support_request_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const supportRef = wsRef(request.company_id, 'support_requests');
+    const supportRef = wsRef(request.workspace_id, 'support_requests');
     const newRequestRef = push(supportRef);
 
     const requestData = cleanData({
@@ -432,7 +499,7 @@ export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 
 
     await set(newRequestRef, requestData);
 
-    const admins = await getAdmins(request.company_id);
+    const admins = await getAdmins(request.workspace_id);
     for (const admin of admins) {
       await createNotification({
         user_id: admin.id,
@@ -441,7 +508,7 @@ export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 
         type: 'support',
         link: `/admin/support/${newRequestRef.key}`,
         read: false,
-        company_id: request.company_id,
+        workspace_id: request.workspace_id,
       });
     }
 
@@ -454,10 +521,10 @@ export async function createSupportRequest(request: Omit<SupportRequest, 'id' | 
 
 // ===== User Functions =====
 
-export async function getUsers(companyId?: string): Promise<User[]> {
+export async function getUsers(workspaceId?: string): Promise<User[]> {
   try {
-    if (companyId) {
-      const usersRef = wsRef(companyId, 'users');
+    if (workspaceId) {
+      const usersRef = wsRef(workspaceId, 'users');
       const snapshot = await get(usersRef);
       if (!snapshot.exists()) return [];
       const users: User[] = [];
@@ -520,7 +587,7 @@ export async function createUser(userId: string, userData: Omit<User, 'id'>): Pr
         type: 'system',
         link: `/admin/users`,
         read: false,
-        company_id: userData.company_id,
+        workspace_id: userData.company_id,
       });
     }
 
@@ -562,8 +629,8 @@ export async function deleteUser(userId: string): Promise<boolean> {
   }
 }
 
-async function getAdmins(companyId?: string): Promise<User[]> {
-  const allUsers = await getUsers(companyId);
+async function getAdmins(workspaceId?: string): Promise<User[]> {
+  const allUsers = await getUsers(workspaceId);
   return allUsers.filter(u => u.role === 'admin');
 }
 
@@ -571,11 +638,11 @@ async function getAdmins(companyId?: string): Promise<User[]> {
 
 export async function createNotification(notification: Omit<Notification, 'id' | 'notification_id' | 'created_at'>): Promise<string | null> {
   try {
-    if (!notification.company_id) {
-      console.error('createNotification requires company_id');
+    if (!notification.workspace_id) {
+      console.error('createNotification requires workspace_id');
       return null;
     }
-    const notificationsRef = wsRef(notification.company_id, 'notifications');
+    const notificationsRef = wsRef(notification.workspace_id, 'notifications');
     const newNotificationRef = push(notificationsRef);
 
     const notificationData = cleanData({
@@ -613,10 +680,10 @@ export async function createNotification(notification: Omit<Notification, 'id' |
   }
 }
 
-export async function getNotifications(userId: string, companyId?: string): Promise<Notification[]> {
+export async function getNotifications(userId: string, workspaceId?: string): Promise<Notification[]> {
   try {
-    const notificationsRef = companyId
-      ? wsRef(companyId, 'notifications')
+    const notificationsRef = workspaceId
+      ? wsRef(workspaceId, 'notifications')
       : ref(database, 'notifications');
     const snapshot = await get(notificationsRef);
 
@@ -637,10 +704,10 @@ export async function getNotifications(userId: string, companyId?: string): Prom
   }
 }
 
-export async function markNotificationAsRead(notificationId: string, companyId?: string): Promise<boolean> {
+export async function markNotificationAsRead(notificationId: string, workspaceId?: string): Promise<boolean> {
   try {
-    const notificationRef = companyId
-      ? wsItemRef(companyId, 'notifications', notificationId)
+    const notificationRef = workspaceId
+      ? wsItemRef(workspaceId, 'notifications', notificationId)
       : ref(database, `notifications/${notificationId}`);
     await update(notificationRef, { read: true });
     return true;
@@ -700,7 +767,7 @@ export async function getInvitations(): Promise<any[]> {
 
 export async function createMeetingRequest(meeting: Omit<MeetingRequest, 'id' | 'meeting_request_id' | 'created_at' | 'updated_at' | 'status'>): Promise<string | null> {
   try {
-    const meetingsRef = wsRef(meeting.company_id, 'meeting_requests');
+    const meetingsRef = wsRef(meeting.workspace_id, 'meeting_requests');
     const newMeetingRef = push(meetingsRef);
 
     const meetingData = cleanData({
@@ -712,7 +779,7 @@ export async function createMeetingRequest(meeting: Omit<MeetingRequest, 'id' | 
 
     await set(newMeetingRef, meetingData);
 
-    const admins = await getAdmins(meeting.company_id);
+    const admins = await getAdmins(meeting.workspace_id);
     for (const admin of admins) {
       await createNotification({
         user_id: admin.id,
@@ -721,7 +788,7 @@ export async function createMeetingRequest(meeting: Omit<MeetingRequest, 'id' | 
         type: 'meeting',
         link: `/admin/meetings`,
         read: false,
-        company_id: meeting.company_id,
+        workspace_id: meeting.workspace_id,
       });
     }
 
@@ -752,13 +819,14 @@ export async function updateMeeting(meetingId: string, updates: Partial<MeetingR
     const meeting = await getMeeting(meetingId);
     if (!meeting) return false;
 
-    const meetingRef = wsItemRef(meeting.company_id, 'meeting_requests', meetingId);
+    const meetingRef = wsItemRef(meeting.workspace_id, 'meeting_requests', meetingId);
     await update(meetingRef, cleanData({
       ...updates,
       updated_at: new Date().toISOString(),
     }));
 
     if (meeting && updates.status && updates.status !== meeting.status) {
+
       await createNotification({
         user_id: meeting.client_id,
         title: 'Meeting Updated',
@@ -766,7 +834,7 @@ export async function updateMeeting(meetingId: string, updates: Partial<MeetingR
         type: 'meeting',
         link: `/meetings`,
         read: false,
-        company_id: meeting.company_id,
+        workspace_id: meeting.workspace_id,
       });
     }
 
@@ -779,10 +847,10 @@ export async function updateMeeting(meetingId: string, updates: Partial<MeetingR
 
 // ===== Transaction Functions =====
 
-export async function getTransactions(companyId: string): Promise<Transaction[]> {
+export async function getTransactions(workspaceId: string): Promise<Transaction[]> {
   try {
-    if (!companyId) return [];
-    const transactionsRef = wsRef(companyId, 'transactions');
+    if (!workspaceId) return [];
+    const transactionsRef = wsRef(workspaceId, 'transactions');
     const snapshot = await get(transactionsRef);
 
     if (!snapshot.exists()) return [];
@@ -790,7 +858,7 @@ export async function getTransactions(companyId: string): Promise<Transaction[]>
     const transactions: Transaction[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         transactions.push({ id: key, ...val } as Transaction);
       }
     }
@@ -804,7 +872,7 @@ export async function getTransactions(companyId: string): Promise<Transaction[]>
 
 export async function createTransaction(transaction: Omit<Transaction, 'id' | 'transaction_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const transactionsRef = wsRef(transaction.company_id, 'transactions');
+    const transactionsRef = wsRef(transaction.workspace_id, 'transactions');
     const newTransactionRef = push(transactionsRef);
 
     const transactionData = cleanData({
@@ -930,10 +998,10 @@ export async function deletePlanningNote(noteId: string): Promise<boolean> {
 
 // ===== Quotation Functions =====
 
-export async function getQuotations(companyId: string, clientId?: string): Promise<Quotation[]> {
+export async function getQuotations(workspaceId: string, clientId?: string): Promise<Quotation[]> {
   try {
-    if (!companyId) return [];
-    const quotRef = wsRef(companyId, 'quotations');
+    if (!workspaceId) return [];
+    const quotRef = wsRef(workspaceId, 'quotations');
     const snapshot = await get(quotRef);
 
     if (!snapshot.exists()) return [];
@@ -941,7 +1009,7 @@ export async function getQuotations(companyId: string, clientId?: string): Promi
     const quotations: Quotation[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         const quotation = { id: key, ...val } as Quotation;
         if (!clientId || quotation.client_id === clientId) {
           quotations.push(quotation);
@@ -973,7 +1041,7 @@ export async function getQuotation(quotationId: string): Promise<Quotation | nul
 
 export async function createQuotation(quotation: Omit<Quotation, 'id' | 'quote_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const quotationsRef = wsRef(quotation.company_id, 'quotations');
+    const quotationsRef = wsRef(quotation.workspace_id, 'quotations');
     const newQuotationRef = push(quotationsRef);
 
     const quotationData = cleanData({
@@ -991,7 +1059,7 @@ export async function createQuotation(quotation: Omit<Quotation, 'id' | 'quote_i
       type: 'payment',
       link: `/quotations`,
       read: false,
-      company_id: quotation.company_id,
+      workspace_id: quotation.workspace_id,
     });
 
     return newQuotationRef.key;
@@ -1006,7 +1074,7 @@ export async function updateQuotation(quotationId: string, updates: Partial<Quot
     const quotation = await getQuotation(quotationId);
     if (!quotation) return false;
 
-    const quotationRef = wsItemRef(quotation.company_id, 'quotations', quotationId);
+    const quotationRef = wsItemRef(quotation.workspace_id, 'quotations', quotationId);
     await update(quotationRef, cleanData({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -1022,7 +1090,7 @@ export async function deleteQuotation(quotationId: string): Promise<boolean> {
   try {
     const quotation = await getQuotation(quotationId);
     if (!quotation) return false;
-    const quotationRef = wsItemRef(quotation.company_id, 'quotations', quotationId);
+    const quotationRef = wsItemRef(quotation.workspace_id, 'quotations', quotationId);
     await remove(quotationRef);
     return true;
   } catch (error) {
@@ -1036,8 +1104,7 @@ export async function convertQuotationToInvoice(quotation: Quotation): Promise<s
     const invoiceId = await createInvoice({
       project_id: quotation.project_id || '',
       client_id: quotation.client_id,
-      workspace_id: quotation.company_id,
-      company_id: quotation.company_id,
+      workspace_id: quotation.workspace_id,
       contact_id: quotation.client_id,
       deal_id: '',
       quote_id: quotation.id,
@@ -1099,7 +1166,7 @@ export async function markInvoiceAsPaid(
       description: `Payment for invoice ${invoiceId}`,
       date: now,
       created_by: '',
-      company_id: invoice?.company_id || '',
+      workspace_id: invoice?.workspace_id || '',
     });
 
     return true;
@@ -1111,10 +1178,10 @@ export async function markInvoiceAsPaid(
 
 // ===== Enquiry Functions =====
 
-export async function getEnquiries(companyId: string): Promise<Enquiry[]> {
+export async function getEnquiries(workspaceId: string): Promise<Enquiry[]> {
   try {
-    if (!companyId) return [];
-    const enqRef = wsRef(companyId, 'enquiries');
+    if (!workspaceId) return [];
+    const enqRef = wsRef(workspaceId, 'enquiries');
     const snapshot = await get(enqRef);
 
     if (!snapshot.exists()) return [];
@@ -1122,7 +1189,7 @@ export async function getEnquiries(companyId: string): Promise<Enquiry[]> {
     const enquiries: Enquiry[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         enquiries.push({ id: key, ...val } as Enquiry);
       }
     }
@@ -1134,10 +1201,57 @@ export async function getEnquiries(companyId: string): Promise<Enquiry[]> {
   }
 }
 
+export interface EnquiriesPageResult {
+  data: Enquiry[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export async function getEnquiriesPaginated(
+  workspaceId: string,
+  page: number = 1,
+  pageSize: number = 25,
+  filters?: { status?: string; search?: string }
+): Promise<EnquiriesPageResult> {
+  try {
+    if (!workspaceId) return { data: [], total: 0, page: 1, pageSize, totalPages: 0 };
+
+    let enquiries = await getEnquiries(workspaceId);
+
+    if (filters?.status && filters.status !== 'all') {
+      enquiries = enquiries.filter((e) => e.status === filters.status);
+    }
+
+    if (filters?.search) {
+      const q = filters.search.toLowerCase();
+      enquiries = enquiries.filter(
+        (e) =>
+          e.name.toLowerCase().includes(q) ||
+          e.email.toLowerCase().includes(q) ||
+          e.subject.toLowerCase().includes(q) ||
+          e.message.toLowerCase().includes(q)
+      );
+    }
+
+    const total = enquiries.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const safePage = Math.max(1, Math.min(page, totalPages || 1));
+    const start = (safePage - 1) * pageSize;
+    const data = enquiries.slice(start, start + pageSize);
+
+    return { data, total, page: safePage, pageSize, totalPages };
+  } catch (error) {
+    console.error('Error getting paginated enquiries:', error);
+    return { data: [], total: 0, page: 1, pageSize, totalPages: 0 };
+  }
+}
+
 export async function createEnquiry(enquiry: Omit<Enquiry, 'id' | 'enquiry_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    if (!enquiry.company_id) return null;
-    const refPath = wsRef(enquiry.company_id, 'enquiries');
+    if (!enquiry.workspace_id) return null;
+    const refPath = wsRef(enquiry.workspace_id, 'enquiries');
     const newRef = push(refPath);
 
     const data = cleanData({
@@ -1148,10 +1262,10 @@ export async function createEnquiry(enquiry: Omit<Enquiry, 'id' | 'enquiry_id' |
 
     await set(newRef, data);
 
-    if (enquiry.company_id) {
+    if (enquiry.workspace_id) {
       try {
         await createLead({
-          company_id: enquiry.company_id,
+          workspace_id: enquiry.workspace_id,
           name: enquiry.name,
           email: enquiry.email,
           phone: enquiry.phone || '',
@@ -1196,10 +1310,10 @@ export async function updateEnquiry(id: string, updates: Partial<Enquiry>): Prom
 
 // ===== Task Functions =====
 
-export async function getTasks(companyId?: string): Promise<TaskItem[]> {
+export async function getTasks(workspaceId?: string): Promise<TaskItem[]> {
   try {
-    if (companyId) {
-      const refPath = wsRef(companyId, 'tasks');
+    if (workspaceId) {
+      const refPath = wsRef(workspaceId, 'tasks');
       const snapshot = await get(refPath);
 
       if (!snapshot.exists()) return [];
@@ -1238,7 +1352,7 @@ export async function getTasks(companyId?: string): Promise<TaskItem[]> {
 
 export async function createTask(task: Omit<TaskItem, 'id' | 'task_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = wsRef(task.company_id, 'tasks');
+    const refPath = wsRef(task.workspace_id, 'tasks');
     const newRef = push(refPath);
 
     const data = cleanData({
@@ -1320,11 +1434,11 @@ export async function saveTaskColumns(columns: string[]): Promise<boolean> {
 
 // ===== Lead Functions =====
 
-export async function getLeads(companyId?: string): Promise<Lead[]> {
+export async function getLeads(workspaceId?: string): Promise<Lead[]> {
   try {
-    if (!companyId) return [];
+    if (!workspaceId) return [];
 
-    const refPath = wsRef(companyId, 'leads');
+    const refPath = wsRef(workspaceId, 'leads');
     const snapshot = await get(refPath);
 
     if (!snapshot.exists()) return [];
@@ -1333,7 +1447,7 @@ export async function getLeads(companyId?: string): Promise<Lead[]> {
     const leads: Lead[] = [];
     
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         leads.push({ id: key, ...val } as Lead);
       }
     }
@@ -1345,14 +1459,14 @@ export async function getLeads(companyId?: string): Promise<Lead[]> {
   }
 }
 
-export function subscribeToLeads(companyId: string, callback: (leads: Lead[]) => void): () => void {
-  const refPath = wsRef(companyId, 'leads');
+export function subscribeToLeads(workspaceId: string, callback: (leads: Lead[]) => void): () => void {
+  const refPath = wsRef(workspaceId, 'leads');
   const unsubscribe = onValue(refPath, (snapshot) => {
     if (snapshot.exists()) {
       const data = snapshot.val();
       const leads: Lead[] = [];
       for (const [key, val] of Object.entries(data)) {
-        if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+        if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
           leads.push({ id: key, ...(val as object) } as Lead);
         }
       }
@@ -1366,7 +1480,7 @@ export function subscribeToLeads(companyId: string, callback: (leads: Lead[]) =>
 
 export async function createLead(lead: Omit<Lead, 'id' | 'lead_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = wsRef(lead.company_id, 'leads');
+    const refPath = wsRef(lead.workspace_id, 'leads');
     const newRef = push(refPath);
 
     const data = cleanData({
@@ -1378,10 +1492,10 @@ export async function createLead(lead: Omit<Lead, 'id' | 'lead_id' | 'created_at
     await set(newRef, data);
 
     try {
-      await createContact(lead.company_id || 'default', {
+      await createContact(lead.workspace_id || 'default', {
         name: lead.name,
         email: lead.email,
-        company_id: lead.company_id || '',
+        workspace_id: lead.workspace_id || '',
         phone: lead.phone || '',
         is_primary: true,
         notes: lead.notes || '',
@@ -1439,9 +1553,9 @@ export async function deleteLead(id: string): Promise<boolean> {
 
 // ===== Field Agent Functions =====
 
-export async function getFieldAgents(companyId: string): Promise<FieldAgent[]> {
+export async function getFieldAgents(workspaceId: string): Promise<FieldAgent[]> {
   try {
-    if (!companyId) return [];
+    if (!workspaceId) return [];
     const refPath = ref(database, 'field_agents');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
@@ -1488,9 +1602,9 @@ export async function deleteFieldAgent(id: string): Promise<boolean> {
   }
 }
 
-export async function getFieldAlerts(companyId: string): Promise<FieldAlert[]> {
+export async function getFieldAlerts(workspaceId: string): Promise<FieldAlert[]> {
   try {
-    if (!companyId) return [];
+    if (!workspaceId) return [];
     const refPath = ref(database, 'field_alerts');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
@@ -1520,16 +1634,16 @@ export async function createFieldAlert(data: Omit<FieldAlert, 'id' | 'field_aler
 
 // ===== Content Item Functions =====
 
-export async function getContentItems(companyId: string): Promise<ContentItem[]> {
+export async function getContentItems(workspaceId: string): Promise<ContentItem[]> {
   try {
-    if (!companyId) return [];
-    const refPath = wsRef(companyId, 'content_items');
+    if (!workspaceId) return [];
+    const refPath = wsRef(workspaceId, 'content_items');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: ContentItem[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         items.push({ id: key, ...val } as ContentItem);
       }
     }
@@ -1541,7 +1655,7 @@ export async function getContentItems(companyId: string): Promise<ContentItem[]>
 
 export async function createContentItem(data: Omit<ContentItem, 'id' | 'content_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = wsRef(data.company_id, 'content_items');
+    const refPath = wsRef(data.workspace_id || 'default', 'content_items');
     const newRef = push(refPath);
     const now = new Date().toISOString();
     await set(newRef, cleanData({ ...data, updated_at: now, created_at: now }));
@@ -1588,9 +1702,9 @@ export async function deleteContentItem(id: string): Promise<boolean> {
 
 // ===== Media Item Functions =====
 
-export async function getMediaItems(companyId: string): Promise<MediaItem[]> {
+export async function getMediaItems(workspaceId: string): Promise<MediaItem[]> {
   try {
-    if (!companyId) return [];
+    if (!workspaceId) return [];
     const refPath = ref(database, 'media_items');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
@@ -1723,16 +1837,16 @@ export async function deleteIntegration(id: string): Promise<boolean> {
 
 // ===== Automation Rule Functions =====
 
-export async function getAutomationRules(companyId: string): Promise<AutomationRule[]> {
+export async function getAutomationRules(workspaceId: string): Promise<AutomationRule[]> {
   try {
-    if (!companyId) return [];
-    const refPath = wsRef(companyId, 'automation_rules');
+    if (!workspaceId) return [];
+    const refPath = wsRef(workspaceId, 'automation_rules');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: AutomationRule[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         items.push({ id: key, ...val } as AutomationRule);
       }
     }
@@ -1744,7 +1858,7 @@ export async function getAutomationRules(companyId: string): Promise<AutomationR
 
 export async function createAutomationRule(data: Omit<AutomationRule, 'id' | 'rule_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = wsRef(data.company_id, 'automation_rules');
+    const refPath = wsRef(data.workspace_id || 'default', 'automation_rules');
     const newRef = push(refPath);
     await set(newRef, cleanData({ ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }));
     return newRef.key;
@@ -1788,11 +1902,11 @@ export async function deleteAutomationRule(id: string): Promise<boolean> {
   }
 }
 
-// ===== AI Conversation Functions (global) =====
+// ===== AI Conversation Functions (workspace scoped) =====
 
-export async function getAiConversations(): Promise<AiConversation[]> {
+export async function getAiConversations(workspaceId: string): Promise<AiConversation[]> {
   try {
-    const refPath = ref(database, 'ai_conversations');
+    const refPath = wsRef(workspaceId, 'ai_conversations');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: AiConversation[] = [];
@@ -1805,9 +1919,9 @@ export async function getAiConversations(): Promise<AiConversation[]> {
   }
 }
 
-export async function createAiConversation(data: Omit<AiConversation, 'id' | 'ai_conversation_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createAiConversation(workspaceId: string, data: Omit<AiConversation, 'id' | 'ai_conversation_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = ref(database, 'ai_conversations');
+    const refPath = wsRef(workspaceId, 'ai_conversations');
     const newRef = push(refPath);
     const now = new Date().toISOString();
     await set(newRef, cleanData({ ...data, created_at: now, updated_at: now }));
@@ -1817,9 +1931,9 @@ export async function createAiConversation(data: Omit<AiConversation, 'id' | 'ai
   }
 }
 
-export async function updateAiConversation(id: string, updates: Partial<AiConversation>): Promise<boolean> {
+export async function updateAiConversation(workspaceId: string, id: string, updates: Partial<AiConversation>): Promise<boolean> {
   try {
-    const refPath = ref(database, `ai_conversations/${id}`);
+    const refPath = wsRef(workspaceId, `ai_conversations/${id}`);
     await update(refPath, cleanData({ ...updates, updated_at: new Date().toISOString() }));
     return true;
   } catch {
@@ -1827,9 +1941,9 @@ export async function updateAiConversation(id: string, updates: Partial<AiConver
   }
 }
 
-export async function deleteAiConversation(id: string): Promise<boolean> {
+export async function deleteAiConversation(workspaceId: string, id: string): Promise<boolean> {
   try {
-    await remove(ref(database, `ai_conversations/${id}`));
+    await remove(wsRef(workspaceId, `ai_conversations/${id}`));
     return true;
   } catch {
     return false;
@@ -1874,7 +1988,7 @@ export async function createTeamMember(data: Omit<TeamMember, 'id' | 'team_membe
     const now = new Date().toISOString();
     await set(newRef, cleanData({ ...data, created_at: now, updated_at: now }));
 
-    const admins = await getAdmins(data.company_id);
+    const admins = await getAdmins(data.workspace_id);
     for (const admin of admins) {
       await createNotification({
         user_id: admin.id,
@@ -1883,7 +1997,7 @@ export async function createTeamMember(data: Omit<TeamMember, 'id' | 'team_membe
         type: 'system',
         link: `/admin/team`,
         read: false,
-        company_id: data.company_id,
+        workspace_id: data.workspace_id,
       });
     }
 
@@ -2066,79 +2180,20 @@ export async function createSupportMessage(data: Omit<SupportMessage, 'id' | 'su
   }
 }
 
-// ===== Payment Functions (global - reads from transactions) =====
 
-export async function getPayments(): Promise<Payment[]> {
-  try {
-    const refPath = ref(database, 'transactions');
-    const snapshot = await get(refPath);
-
-    if (!snapshot.exists()) return [];
-
-    const items: Payment[] = [];
-    snapshot.forEach((child) => {
-      items.push({ id: child.key, ...child.val() } as Payment);
-    });
-
-    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-  } catch {
-    return [];
-  }
-}
-
-export async function getPayment(id: string): Promise<Payment | null> {
-  try {
-    const refPath = ref(database, `transactions/${id}`);
-    const snapshot = await get(refPath);
-    if (!snapshot.exists()) return null;
-    return { id: snapshot.key, ...snapshot.val() } as Payment;
-  } catch {
-    return null;
-  }
-}
-
-export async function updatePayment(id: string, updates: Partial<Payment>): Promise<boolean> {
-  try {
-    const refPath = ref(database, `transactions/${id}`);
-    await update(refPath, cleanData({ ...updates, updated_at: new Date().toISOString() }));
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-export async function createPayment(data: Omit<Payment, 'id' | 'payment_id' | 'created_at'>): Promise<string | null> {
-  try {
-    const refPath = ref(database, 'transactions');
-    const newRef = push(refPath);
-    await set(newRef, cleanData({ ...data, created_at: new Date().toISOString() }));
-    return newRef.key;
-  } catch {
-    return null;
-  }
-}
-
-export async function deletePayment(id: string): Promise<boolean> {
-  try {
-    await remove(ref(database, `transactions/${id}`));
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // ===== Campaign Functions =====
 
-export async function getCampaigns(companyId: string): Promise<Campaign[]> {
+export async function getCampaigns(workspaceId: string): Promise<Campaign[]> {
   try {
-    if (!companyId) return [];
-    const refPath = wsRef(companyId, 'campaigns');
+    if (!workspaceId) return [];
+    const refPath = wsRef(workspaceId, 'campaigns');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: Campaign[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         items.push({ id: key, ...val } as Campaign);
       }
     }
@@ -2148,14 +2203,14 @@ export async function getCampaigns(companyId: string): Promise<Campaign[]> {
 
 export async function createCampaign(data: Omit<Campaign, 'id' | 'campaign_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = wsRef(data.company_id, 'campaigns');
+    const refPath = wsRef(data.workspace_id || 'default', 'campaigns');
     const newRef = push(refPath);
     const campaign = { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
     await set(newRef, campaign);
     await createNotification({
       user_id: 'system', title: 'Campaign Created', message: `Campaign "${data.name}" created`,
       type: 'system', link: '/campaigns', read: false,
-      company_id: data.company_id,
+      workspace_id: data.workspace_id || 'default',
     });
     return newRef.key;
   } catch { return null; }
@@ -2268,34 +2323,7 @@ export async function deleteDelivery(id: string): Promise<boolean> {
   } catch { return false; }
 }
 
-// ===== Activity Log Functions =====
 
-export async function getActivityLogs(companyId: string, limitCount: number = 50): Promise<ActivityLog[]> {
-  try {
-    if (!companyId) return [];
-    const logsRef = wsRef(companyId, 'activity_logs');
-    const snapshot = await get(logsRef);
-    if (!snapshot.exists()) return [];
-    const items: ActivityLog[] = [];
-    const data = snapshot.val();
-    for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
-        items.push({ id: key, ...val } as ActivityLog);
-      }
-    }
-    return items.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limitCount);
-  } catch { return []; }
-}
-
-export async function createActivityLog(data: Omit<ActivityLog, 'id' | 'created_at'>): Promise<string | null> {
-  try {
-    if (!data.company_id) return null;
-    const refPath = wsRef(data.company_id, 'activity_logs');
-    const newRef = push(refPath);
-    await set(newRef, { ...data, created_at: new Date().toISOString() });
-    return newRef.key;
-  } catch { return null; }
-}
 
 // ===== Email Template Functions (global) =====
 
@@ -2337,16 +2365,16 @@ export async function deleteEmailTemplate(id: string): Promise<boolean> {
 
 // ===== Email Campaign Functions =====
 
-export async function getEmailCampaigns(companyId: string): Promise<EmailCampaign[]> {
+export async function getEmailCampaigns(workspaceId: string): Promise<EmailCampaign[]> {
   try {
-    if (!companyId) return [];
-    const refPath = wsRef(companyId, 'email_campaigns');
+    if (!workspaceId) return [];
+    const refPath = wsRef(workspaceId, 'email_campaigns');
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: EmailCampaign[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         items.push({ id: key, ...val } as EmailCampaign);
       }
     }
@@ -2356,7 +2384,7 @@ export async function getEmailCampaigns(companyId: string): Promise<EmailCampaig
 
 export async function createEmailCampaign(data: Omit<EmailCampaign, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const refPath = wsRef(data.company_id, 'email_campaigns');
+    const refPath = wsRef(data.workspace_id || 'default', 'email_campaigns');
     const newRef = push(refPath);
     await set(newRef, { ...data, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
     return newRef.key;
@@ -2421,9 +2449,9 @@ export async function createEmailLog(data: Omit<EmailLog, 'id'>): Promise<string
 
 // ===== Pipeline Functions (global) =====
 
-export async function getPipelines(companyId: string): Promise<Pipeline[]> {
+export async function getPipelines(workspaceId: string): Promise<Pipeline[]> {
   try {
-    const refPath = ref(database, `workspaces/${companyId}/pipelines`);
+    const refPath = ref(database, `workspaces/${workspaceId}/pipelines`);
     const snapshot = await get(refPath);
     if (!snapshot.exists()) return [];
     const items: Pipeline[] = [];
@@ -2434,43 +2462,43 @@ export async function getPipelines(companyId: string): Promise<Pipeline[]> {
   } catch { return []; }
 }
 
-export async function getPipeline(companyId: string, id: string): Promise<Pipeline | null> {
+export async function getPipeline(workspaceId: string, id: string): Promise<Pipeline | null> {
   try {
-    const snapshot = await get(ref(database, `workspaces/${companyId}/pipelines/${id}`));
+    const snapshot = await get(ref(database, `workspaces/${workspaceId}/pipelines/${id}`));
     if (!snapshot.exists()) return null;
     return { id: snapshot.key, ...snapshot.val() } as Pipeline;
   } catch { return null; }
 }
 
-export async function createPipeline(companyId: string, data: Omit<Pipeline, 'id' | 'pipeline_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
+export async function createPipeline(workspaceId: string, data: Omit<Pipeline, 'id' | 'pipeline_id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const newRef = push(ref(database, `workspaces/${companyId}/pipelines`));
-    await set(newRef, { ...data, company_id: companyId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
-    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', entity_id: newRef.key || '', user_id: 'system', user_name: 'System', title: 'Pipeline Created', metadata: {}, company_id: companyId });
+    const newRef = push(ref(database, `workspaces/${workspaceId}/pipelines`));
+    await set(newRef, { ...data, workspace_id: workspaceId, created_at: new Date().toISOString(), updated_at: new Date().toISOString() });
+    await createActivityLog({ action: 'project_created', description: `Created pipeline: ${data.name}`, entity_type: 'pipeline', entity_id: newRef.key || '', user_id: 'system', user_name: 'System', title: 'Pipeline Created', metadata: {}, workspace_id: workspaceId });
     return newRef.key;
   } catch { return null; }
 }
 
-export async function updatePipeline(companyId: string, id: string, updates: Partial<Pipeline>): Promise<boolean> {
+export async function updatePipeline(workspaceId: string, id: string, updates: Partial<Pipeline>): Promise<boolean> {
   try {
-    await update(ref(database, `workspaces/${companyId}/pipelines/${id}`), { ...updates, updated_at: new Date().toISOString() });
+    await update(ref(database, `workspaces/${workspaceId}/pipelines/${id}`), { ...updates, updated_at: new Date().toISOString() });
     return true;
   } catch { return false; }
 }
 
-export async function deletePipeline(companyId: string, id: string): Promise<boolean> {
+export async function deletePipeline(workspaceId: string, id: string): Promise<boolean> {
   try {
-    await remove(ref(database, `workspaces/${companyId}/pipelines/${id}`));
+    await remove(ref(database, `workspaces/${workspaceId}/pipelines/${id}`));
     return true;
   } catch { return false; }
 }
 
 // ===== Contract Functions =====
 
-export async function getContracts(companyId: string): Promise<Contract[]> {
+export async function getContracts(workspaceId: string): Promise<Contract[]> {
   try {
-    if (!companyId) return [];
-    const contractsRef = wsRef(companyId, 'contracts');
+    if (!workspaceId) return [];
+    const contractsRef = wsRef(workspaceId, 'contracts');
     const snapshot = await get(contractsRef);
 
     if (!snapshot.exists()) return [];
@@ -2478,7 +2506,7 @@ export async function getContracts(companyId: string): Promise<Contract[]> {
     const contracts: Contract[] = [];
     const data = snapshot.val();
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).company_id === companyId) {
+      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
         contracts.push({ id: key, ...val } as Contract);
       }
     }
@@ -2507,7 +2535,7 @@ export async function getContract(contractId: string): Promise<Contract | null> 
 
 export async function createContract(contract: Omit<Contract, 'id' | 'created_at' | 'updated_at'>): Promise<string | null> {
   try {
-    const contractsRef = wsRef(contract.company_id, 'contracts');
+    const contractsRef = wsRef(contract.workspace_id, 'contracts');
     const newContractRef = push(contractsRef);
 
     const contractData = cleanData({
@@ -2529,7 +2557,7 @@ export async function updateContract(contractId: string, updates: Partial<Contra
     const contract = await getContract(contractId);
     if (!contract) return false;
 
-    const contractRef = wsItemRef(contract.company_id, 'contracts', contractId);
+    const contractRef = wsItemRef(contract.workspace_id, 'contracts', contractId);
     await update(contractRef, cleanData({
       ...updates,
       updated_at: new Date().toISOString(),
@@ -2545,11 +2573,76 @@ export async function deleteContract(contractId: string): Promise<boolean> {
   try {
     const contract = await getContract(contractId);
     if (!contract) return false;
-    const contractRef = wsItemRef(contract.company_id, 'contracts', contractId);
+    const contractRef = wsItemRef(contract.workspace_id, 'contracts', contractId);
     await remove(contractRef);
     return true;
   } catch (error) {
     console.error('Error deleting contract:', error);
     return false;
+  }
+}
+
+// ===== Activity Log Functions =====
+
+export async function getActivityLogs(workspaceId: string, limitCount: number = 50): Promise<ActivityLog[]> {
+  try {
+    if (!workspaceId) return [];
+    const logsRef = wsRef(workspaceId, 'activity_logs');
+    const snapshot = await get(logsRef);
+    if (!snapshot.exists()) return [];
+
+    const logs: ActivityLog[] = [];
+    const data = snapshot.val();
+    for (const [key, val] of Object.entries(data)) {
+      if (typeof val === 'object' && val !== null) {
+        logs.push({ id: key, ...(val as any) } as ActivityLog);
+      }
+    }
+    return logs.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()).slice(0, limitCount);
+  } catch (error) {
+    console.error('Error getting activity logs:', error);
+    return [];
+  }
+}
+
+export async function createActivityLog(data: Omit<ActivityLog, 'id' | 'created_at'>): Promise<string | null> {
+  return logActivity(data);
+}
+
+export async function logActivity(log: Omit<ActivityLog, 'id' | 'created_at' | 'user_id' | 'user_name'> & { user_id?: string; user_name?: string }): Promise<string | null> {
+  try {
+    if (!log.workspace_id) return null;
+    const logsRef = wsRef(log.workspace_id, 'activity_logs');
+    const newLogRef = push(logsRef);
+    
+    let userId = log.user_id;
+    let userName = log.user_name;
+
+    if (!userId || !userName) {
+      const currentUser = auth.currentUser;
+      if (currentUser) {
+        userId = userId || currentUser.uid;
+        userName = userName || currentUser.displayName || currentUser.email || 'System';
+      } else {
+        userId = userId || 'system';
+        userName = userName || 'System';
+      }
+    }
+    
+    const now = new Date();
+    const logData = cleanData({
+      ...log,
+      user_id: userId,
+      user_name: userName,
+      date: now.toISOString().split('T')[0],
+      time: now.toLocaleTimeString(),
+      created_at: now.toISOString(),
+    });
+
+    await set(newLogRef, logData);
+    return newLogRef.key;
+  } catch (error) {
+    console.error('Error logging activity:', error);
+    return null;
   }
 }

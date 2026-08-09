@@ -34,9 +34,6 @@ export interface DashboardWidget {
   type: 'overview' | 'status-chart' | 'priority-chart' | 'team-activity';
 }
 
-// --- Mock Data ---
-const MOCK_TASKS: Task[] = [];
-
 const PriorityStyle = (priority: TaskPriority) => {
   switch (priority) {
     case 'Urgent': return 'text-rose-600 font-bold';
@@ -48,7 +45,7 @@ const PriorityStyle = (priority: TaskPriority) => {
 };
 
 export default function TaskManagerPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
@@ -60,19 +57,19 @@ export default function TaskManagerPage() {
   const [members, setMembers] = useState<Member[]>([]);
 
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubscribeTasks = subscribeToTasksData(user.company_id, (data) => {
+    if (!workspace?.id) return;
+    const unsubscribeTasks = subscribeToTasksData(workspace?.id, (data) => {
       setTasks(data.tasks);
       setColumns(data.columns);
     });
-    const unsubscribeProjects = subscribeToProjectsData(user.company_id, (data) => {
+    const unsubscribeProjects = subscribeToProjectsData(workspace?.id, (data) => {
       setMembers(data.members);
     });
     return () => {
       unsubscribeTasks();
       unsubscribeProjects();
     };
-  }, [user?.company_id]);
+  }, [workspace?.id]);
   const [view, setView] = useState<ViewType>('Kanban');
   const [search, setSearch] = useState('');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
@@ -160,7 +157,7 @@ export default function TaskManagerPage() {
 
   // Handlers
   const handleCreateTask = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!formTitle.trim()) return toast.error('Task title is required');
     
     const assignees = members
@@ -186,7 +183,7 @@ export default function TaskManagerPage() {
     };
     
     try {
-      await createTask(user.company_id, newTask);
+      await createTask(workspace?.id, newTask);
       setIsNewTaskOpen(false);
       toast.success('Task scheduled successfully');
       
@@ -204,11 +201,11 @@ export default function TaskManagerPage() {
   };
 
   const handleSaveNewColumn = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     const trimmed = newColumnName.trim();
     if (trimmed && !columns.includes(trimmed)) {
       const nextCols = [...columns, trimmed];
-      const success = await saveTaskColumns(user.company_id, nextCols);
+      const success = await saveTaskColumns(workspace?.id, nextCols);
       if (!success) {
         toast.error('Failed to save column to backend');
       } else {
@@ -222,14 +219,14 @@ export default function TaskManagerPage() {
   };
 
   const handleDeleteColumn = async (colToDelete: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     const colTasks = tasks.filter(t => t.status === colToDelete);
     if (colTasks.length > 0) {
       if (!window.confirm(`There are ${colTasks.length} tasks in "${colToDelete}". Are you sure you want to delete this column?`)) return;
     }
     
     const nextCols = columns.filter(c => c !== colToDelete);
-    const success = await saveTaskColumns(user.company_id, nextCols);
+    const success = await saveTaskColumns(workspace?.id, nextCols);
     if (!success) {
       toast.error('Failed to delete column from backend');
     } else {
@@ -238,12 +235,12 @@ export default function TaskManagerPage() {
   };
 
   const handleDragEnd = async (result: DropResult) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     const { source, destination, draggableId } = result;
     if (!destination || source.droppableId === destination.droppableId) return;
     
     try {
-      await updateTask(user.company_id, draggableId, { status: destination.droppableId });
+      await updateTask(workspace?.id, draggableId, { status: destination.droppableId });
     } catch (e) {
       toast.error('Failed to move task');
     }
@@ -256,9 +253,9 @@ export default function TaskManagerPage() {
   };
 
   const handleDeleteSingleTask = async (taskId: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await deleteTask(user.company_id, taskId);
+      await deleteTask(workspace?.id, taskId);
       toast.success('Task deleted successfully');
     } catch (e) {
       toast.error('Failed to delete task');
@@ -266,9 +263,9 @@ export default function TaskManagerPage() {
   };
 
   const handleBulkDelete = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      const promises = Array.from(selectedTaskIds).map(id => deleteTask(user.company_id!, id));
+      const promises = Array.from(selectedTaskIds).map(id => deleteTask(workspace?.id!, id));
       await Promise.all(promises);
       setSelectedTaskIds(new Set());
       toast.success('Selected tasks deleted');
@@ -278,10 +275,10 @@ export default function TaskManagerPage() {
   };
 
   const handleBulkStatusChange = async (newStatus: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
       await Promise.all(
-        Array.from(selectedTaskIds).map(id => updateTask(user.company_id!, id, { status: newStatus }))
+        Array.from(selectedTaskIds).map(id => updateTask(workspace?.id!, id, { status: newStatus }))
       );
       toast.success(`${selectedTaskIds.size} tasks moved to ${newStatus}`);
       setSelectedTaskIds(new Set());
@@ -293,7 +290,7 @@ export default function TaskManagerPage() {
   const handleAddNewMember = async (e: React.MouseEvent, target: 'task' | 'subtask') => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!newMemberName.trim()) return;
     
     const newMemb = {
@@ -302,7 +299,7 @@ export default function TaskManagerPage() {
     };
     
     try {
-      const newId = await createMember(user.company_id, newMemb);
+      const newId = await createMember(workspace?.id, newMemb);
       if (newId) {
         if (target === 'task') {
           setFormAssigneeIds(prev => [...prev, newId]);
@@ -317,7 +314,7 @@ export default function TaskManagerPage() {
   };
 
   const handleAddSubtask = async () => {
-    if (!user?.company_id || !viewingTask) return;
+    if (!workspace?.id || !viewingTask) return;
     if (!newSubtaskTitle.trim()) return;
     
     const assignees = members
@@ -336,7 +333,7 @@ export default function TaskManagerPage() {
     const nextSubtasks = [...(viewingTask.subtasks || []), newSubtask];
     
     try {
-      await updateTask(user.company_id, viewingTask.id, { subtasks: nextSubtasks });
+      await updateTask(workspace?.id, viewingTask.id, { subtasks: nextSubtasks });
       setIsAddingSubtask(false);
       setNewSubtaskTitle('');
       setNewSubtaskDueDate('');
@@ -357,21 +354,21 @@ export default function TaskManagerPage() {
   };
 
   const toggleSubtaskCompletion = async (subtaskId: string) => {
-    if (!user?.company_id || !viewingTask) return;
+    if (!workspace?.id || !viewingTask) return;
     const nextSubtasks = (viewingTask.subtasks || []).map(s => 
       s.id === subtaskId ? { ...s, completed: !s.completed } : s
     );
     try {
-      await updateTask(user.company_id, viewingTask.id, { subtasks: nextSubtasks });
+      await updateTask(workspace?.id, viewingTask.id, { subtasks: nextSubtasks });
     } catch (e) {
       toast.error('Failed to update subtask');
     }
   };
 
   const updateTaskField = async (id: string, field: keyof Task, value: any) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await updateTask(user.company_id, id, { [field]: value });
+      await updateTask(workspace?.id, id, { [field]: value });
     } catch (e) {
       toast.error('Failed to update task');
     }

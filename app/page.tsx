@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 
 export default function Home() {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { workspace, user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading) {

@@ -34,7 +34,7 @@ const COLORS = [
 const MOCK_EVENTS: ScheduledEvent[] = [];
 
 export default function MarketingCalendarPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
@@ -42,8 +42,8 @@ export default function MarketingCalendarPage() {
   const [events, setEvents] = useState<ScheduledEvent[]>(MOCK_EVENTS);
   
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubscribe = subscribeToCalendar(user.company_id, (data) => {
+    if (!workspace?.id) return;
+    const unsubscribe = subscribeToCalendar(workspace?.id, (data) => {
       setEvents(data);
       if (editingEvent) {
         setEditingEvent(prev => data.find(i => i.id === prev?.id) || null);
@@ -53,7 +53,7 @@ export default function MarketingCalendarPage() {
       }
     });
     return () => unsubscribe();
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null); // null means "Month View"
@@ -124,7 +124,7 @@ export default function MarketingCalendarPage() {
   };
 
   const saveEvent = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!formTitle) return toast.error('Title is required');
     
     let finalDateStr = formDate;
@@ -145,10 +145,10 @@ export default function MarketingCalendarPage() {
 
     try {
       if (editingEvent) {
-        await updateCalendarEvent(user.company_id, editingEvent.id, finalEventData);
+        await updateCalendarEvent(workspace?.id, editingEvent.id, finalEventData);
         toast.success('Post updated successfully!', { className: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
       } else {
-        await createCalendarEvent(user.company_id, finalEventData);
+        await createCalendarEvent(workspace?.id, finalEventData);
         toast.success('Post scheduled successfully!', { className: 'bg-emerald-50 text-emerald-700 border-emerald-200' });
       }
       setIsScheduleModalOpen(false);
@@ -158,9 +158,9 @@ export default function MarketingCalendarPage() {
   };
 
   const deleteEvent = async (id: string | number) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await deleteCalendarEvent(user.company_id, id);
+      await deleteCalendarEvent(workspace?.id, id);
       toast.success('Post removed.', { className: 'bg-rose-50 text-rose-700 border-rose-200' });
     } catch (e) {
       toast.error('Failed to remove post');

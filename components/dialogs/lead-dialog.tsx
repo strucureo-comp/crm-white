@@ -91,21 +91,21 @@ function formToPayload(f: LeadForm) {
   return {
     name: f.name,
     email: f.email,
-    company: f.company || null,
-    phone: f.phone || null,
+    company: f.company || undefined,
+    phone: f.phone || undefined,
     status: f.status,
-    source: f.source || null,
-    estimated_value: f.estimated_value || null,
-    owner_id: f.owner_id || null,
-    notes: f.notes || null,
-    tags: f.tags.length > 0 ? f.tags : null,
-    priority: f.priority || null,
-    next_follow_up: f.next_follow_up || null,
+    source: f.source || undefined,
+    estimated_value: f.estimated_value || undefined,
+    owner_id: f.owner_id,
+    notes: f.notes || undefined,
+    tags: f.tags.length > 0 ? f.tags : undefined,
+    priority: f.priority || undefined,
+    next_follow_up: f.next_follow_up || undefined,
   };
 }
 
 export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState<LeadForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -134,13 +134,13 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
     try {
       const payload = formToPayload(form);
       if (lead) {
-        await updateLead(lead.id, payload as any);
+        await updateLead(lead.id, payload);
         toast.success('Updated successfully');
       } else {
         await createLead({
           ...payload,
-          company_id: user?.company_id || '',
-        } as any);
+          workspace_id: workspace?.id || '',
+        });
         toast.success('Created successfully');
       }
       onSaved();
@@ -263,10 +263,6 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
                   );
                 })}
               </div>
-            </div>
-            <div className="col-span-2">
-              <Label htmlFor="next_follow_up">Next Follow-up</Label>
-              <Input id="next_follow_up" type="date" value={form.next_follow_up} onChange={(e) => set('next_follow_up', e.target.value)} />
             </div>
           </div>
           <DialogFooter>

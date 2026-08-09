@@ -87,7 +87,7 @@ export async function getCompanyDeals(
   workspaceId: string, 
   companyId: string
 ): Promise<Deal[]> {
-  const q = query(dealsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(dealsRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
@@ -357,7 +357,7 @@ export function subscribeToCompanyDeals(
   companyId: string,
   callback: (deals: Deal[]) => void
 ): () => void {
-  const q = query(dealsRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(dealsRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {

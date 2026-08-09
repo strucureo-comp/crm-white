@@ -183,7 +183,7 @@ export async function logActivity(
     type: ActivityType;
     title: string;
     description?: string;
-    company_id?: string;
+    workspace_id?: string;
     contact_id?: string;
     deal_id?: string;
     quote_id?: string;
@@ -202,7 +202,7 @@ export async function logActivity(
     type: data.type,
     title: data.title,
     description: data.description || '',
-    company_id: data.company_id || '',
+    workspace_id: data.workspace_id || '',
     contact_id: data.contact_id || '',
     deal_id: data.deal_id || '',
     quote_id: data.quote_id || '',
@@ -251,7 +251,7 @@ export async function getCompanyActivities(
 ): Promise<NormalizedActivity[]> {
   let q = query(
     activitiesRef(workspaceId), 
-    orderByChild('company_id'), 
+    orderByChild('workspace_id'), 
     equalTo(companyId)
   );
   
@@ -426,7 +426,7 @@ export async function logLeadCreated(
     title: `Lead created: ${leadName}`,
     description: `New lead "${leadName}" was created`,
     lead_id: leadId,
-    company_id: companyId,
+    workspace_id: companyId,
   });
 }
 
@@ -444,7 +444,7 @@ export async function logLeadQualified(
     title: `Lead qualified: ${leadName}`,
     description: `Lead "${leadName}" has been qualified`,
     lead_id: leadId,
-    company_id: companyId,
+    workspace_id: companyId,
   });
 }
 
@@ -463,7 +463,7 @@ export async function logDealCreated(
     title: `Deal created: ${dealTitle}`,
     description: `New deal "${dealTitle}" was created`,
     deal_id: dealId,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
   });
 }
@@ -484,7 +484,7 @@ export async function logDealStageChanged(
     title: `Deal stage changed: ${dealTitle}`,
     description: `Deal "${dealTitle}" moved from "${oldStage}" to "${newStage}"`,
     deal_id: dealId,
-    company_id: companyId,
+    workspace_id: companyId,
     metadata: { old_stage: oldStage, new_stage: newStage },
   });
 }
@@ -505,7 +505,7 @@ export async function logQuoteCreated(
     title: `Quote created: ${quoteNumber}`,
     description: `New quote "${quoteNumber}" was created`,
     quote_id: quoteId,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId,
   });
@@ -527,7 +527,7 @@ export async function logInvoiceCreated(
     title: `Invoice created: ${invoiceNumber}`,
     description: `New invoice "${invoiceNumber}" was created`,
     invoice_id: invoiceId,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId,
   });
@@ -548,7 +548,7 @@ export async function logPaymentReceived(
     type: 'payment_received',
     title: `Payment received: ${amount}`,
     description: `Payment of ${amount} received for invoice "${invoiceNumber}"`,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     metadata: { amount, invoice_number: invoiceNumber },
   });
@@ -570,7 +570,7 @@ export async function logQuoteAccepted(
     title: `Quote ${quoteNumber} accepted`,
     description: `Quote has been accepted by client`,
     quote_id: quoteId,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId || '',
     metadata: { quote_number: quoteNumber },
@@ -593,7 +593,7 @@ export async function logQuoteRejected(
     title: `Quote ${quoteNumber} rejected`,
     description: `Quote has been rejected by client`,
     quote_id: quoteId,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId || '',
     metadata: { quote_number: quoteNumber },
@@ -614,7 +614,7 @@ export async function logDealWon(
     type: 'deal_won',
     title: `Deal won: ${dealTitle}`,
     description: `Deal has been marked as won`,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId,
     metadata: { deal_title: dealTitle },
@@ -635,7 +635,7 @@ export async function logDealLost(
     type: 'deal_lost',
     title: `Deal lost: ${dealTitle}`,
     description: `Deal has been marked as lost`,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId,
     metadata: { deal_title: dealTitle },
@@ -658,7 +658,7 @@ export async function logInvoicePaid(
     title: `Invoice ${invoiceNumber} paid`,
     description: `Invoice has been fully paid`,
     invoice_id: invoiceId,
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     deal_id: dealId || '',
     metadata: { invoice_number: invoiceNumber },
@@ -704,7 +704,7 @@ export function subscribeToCompanyActivities(
 ): () => void {
   const q = query(
     activitiesRef(workspaceId), 
-    orderByChild('company_id'), 
+    orderByChild('workspace_id'), 
     equalTo(companyId)
   );
   

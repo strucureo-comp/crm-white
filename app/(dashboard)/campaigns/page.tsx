@@ -36,18 +36,18 @@ const GoogleIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
 );
 
 export default function CampaignsPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
   const [externalCampaigns, setExternalCampaigns] = useState<Campaign[]>([]);
 
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubscribe = subscribeToCampaigns(user.company_id, (data) => {
+    if (!workspace?.id) return;
+    const unsubscribe = subscribeToCampaigns(workspace?.id, (data) => {
       setInternalCampaigns(data.filter(c => c.source === 'internal'));
       setExternalCampaigns(data.filter(c => c.source !== 'internal'));
     });
     return () => unsubscribe();
-  }, [user?.company_id]);
+  }, [workspace?.id]);
   
   const metaConnected = externalCampaigns.some(c => c.source === 'meta');
   const googleConnected = externalCampaigns.some(c => c.source === 'google');
@@ -78,9 +78,9 @@ export default function CampaignsPage() {
   };
 
   const handleConnectMeta = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await createCampaign(user.company_id, {
+      await createCampaign(workspace?.id, {
         name: "Retargeting - Product A",
         source: "meta",
         status: "Active",
@@ -98,9 +98,9 @@ export default function CampaignsPage() {
   };
 
   const handleConnectGoogle = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await createCampaign(user.company_id, {
+      await createCampaign(workspace?.id, {
         name: "Search - Brand Keywords",
         source: "google",
         status: "Active",
@@ -118,7 +118,7 @@ export default function CampaignsPage() {
   };
 
   const handleSyncData = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!metaConnected && !googleConnected) {
       addToast("Connect an external provider to sync data.", "error");
       return;
@@ -127,7 +127,7 @@ export default function CampaignsPage() {
     
     try {
       const updates = externalCampaigns.map(c => {
-        return updateCampaign(user.company_id!, c.id!, {
+        return updateCampaign(workspace?.id!, c.id!, {
           spent: c.spent + Math.floor(Math.random() * 100),
           clicks: c.clicks + Math.floor(Math.random() * 50),
           impressions: c.impressions + Math.floor(Math.random() * 1000),
@@ -144,11 +144,11 @@ export default function CampaignsPage() {
   };
 
   const handleSaveCampaign = async () => {
-    if (!user?.company_id || !formData.name || !formData.budget) return;
+    if (!workspace?.id || !formData.name || !formData.budget) return;
     
     try {
       if (editingCampaign && editingCampaign.id) {
-        await updateCampaign(user.company_id, editingCampaign.id, formData);
+        await updateCampaign(workspace?.id, editingCampaign.id, formData);
         addToast("Campaign updated!");
       } else {
         const newCampaign = {
@@ -166,7 +166,7 @@ export default function CampaignsPage() {
           spendHistory: formData.spendHistory || [],
           ...formData
         };
-        await createCampaign(user.company_id, newCampaign);
+        await createCampaign(workspace?.id, newCampaign);
         addToast("Campaign created!");
       }
       setIsModalOpen(false);
@@ -178,10 +178,10 @@ export default function CampaignsPage() {
   };
 
   const handleDeleteCampaign = async (id: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (confirm("Are you sure you want to delete this campaign?")) {
       try {
-        await deleteCampaign(user.company_id, id);
+        await deleteCampaign(workspace?.id, id);
         addToast("Campaign deleted!");
       } catch (e) {
         addToast("Failed to delete campaign", "error");

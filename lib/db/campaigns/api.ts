@@ -22,7 +22,7 @@ export type Campaign = {
   endDate?: string;
   currency?: string;
   spendHistory?: SpendEntry[];
-  company_id?: string;
+  workspace_id?: string;
 };
 
 function campaignsRef(workspaceId: string) {

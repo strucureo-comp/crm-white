@@ -45,29 +45,31 @@ export default function AiAssistantPage() {
   const [sending, setSending] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
+  const workspaceId = workspace?.id || '';
   const historyRef = useRef<HTMLDivElement>(null);
 
   const activeConversation = conversations.find((c) => c.id === activeId) || null;
 
   const load = useCallback(async () => {
+    if (!workspaceId) return;
     setLoading(true);
-    const data = await getAiConversations();
+    const data = await getAiConversations(workspaceId);
     setConversations(data);
     if (data.length > 0) {
       setActiveId(data[0].id);
     }
     setLoading(false);
-  }, []);
+  }, [workspaceId]);
 
   useEffect(() => { load(); }, [load]);
 
   async function handleSend() {
-    if (!message.trim() || sending) return;
+    if (!message.trim() || sending || !workspaceId) return;
     let conv = activeConversation;
 
     if (!conv) {
-      const id = await createAiConversation({
+      const id = await createAiConversation(workspaceId, {
         title: message.slice(0, 40) + (message.length > 40 ? '...' : ''),
         assistant: 'tara',
         messages: [],
@@ -82,7 +84,7 @@ export default function AiAssistantPage() {
     setSending(true);
     const userMsg: AiMessage = { role: 'user', message, timestamp: new Date().toISOString() };
     const updatedMessages = [...(conv!.messages || []), userMsg];
-    await updateAiConversation(conv!.id, { messages: updatedMessages });
+    await updateAiConversation(workspaceId, conv!.id, { messages: updatedMessages });
     setMessage('');
 
     let aiMessage = 'No response available.';
@@ -102,7 +104,7 @@ export default function AiAssistantPage() {
 
     const aiMsg: AiMessage = { role: 'assistant', message: aiMessage, timestamp: new Date().toISOString() };
     const finalMessages = [...updatedMessages, aiMsg];
-    await updateAiConversation(conv!.id, { messages: finalMessages, title: conv!.messages.length === 0 ? userMsg.message.slice(0, 40) : conv!.title });
+    await updateAiConversation(workspaceId, conv!.id, { messages: finalMessages, title: conv!.messages.length === 0 ? userMsg.message.slice(0, 40) : conv!.title });
     setSending(false);
     load();
   }
@@ -120,7 +122,7 @@ export default function AiAssistantPage() {
     if (!id) return;
     setConfirmState((prev) => ({ ...prev, loading: true }));
     try {
-      await deleteAiConversation(id);
+      await deleteAiConversation(workspaceId, id);
       if (activeId === id) setActiveId(null);
       load();
     } catch {
@@ -158,7 +160,7 @@ export default function AiAssistantPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <Select defaultValue="tara" value={activeConversation?.assistant || 'tara'} onValueChange={async (v) => { if (activeConversation) { await updateAiConversation(activeConversation.id, { assistant: v }); load(); } }}>
+          <Select defaultValue="tara" value={activeConversation?.assistant || 'tara'} onValueChange={async (v) => { if (activeConversation) { await updateAiConversation(workspaceId, activeConversation.id, { assistant: v }); load(); } }}>
             <SelectTrigger className="w-[150px]">
               <SelectValue />
             </SelectTrigger>

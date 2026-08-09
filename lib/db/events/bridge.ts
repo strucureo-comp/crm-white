@@ -30,7 +30,7 @@ export function initEventBridge(companyId: string): () => void {
           const normalizedLead: NormalizedLead = {
             lead_id: id,
             workspace_id: companyId,
-            company_id: leadData.company_id || '',
+            company_id: companyId,
             contact_id: leadData.contact_id || '',
             name: leadData.name || '',
             email: leadData.email || '',

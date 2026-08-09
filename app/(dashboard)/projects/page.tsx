@@ -30,31 +30,6 @@ import {
 
 const COLUMNS: ProjectStatus[] = ['Kick-off', 'Planning', 'Implementation', 'Review', 'Closing'];
 
-// --- Mock Data ---
-const MOCK_MEMBERS: Member[] = [
-  { id: 'm1', name: 'Alex Rivera', avatar: 'AR' },
-  { id: 'm2', name: 'Sarah Jones', avatar: 'SJ' },
-  { id: 'm3', name: 'Mike Thomas', avatar: 'MT' }
-];
-
-const MOCK_PROJECTS: Project[] = [
-  {
-    id: 'p1', name: 'Website Redesign 2026', status: 'Planning', color: '#8b5cf6', members: ['m1', 'm2'],
-    linkedDeal: 'Acme Corp Upgrade', emoji: '🎨', startDate: '2026-08-01', endDate: '2026-10-15',
-    budget: { est: 15000, actual: 2500 }, progress: 35
-  },
-  {
-    id: 'p2', name: 'Q3 Ad Campaign', status: 'Kick-off', color: '#ec4899', members: ['m3'],
-    linkedDeal: null, emoji: '📢', startDate: '2026-07-15', endDate: '2026-09-30',
-    budget: { est: 5000, actual: 0 }, progress: 5
-  }
-];
-
-const MOCK_TASKS: Task[] = [
-  { id: 't1', title: 'Wireframe Homepage', projectId: 'p1', owner: 'm1', status: 'Done', priority: 'High', due: '2026-08-10', phase: 'Planning' },
-  { id: 't2', title: 'Approve Copywriting', projectId: 'p1', owner: 'm2', status: 'To Do', priority: 'Urgent', due: '2026-08-15', phase: 'Planning' }
-];
-
 // --- Helpers ---
 const CircularProgress = ({ progress, color }: { progress: number, color: string }) => {
   const radius = 14;
@@ -72,7 +47,7 @@ const CircularProgress = ({ progress, color }: { progress: number, color: string
 };
 
 export default function ProjectsPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
@@ -87,8 +62,8 @@ export default function ProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubscribe = subscribeToProjectsData(user.company_id, (data: ProjectsData) => {
+    if (!workspace?.id) return;
+    const unsubscribe = subscribeToProjectsData(workspace?.id, (data: ProjectsData) => {
       setProjects(data.projects);
       setMembers(data.members);
       setTasks(data.tasks);
@@ -99,7 +74,7 @@ export default function ProjectsPage() {
       }
     });
     return () => unsubscribe();
-  }, [user?.company_id, selectedProject?.id]);
+  }, [workspace?.id, selectedProject?.id]);
 
   // Overlay Tabs
   const [activeTab, setActiveTab] = useState<'Plan' | 'Files' | 'Notes' | 'Emails' | 'Documents'>('Plan');
@@ -127,9 +102,9 @@ export default function ProjectsPage() {
     if (!destination) return;
     if (source.droppableId === destination.droppableId) return;
 
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await updateProject(user.company_id, draggableId, { status: destination.droppableId as ProjectStatus });
+      await updateProject(workspace?.id, draggableId, { status: destination.droppableId as ProjectStatus });
       toast.success(`Moved to ${destination.droppableId}`);
     } catch (e) {
       toast.error('Failed to move project');
@@ -137,7 +112,7 @@ export default function ProjectsPage() {
   };
 
   const handleCreateProject = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!formName.trim()) return toast.error('Project name is required');
 
     const newProject = {
@@ -154,7 +129,7 @@ export default function ProjectsPage() {
     };
 
     try {
-      await createProject(user.company_id, newProject);
+      await createProject(workspace?.id, newProject);
       setIsCreateOpen(false);
       toast.success('Project created successfully');
 
@@ -171,7 +146,7 @@ export default function ProjectsPage() {
   const handleAddNewMember = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!newMemberName.trim()) return;
 
     const newMemb = {
@@ -180,7 +155,7 @@ export default function ProjectsPage() {
     };
 
     try {
-      const newId = await createMember(user.company_id, newMemb);
+      const newId = await createMember(workspace?.id, newMemb);
       if (newId) setFormMembers(prev => [...prev, newId]);
       setNewMemberName('');
     } catch (err) {
@@ -189,7 +164,7 @@ export default function ProjectsPage() {
   };
 
   const handleCreateTask = async (phase: ProjectStatus) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!taskFormTitle.trim()) return toast.error('Task title is required');
     if (!taskFormOwner) return toast.error('Assignee is required');
 
@@ -204,7 +179,7 @@ export default function ProjectsPage() {
     };
 
     try {
-      await createTask(user.company_id, newTask);
+      await createTask(workspace?.id, newTask);
       setAddingTaskPhase(null);
       setTaskFormTitle('');
       setTaskFormOwner('');

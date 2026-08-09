@@ -10,14 +10,11 @@ import { ClientSection } from './client-section';
 import { ItemsTable } from './items-table';
 import { PricingSummary } from './pricing-summary';
 import { NotesSection } from './notes-section';
-import { LivePreview } from './live-preview';
-import { DocumentLayout } from './document-layout';
 import { useWorkspace } from '@/lib/settings/workspace-context';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { createQuotation, updateQuotation } from '@/lib/firebase/database';
 import type { Quotation, QuotationStatus } from '@/lib/db/types';
 import type {
-  DocumentTemplate,
   DocumentMeta,
   DocumentClient,
   DocumentItem,
@@ -33,14 +30,11 @@ interface QuoteFormProps {
 export function QuoteForm({ existingQuote }: QuoteFormProps) {
   const router = useRouter();
   const { settings } = useWorkspace();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
   // Form state
-  const [template, setTemplate] = useState<DocumentTemplate>(
-    (settings.branding.template_style as DocumentTemplate) || 'modern'
-  );
   const [meta, setMeta] = useState<DocumentMeta>({
     document_number: existingQuote?.quotation_number || `QTE-${Date.now().toString().slice(-6)}`,
     status: existingQuote?.status || 'draft',
@@ -59,15 +53,15 @@ export function QuoteForm({ existingQuote }: QuoteFormProps) {
     email: existingQuote?.client_email || '',
     phone: '',
     address: existingQuote?.client_address || '',
-    gstin: '',
+    gstin: existingQuote?.client_gstin || '',
   });
 
   const [items, setItems] = useState<DocumentItem[]>(() => {
     if (existingQuote?.items && existingQuote.items.length > 0) {
       return existingQuote.items.map((item, idx) => ({
-        id: crypto.randomUUID(),
-        name: item.description || '',
-        description: '',
+        id: item.item_id || crypto.randomUUID(),
+        name: item.name || item.description || '',
+        description: item.name ? (item.description || '') : '',
         quantity: item.quantity,
         unit: 'pcs',
         unit_price: item.unit_price,
@@ -77,20 +71,25 @@ export function QuoteForm({ existingQuote }: QuoteFormProps) {
     return [createEmptyItem()];
   });
 
-  const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(existingQuote?.discount_percent || 0);
+  const [taxCgst, setTaxCgst] = useState(existingQuote?.cgst_percent ?? settings.branding.tax_cgst ?? 0);
+  const [taxSgst, setTaxSgst] = useState(existingQuote?.sgst_percent ?? settings.branding.tax_sgst ?? 0);
+  const [taxIgst, setTaxIgst] = useState(existingQuote?.igst_percent ?? settings.branding.tax_igst ?? 0);
+
   const [notes, setNotes] = useState<DocumentNotes>({
     notes: existingQuote?.notes || '',
-    terms: settings.branding.default_terms || '',
-    internal_notes: '',
+    terms: existingQuote?.terms ?? settings.branding.default_terms ?? '',
+    internal_notes: existingQuote?.internal_notes || '',
+    delivery_timeline: existingQuote?.delivery_timeline || '',
   });
 
   // Calculate pricing
   const pricing = calculatePricing(
     items,
     discountPercent,
-    settings.branding.tax_cgst || 0,
-    settings.branding.tax_sgst || 0,
-    settings.branding.tax_igst || 0
+    taxCgst,
+    taxSgst,
+    taxIgst
   );
 
   // Update meta defaults when settings change
@@ -128,16 +127,29 @@ export function QuoteForm({ existingQuote }: QuoteFormProps) {
           client_email: client.email,
           client_company: client.company,
           client_address: client.address,
+          client_gstin: client.gstin,
           project_title: '',
           amount: pricing.grand_total,
+          subtotal: pricing.subtotal,
+          discount_percent: pricing.discount_percent,
+          discount_amount: pricing.discount_amount,
+          tax_amount: pricing.tax_amount,
+          cgst_percent: pricing.cgst_percent,
+          sgst_percent: pricing.sgst_percent,
+          igst_percent: pricing.igst_percent,
           currency: meta.currency,
           valid_until: meta.valid_until ? new Date(meta.valid_until).toISOString() : '',
           status: status,
           description: '',
           notes: notes.notes,
-          company_id: user?.company_id || '',
+          terms: notes.terms,
+          internal_notes: notes.internal_notes,
+          delivery_timeline: notes.delivery_timeline,
+          workspace_id: workspace?.id || '',
           items: items.map((item) => ({
-            description: item.name,
+            item_id: item.id,
+            name: item.name,
+            description: item.description,
             quantity: item.quantity,
             unit_price: item.unit_price,
             total: item.total,
@@ -190,41 +202,26 @@ export function QuoteForm({ existingQuote }: QuoteFormProps) {
         </div>
       </div>
 
-      {/* Two-Column Layout */}
-      <DocumentLayout
-        leftColumn={
-          <div className="space-y-6">
-            <DocumentHeader
-              meta={meta}
-              onMetaChange={(m) => setMeta((prev) => ({ ...prev, ...m }))}
-              template={template}
-              onTemplateChange={setTemplate}
-              docType="quote"
-            />
-            <ClientSection client={client} onClientChange={(c) => setClient((prev) => ({ ...prev, ...c }))} />
-            <ItemsTable items={items} onItemsChange={setItems} currency={meta.currency} />
-            <PricingSummary
-              pricing={pricing}
-              onPricingChange={(p) => {
-                if (p.discount_percent !== undefined) setDiscountPercent(p.discount_percent);
-              }}
-              currency={meta.currency}
-            />
-            <NotesSection notes={notes} onNotesChange={(n) => setNotes((prev) => ({ ...prev, ...n }))} docType="quote" />
-          </div>
-        }
-        rightColumn={
-          <LivePreview
-            docType="quote"
-            template={template}
-            meta={meta}
-            client={client}
-            items={items}
-            pricing={pricing}
-            notes={notes}
-          />
-        }
-      />
+      <div className="max-w-4xl mx-auto w-full mt-8 pb-24 space-y-8">
+        <DocumentHeader
+          meta={meta}
+          onMetaChange={(m) => setMeta((prev) => ({ ...prev, ...m }))}
+          docType="quote"
+        />
+        <ClientSection client={client} onClientChange={(c) => setClient((prev) => ({ ...prev, ...c }))} />
+        <ItemsTable items={items} onItemsChange={setItems} currency={meta.currency} />
+        <PricingSummary
+          pricing={pricing}
+          onPricingChange={(p) => {
+            if (p.discount_percent !== undefined) setDiscountPercent(p.discount_percent);
+            if (p.cgst_percent !== undefined) setTaxCgst(p.cgst_percent);
+            if (p.sgst_percent !== undefined) setTaxSgst(p.sgst_percent);
+            if (p.igst_percent !== undefined) setTaxIgst(p.igst_percent);
+          }}
+          currency={meta.currency}
+        />
+        <NotesSection notes={notes} onNotesChange={(n) => setNotes((prev) => ({ ...prev, ...n }))} docType="quote" />
+      </div>
     </div>
   );
 }

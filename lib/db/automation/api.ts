@@ -643,13 +643,14 @@ export async function deleteMedia(workspaceId: string, fileId: string): Promise<
 
 // ===== Calendar =====
 
-export async function createCalendarEvent(workspaceId: string, event: Omit<CalendarEvent, 'id' | 'event_id' | 'created_at' | 'updated_at'>): Promise<CalendarEvent> {
+export async function createCalendarEvent(workspaceId: string, event: Omit<CalendarEvent, 'id' | 'event_id' | 'created_at' | 'updated_at' | 'workspace_id'>): Promise<CalendarEvent> {
   const newRef = push(calendarRef(workspaceId));
   const eventId = newRef.key!;
   const now = new Date().toISOString();
   
   const fullEvent: CalendarEvent = {
     ...event,
+    workspace_id: workspaceId,
     id: eventId,
     event_id: eventId,
     created_at: now,

@@ -76,7 +76,7 @@ export async function POST(request: NextRequest) {
         for (const app of Object.values(apps) as any[]) {
           if (app.platform === 'whatsapp' && app.config?.phoneNumberId === phoneNumberOf) {
             workspaceId = wsId;
-            // Get company_id from workspace-scoped companies table
+            // Get workspace_id from workspace-scoped companies table
             const companiesSnap = await db.ref(`workspaces/${wsId}/companies`).once('value');
             const companies = companiesSnap.val() || {};
             const firstCompany = Object.values(companies)[0] as any;
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       const writes = parsed.messages.map((msg) =>
         db.ref(`workspaces/${workspaceId}/whatsapp_messages/${msg.messageId}`).set({
           ...msg,
-          company_id: companyId,
+          workspace_id: companyId,
           direction: 'incoming',
           timestamp: msg.timestamp.toISOString(),
         }),
@@ -116,7 +116,7 @@ export async function POST(request: NextRequest) {
         const fallbackWrites = parsed.messages.map((msg) =>
           set(ref(database, `workspaces/${workspaceId}/whatsapp_messages/${msg.messageId}`), {
             ...msg,
-            company_id: companyId,
+            workspace_id: companyId,
             direction: 'incoming',
             timestamp: msg.timestamp.toISOString(),
           }),

@@ -56,7 +56,7 @@ export interface EntityConfig {
 export interface FinanceConfiguration {
   // Company Info
   company_name: string;
-  company_id: string;
+  workspace_id: string;
   
   // Accounting Standard
   accounting_standard: AccountingStandard;

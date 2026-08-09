@@ -136,7 +136,7 @@ export async function getCompanyQuotes(
   workspaceId: string, 
   companyId: string
 ): Promise<NormalizedQuote[]> {
-  const q = query(quotesRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(quotesRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   const snapshot = await get(q);
   
   if (snapshot.exists()) {
@@ -371,7 +371,7 @@ export function subscribeToCompanyQuotes(
   companyId: string,
   callback: (quotes: NormalizedQuote[]) => void
 ): () => void {
-  const q = query(quotesRef(workspaceId), orderByChild('company_id'), equalTo(companyId));
+  const q = query(quotesRef(workspaceId), orderByChild('workspace_id'), equalTo(companyId));
   
   const unsubscribe = onValue(q, (snapshot) => {
     if (snapshot.exists()) {

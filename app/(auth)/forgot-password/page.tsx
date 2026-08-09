@@ -13,7 +13,7 @@ export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [sent, setSent] = useState(false);
-  const { resetPassword } = useAuth();
+  const { workspace, resetPassword } = useAuth();
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();

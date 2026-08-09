@@ -60,6 +60,7 @@ export interface PdfDocumentMeta {
   due_date?: string;
   valid_until?: string;
   status?: string;
+  primaryColor?: string; // ← passed into HTML template for theming
 }
 
 export interface PdfAddress {
@@ -69,20 +70,11 @@ export interface PdfAddress {
   email?: string;
   phone?: string;
   address?: string;
-}
-
-export interface PdfTableRow {
-  cells: string[];
-  styles?: Record<number, { halign?: 'left' | 'center' | 'right'; fontStyle?: string }>;
-}
-
-export interface PdfTableSection {
-  head: string[];
-  body: PdfTableRow[];
-  footer?: string[];
+  gstin?: string;
 }
 
 export interface PdfLineItem {
+  name: string;
   description: string;
   quantity: string;
   unit_price: string;
@@ -98,5 +90,11 @@ export interface PdfDocumentInput {
   notes?: string;
   terms?: string;
   bank_details?: string[];
-  signatures?: { label: string; image_url?: string }[];
+  payment_summary?: { amount_paid: number; balance_due: number };
+}
+
+// Old jsPDF types kept for reference — no longer used in generation
+export interface PdfTableRow {
+  cells: string[];
+  styles?: Record<number, { halign?: 'left' | 'center' | 'right'; fontStyle?: string }>;
 }

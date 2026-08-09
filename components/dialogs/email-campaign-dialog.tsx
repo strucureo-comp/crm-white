@@ -43,7 +43,7 @@ const defaultForm = {
 };
 
 export function EmailCampaignDialog({ open, onOpenChange, onSaved, item, templates }: EmailCampaignDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -94,7 +94,7 @@ export function EmailCampaignDialog({ open, onOpenChange, onSaved, item, templat
       } else {
         await createEmailCampaign({
           ...payload,
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
         });
         toast.success('Campaign created');
       }

@@ -14,6 +14,7 @@ import {
   Download, RotateCcw, AlertTriangle, ExternalLink,
   Globe, Zap, Lock, Mail as MailIcon, Clock, Smartphone, Laptop,
 } from 'lucide-react';
+import { auth } from '@/lib/firebase/config';
 import { ThemeSwitcher } from '@/components/dashboard/theme-switcher';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
@@ -102,7 +103,7 @@ function PrefixSelect({ value, onValueChange, presets, label }: {
 }
 
 export default function SettingsPage() {
-  const { user, resetPassword } = useAuth();
+  const { workspace, user, resetPassword } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle');
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
@@ -314,22 +315,41 @@ export default function SettingsPage() {
     const setLoading = field === 'logo_url' ? setUploadingLogo : setUploadingFooterLogo;
     setLoading(true);
     try {
-      const reader = new FileReader();
-      const dataUrl = await new Promise<string>((resolve, reject) => {
-        reader.onload = () => resolve(reader.result as string);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      const sizeKb = Math.round((dataUrl.length * 3) / 4 / 1024);
-      if (sizeKb > 600) {
-        toast.error(`Image is ${sizeKb}KB (base64). Max 600KB allowed.`);
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Logo file too large (max 5MB)');
         return;
       }
-      setBranding((p) => ({ ...p, [field]: dataUrl }));
+      
+      const token = await auth.currentUser?.getIdToken();
+      if (!token) throw new Error('Not authenticated');
+
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('bucket', 'media');
+      formData.append('path', `logos/${Date.now()}_${file.name}`);
+
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const data = await res.json();
+        throw new Error(data.error || 'Upload failed');
+      }
+
+      const { url } = await res.json();
+      setBranding((p) => ({ ...p, [field]: url }));
       markDirty();
       toast.success('Logo uploaded successfully');
-    } catch { toast.error('Failed to upload logo'); }
-    finally { setLoading(false); }
+    } catch (e: any) { 
+      toast.error(e.message || 'Failed to upload logo'); 
+    } finally { 
+      setLoading(false); 
+    }
   }
 
   function exportSettings() {

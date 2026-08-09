@@ -52,8 +52,8 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 export default function ReportsPage() {
-  const { user } = useAuth();
-  const companyId = user?.company_id;
+  const { workspace, user } = useAuth();
+  const companyId = workspace?.id;
 
   const [activeType, setActiveType] = useState<ReportType>('revenue');
   const [isGenerating, setIsGenerating] = useState(false);

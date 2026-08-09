@@ -46,7 +46,7 @@ const PlatformTheme = (platform: string) => {
 };
 
 export default function SocialPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -69,12 +69,12 @@ export default function SocialPage() {
   }, []);
 
   useEffect(() => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     let unsubscribe: (() => void) | undefined;
 
     const init = async () => {
-      await ensureDefaultAccounts(user.company_id!);
-      unsubscribe = subscribeToSocialData(user.company_id!, (data) => {
+      await ensureDefaultAccounts(workspace?.id!);
+      unsubscribe = subscribeToSocialData(workspace?.id!, (data) => {
         setAccounts(data.accounts);
         setPosts(data.posts);
         setIsLoading(false);
@@ -85,7 +85,7 @@ export default function SocialPage() {
     return () => {
       if (unsubscribe) unsubscribe();
     };
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   const pendingPosts = posts.filter(p => p.status === 'pending');
   const publishedPosts = posts.filter(p => p.status === 'published');
@@ -98,9 +98,9 @@ export default function SocialPage() {
     : '0.0';
 
   const handleApprove = async (id: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await updatePost(user.company_id, id, { status: 'published' });
+      await updatePost(workspace?.id, id, { status: 'published' });
       toast.success('Post approved and published!');
     } catch {
       toast.error('Failed to approve post');
@@ -108,9 +108,9 @@ export default function SocialPage() {
   };
 
   const handleReject = async (id: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await deletePost(user.company_id, id);
+      await deletePost(workspace?.id, id);
       toast.success('Post rejected and removed.');
     } catch {
       toast.error('Failed to reject post');
@@ -118,10 +118,10 @@ export default function SocialPage() {
   };
 
   const handleDeletePublished = async (id: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!confirm('Delete this published post?')) return;
     try {
-      await deletePost(user.company_id, id);
+      await deletePost(workspace?.id, id);
       toast.success('Post deleted.');
     } catch {
       toast.error('Failed to delete post');
@@ -129,7 +129,7 @@ export default function SocialPage() {
   };
 
   const handleLinkAccount = async (platform: SocialPlatform) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!linkHandle.trim()) {
       toast.error('Please enter your account handle');
       return;
@@ -138,7 +138,7 @@ export default function SocialPage() {
     try {
       const existing = accounts.find(a => a.platform === platform);
       if (existing) {
-        await updateAccount(user.company_id, existing.id, {
+        await updateAccount(workspace?.id, existing.id, {
           connected: true,
           handle: linkHandle.trim(),
           followers: 0,
@@ -156,10 +156,10 @@ export default function SocialPage() {
   };
 
   const handleDisconnect = async (accountId: string, platform: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!confirm(`Disconnect your ${platform} account?`)) return;
     try {
-      await updateAccount(user.company_id, accountId, {
+      await updateAccount(workspace?.id, accountId, {
         connected: false,
         handle: '',
         followers: 0,
@@ -175,7 +175,7 @@ export default function SocialPage() {
   };
 
   const handleCreatePost = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!formContent.trim()) {
       toast.error('Post content is required');
       return;
@@ -200,7 +200,7 @@ export default function SocialPage() {
     };
 
     try {
-      await createPost(user.company_id, newPost);
+      await createPost(workspace?.id, newPost);
       setIsCreateOpen(false);
       toast.success(formPublishMode === 'immediate' ? 'Post published successfully!' : 'Post added to pending queue.');
       setFormContent('');

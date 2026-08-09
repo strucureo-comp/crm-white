@@ -43,7 +43,7 @@ const breadcrumbs: Record<string, string> = {
   '/dashboard': 'Dashboard',
   '/leads': 'Leads',
   '/contacts': 'Contacts',
-  '/deals': 'Deals',
+
   '/pipeline': 'Pipeline',
   '/field-monitoring': 'Field Monitoring',
   '/quotes': 'Quotes',
@@ -71,10 +71,10 @@ export function AppHeader() {
 
   const loadNotifs = useCallback(async () => {
     if (!user?.id) return;
-    const notifications = await getNotifications(user.id, user.company_id).catch(() => []);
+    const notifications = await getNotifications(user.id, workspace?.id).catch(() => []);
     setNotifList(notifications);
     setNotificationCount(notifications.filter((n) => !n.read).length);
-  }, [user?.id, user?.company_id]);
+  }, [user?.id, workspace?.id]);
 
   useEffect(() => { loadNotifs(); }, [loadNotifs]);
 
@@ -149,7 +149,7 @@ export function AppHeader() {
                       className={`w-full text-left p-3 text-sm border-b hover:bg-muted/50 transition-colors ${!n.read ? 'bg-primary/5 font-medium' : ''}`}
                       onClick={async () => {
                         if (!n.read) {
-                          await markNotificationAsRead(n.id, user?.company_id);
+                          await markNotificationAsRead(n.id, workspace?.id);
                           loadNotifs();
                         }
                         if (n.link) router.push(n.link);

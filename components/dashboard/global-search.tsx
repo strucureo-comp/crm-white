@@ -6,6 +6,7 @@ import { Search, Command, FileText, Users, DollarSign, Briefcase, ArrowRight, Ch
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { getLeads, getProjects, getTasks } from '@/lib/firebase/database';
+import { useAuth } from '@/lib/firebase/auth-context';
 
 interface SearchResult {
   label: string;
@@ -19,7 +20,7 @@ const staticItems: SearchResult[] = [
   { label: 'Dashboard', href: '/dashboard', icon: Briefcase, category: 'Pages' },
   { label: 'Leads', href: '/leads', icon: Users, category: 'CRM' },
   { label: 'Contacts', href: '/contacts', icon: Users, category: 'CRM' },
-  { label: 'Deals', href: '/deals', icon: DollarSign, category: 'CRM' },
+
   { label: 'Quotes', href: '/quotes', icon: FileText, category: 'Revenue' },
   { label: 'Invoices', href: '/invoices', icon: FileText, category: 'Revenue' },
   { label: 'Contracts', href: '/contracts', icon: FileText, category: 'Revenue' },
@@ -40,15 +41,16 @@ export function GlobalSearch({ open, onOpenChange }: GlobalSearchProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [dynamicResults, setDynamicResults] = useState<SearchResult[]>([]);
+  const { workspace, user } = useAuth();
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || !workspace?.id) return;
     const load = async () => {
       try {
         const [leads, projects, tasks] = await Promise.all([
-          getLeads(),
-          getProjects(),
-          getTasks(),
+          getLeads(workspace?.id),
+          getProjects(workspace?.id),
+          getTasks(workspace?.id),
         ]);
         const results: SearchResult[] = [
           ...leads.map((l) => ({

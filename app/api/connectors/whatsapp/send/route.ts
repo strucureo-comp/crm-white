@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { to, message, company_id } = body as { to?: string; message?: string; company_id?: string };
+    const { to, message, workspace_id } = body as { to?: string; message?: string; workspace_id?: string };
 
     if (!to || !message) {
       return NextResponse.json(
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
         to,
         body: message,
         type: 'text',
-        company_id: company_id || '',
+        workspace_id: workspace_id || '',
         direction: 'outgoing',
         status: 'sent',
         timestamp: new Date().toISOString(),

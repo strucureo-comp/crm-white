@@ -57,7 +57,7 @@ const STAGE_LABELS: Record<string, string> = {
 };
 
 export default function FunnelPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -65,15 +65,15 @@ export default function FunnelPage() {
   const [dateRange, setDateRange] = useState('30d');
 
   const load = useCallback(async () => {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const [leadsData, pipelinesData] = await Promise.all([
-        getLeads(user.company_id),
-        getPipelines(user.company_id),
+        getLeads(workspace?.id),
+        getPipelines(workspace?.id),
       ]);
       setLeads(leadsData);
       setPipelines(pipelinesData);
@@ -82,7 +82,7 @@ export default function FunnelPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   useEffect(() => {
     load();
@@ -91,7 +91,15 @@ export default function FunnelPage() {
   const daysOld = dateRange === '7d' ? 7 : dateRange === '90d' ? 90 : dateRange === '1y' ? 365 : 30;
   const cutoff = new Date(Date.now() - daysOld * 86400000).toISOString();
 
-  const filteredLeads = leads.filter((l) => l.created_at >= cutoff);
+  const filteredLeads = leads.filter((l) => {
+    const withinDate = l.created_at >= cutoff;
+    if (!withinDate) return false;
+    if (selectedPipeline === 'all') return true;
+    const pipeline = pipelines.find(p => p.id === selectedPipeline);
+    if (!pipeline) return true;
+    const stageNames = pipeline.stages.map(s => s.name.toLowerCase());
+    return stageNames.includes(l.status);
+  });
 
   const stageData = FUNNEL_STAGES.map((stage) => {
     const stageLeads = filteredLeads.filter((l) => l.status === stage);

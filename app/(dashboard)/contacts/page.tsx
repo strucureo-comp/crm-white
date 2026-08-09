@@ -23,6 +23,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { DataPagination } from '@/components/ui/data-pagination';
 import { getContacts, deleteContact } from '@/lib/db/contacts/api';
 import type { Contact } from '@/lib/db/types';
 import { ContactDialog } from '@/components/dialogs/contact-dialog';
@@ -49,9 +50,11 @@ function formatDate(dateStr: string | undefined | null): string {
   }
 }
 
+const PAGE_SIZE = 25;
+
 export default function ContactsPage() {
   const { user, workspace } = useAuth();
-  const companyId = user?.company_id || workspace?.id || '';
+  const companyId = workspace?.id || workspace?.id || '';
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -62,6 +65,7 @@ export default function ContactsPage() {
   const [viewingContact, setViewingContact] = useState<Contact | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
     if (!companyId) {
@@ -82,6 +86,7 @@ export default function ContactsPage() {
   }, [companyId]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [search]);
 
   const filtered = useMemo(() => {
     return contacts.filter((c) => {
@@ -95,6 +100,11 @@ export default function ContactsPage() {
       return true;
     });
   }, [contacts, search]);
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   const hasActiveFilters = !!search;
 
@@ -240,7 +250,7 @@ export default function ContactsPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((contact) => {
+                {paginatedData.map((contact) => {
                   return (
                     <TableRow key={contact.contact_id}>
                       <TableCell>
@@ -299,7 +309,7 @@ export default function ContactsPage() {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            {filtered.map((contact) => {
+            {paginatedData.map((contact) => {
               return (
                 <Card key={contact.contact_id} className="hover:shadow-sm transition-all duration-200 group">
                   <CardContent className="p-4 sm:p-5">
@@ -365,6 +375,15 @@ export default function ContactsPage() {
         )
       ) : (
         <Card><CardContent className="py-12 text-center"><p className="text-muted-foreground">{hasActiveFilters ? 'No contacts match your filters' : 'No contacts yet'}</p></CardContent></Card>
+      )}
+
+      {filtered.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
       )}
 
       {/* View Modal */}

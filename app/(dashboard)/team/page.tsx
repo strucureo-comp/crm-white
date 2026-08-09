@@ -7,10 +7,13 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
+import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { getActivityLogs } from '@/lib/firebase/database';
+import { ActivityLog } from '@/lib/db/types';
 import { subscribeToProjectsData, createMember, updateMember, deleteMember } from '@/lib/db/projects/api';
 
 type PermissionType = 'v' | 'e' | 'd';
@@ -124,7 +127,7 @@ export default function TeamPage() {
   const [editName, setEditName] = useState('');
   const [editEmail, setEditEmail] = useState('');
   const [members, setMembers] = useState<UIMember[]>([]);
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [searchMember, setSearchMember] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
@@ -133,10 +136,16 @@ export default function TeamPage() {
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [editedRole, setEditedRole] = useState<Role | null>(null);
   const [filterAction, setFilterAction] = useState('All');
+  const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
 
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsub = subscribeToProjectsData(user.company_id, (data) => {
+    if (!workspace?.id) return;
+    getActivityLogs(workspace?.id).then(setActivityLogs).catch(console.error);
+  }, [user]);
+
+  useEffect(() => {
+    if (!workspace?.id) return;
+    const unsub = subscribeToProjectsData(workspace?.id, (data) => {
       const mapped: UIMember[] = (data.members || []).map((m, i) => {
         const initials = m.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         return {
@@ -162,22 +171,22 @@ export default function TeamPage() {
   }, [selectedRoleId, roles]);
 
   const handleRoleChange = async (memberId: string, newRole: string) => {
-    if (!user?.company_id) return;
-    try { await updateMember(user.company_id, memberId, { role: newRole }); } catch(err) { console.error(err); }
+    if (!workspace?.id) return;
+    try { await updateMember(workspace?.id, memberId, { role: newRole }); } catch(err) { toast.error('Failed to update member role'); }
   };
 
   const handleRemoveMember = async (memberId: string) => {
-    if (!user?.company_id) return;
-    try { await deleteMember(user.company_id, memberId); } catch(err) { console.error(err); }
+    if (!workspace?.id) return;
+    try { await deleteMember(workspace?.id, memberId); } catch(err) { toast.error('Failed to remove member'); }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!editingMember || !user?.company_id || !editName.trim()) return;
+    if (!editingMember || !workspace?.id || !editName.trim()) return;
     try {
-      await updateMember(user.company_id, editingMember.id, { name: editName.trim(), email: editEmail.trim() });
+      await updateMember(workspace?.id, editingMember.id, { name: editName.trim(), email: editEmail.trim() });
       setEditingMember(null);
-    } catch (err) { console.error('Failed to update member:', err); }
+    } catch (err) { toast.error('Failed to update member'); }
   };
 
   const togglePermission = (mod: ModuleKey, perm: PermissionType) => {
@@ -210,14 +219,14 @@ export default function TeamPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteName || !inviteEmail || !user?.company_id) return;
+    if (!inviteName || !inviteEmail || !workspace?.id) return;
     try {
-      await createMember(user.company_id, { name: inviteName, email: inviteEmail, role: inviteRole, avatar: '', projectIds: [] });
+      await createMember(workspace?.id, { name: inviteName, email: inviteEmail, role: inviteRole, avatar: '', projectIds: [] });
       setIsInviteModalOpen(false);
       setInviteName('');
       setInviteEmail('');
       setInviteRole('Viewer');
-    } catch(err) { console.error(err); }
+    } catch(err) { toast.error('Failed to send invite'); }
   };
 
   return (
@@ -344,137 +353,74 @@ export default function TeamPage() {
 
         {/* Roles Tab */}
         <TabsContent value="roles">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <Card className="w-full lg:w-72 shrink-0 self-start">
-              <CardHeader className="p-4 border-b flex flex-row items-center justify-between">
-                <h3 className="text-sm font-semibold">Roles</h3>
-                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1"><Plus className="h-3 w-3" /> Add</Button>
-              </CardHeader>
-              <CardContent className="p-2 space-y-1">
-                {roles.map(r => (
-                  <button
-                    key={r.id}
-                    onClick={() => setSelectedRoleId(r.id)}
-                    className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm flex items-center justify-between ${
-                      selectedRoleId === r.id ? 'bg-muted font-medium' : 'text-muted-foreground hover:bg-muted/50'
-                    }`}
-                  >
-                    {r.name}
-                    {selectedRoleId === r.id && <Check className="h-4 w-4 text-foreground" />}
-                  </button>
-                ))}
-              </CardContent>
-            </Card>
-
-            <Card className="flex-1">
-              <CardHeader className="p-4 border-b flex flex-row items-start sm:items-center justify-between gap-4">
-                <div>
-                  <h3 className="text-sm font-semibold">{editedRole?.name} Permissions</h3>
-                  <p className="text-xs text-muted-foreground mt-1">Configure what users with this role can access and modify.</p>
-                </div>
-                <Button
-                  variant={saveState === 'saved' ? 'default' : 'outline'}
-                  size="sm"
-                  onClick={handleSaveRole}
-                  disabled={saveState !== 'idle'}
-                  className={saveState === 'saved' ? 'bg-emerald-600 hover:bg-emerald-700' : ''}
-                >
-                  {saveState === 'saving' ? <><Activity className="h-4 w-4 mr-1 animate-spin" /> Saving</> :
-                   saveState === 'saved' ? <><Check className="h-4 w-4 mr-1" /> Saved</> :
-                   <><Save className="h-4 w-4 mr-1" /> Save</>}
-                </Button>
-              </CardHeader>
-              <CardContent className="p-0">
-                <div className="divide-y">
-                  {MODULE_NAMES.map(mod => {
-                    const perms = editedRole?.modules[mod];
-                    if (!perms) return null;
-                    return (
-                      <div key={mod} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                        <div>
-                          <span className="text-sm font-medium capitalize">{mod}</span>
-                          <p className="text-xs text-muted-foreground mt-0.5">Control access to {mod} data.</p>
-                        </div>
-                        <div className="flex items-center bg-muted p-0.5 rounded-lg gap-0.5">
-                          <button
-                            onClick={() => togglePermission(mod, 'v')}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                              perms.v ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {perms.v ? <Check className="h-3 w-3" /> : <span>–</span>} View
-                          </button>
-                          <button
-                            onClick={() => togglePermission(mod, 'e')}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                              perms.e ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {perms.e ? <Check className="h-3 w-3" /> : <span>–</span>} Edit
-                          </button>
-                          <button
-                            onClick={() => togglePermission(mod, 'd')}
-                            className={`flex items-center gap-1 px-3 py-1 rounded-md text-xs font-medium transition-colors ${
-                              perms.d ? 'bg-background shadow-sm text-foreground' : 'text-muted-foreground hover:text-foreground'
-                            }`}
-                          >
-                            {perms.d ? <Check className="h-3 w-3" /> : <span>–</span>} None
-                          </button>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center border-dashed">
+            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
+              <Shield className="w-8 h-8 text-primary" />
+            </div>
+            <h3 className="text-xl font-semibold mb-2">Granular Permissions Coming Soon</h3>
+            <p className="text-muted-foreground max-w-sm mb-6">
+              We are building a comprehensive Role-Based Access Control (RBAC) system. Soon you will be able to customize exact view, edit, and delete permissions for every module.
+            </p>
+            <Button variant="outline" disabled>
+              <Activity className="w-4 h-4 mr-2" />
+              In Development
+            </Button>
+          </Card>
         </TabsContent>
 
         {/* Activity Tab */}
-        <TabsContent value="activity" className="space-y-4">
-          <div className="flex items-center gap-3">
-            <Filter size={16} className="text-muted-foreground" />
-            <Select value={filterAction} onValueChange={setFilterAction}>
-              <SelectTrigger className="w-[200px] h-9"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="All">All Activity</SelectItem>
-                <SelectItem value="updated permissions">Permissions Updated</SelectItem>
-                <SelectItem value="invited">Invitations</SelectItem>
-                <SelectItem value="logged in">Logins</SelectItem>
-                <SelectItem value="changed role">Role Changes</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-3">
-            {filteredActivity.length === 0 && (
-              <Card><CardContent className="p-8 text-center text-sm text-muted-foreground">No recent activity.</CardContent></Card>
-            )}
-            {filteredActivity.map(a => {
-              const member = members.find(m => m.id === a.repId) || MOCK_MEMBERS.find(m => m.id === a.repId);
-              if (!member) return null;
-              return (
-                <Card key={a.id}>
-                  <CardContent className="p-4 flex items-center justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-8 w-8 shrink-0">
-                        <AvatarFallback className="text-xs text-white" style={{ backgroundColor: member.color }}>{member.initials}</AvatarFallback>
-                      </Avatar>
-                      <div className="text-sm">
-                        <span className="font-medium">{member.name}</span>{' '}
-                        <span className="text-muted-foreground">{a.action}</span>{' '}
-                        <span className="font-medium">{a.target}</span>
+        <TabsContent value="activity">
+          <Card>
+            <CardHeader>
+              <div className="flex flex-col sm:flex-row gap-4 sm:items-center sm:justify-between">
+                <CardTitle className="text-lg">Activity Log</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Select value={filterAction} onValueChange={setFilterAction}>
+                    <SelectTrigger className="w-[180px]"><SelectValue placeholder="Filter by action" /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="All">All Actions</SelectItem>
+                      <SelectItem value="login">Login</SelectItem>
+                      <SelectItem value="create">Created</SelectItem>
+                      <SelectItem value="update">Updated</SelectItem>
+                      <SelectItem value="delete">Deleted</SelectItem>
+                      <SelectItem value="payment">Payment</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {activityLogs.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Activity className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                    <p>No activity recorded yet.</p>
+                  </div>
+                ) : (
+                  activityLogs
+                    .filter(log => filterAction === 'All' || log.action.includes(filterAction.toLowerCase()))
+                    .map(log => (
+                      <div key={log.id} className="flex gap-4 p-4 rounded-lg bg-muted/50 items-start">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center shrink-0">
+                          <Activity size={14} className="text-primary" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm">
+                            <span className="font-medium text-foreground">{log.user_name}</span>{' '}
+                            <span className="text-muted-foreground">{log.description}</span>
+                          </p>
+                          <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
+                            <span>{log.date}</span>
+                            <span>•</span>
+                            <span>{log.time}</span>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground shrink-0">
-                      <Clock className="h-3 w-3" />
-                      {a.time}
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+                    ))
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 

@@ -37,7 +37,7 @@ export async function qualifyLead(
   leadData: NormalizedLead
 ): Promise<NormalizedLead> {
   // Log activity
-  await logLeadQualified(workspaceId, leadId, leadData.name, leadData.company_id);
+  await logLeadQualified(workspaceId, leadId, leadData.name, leadData.workspace_id);
   
   // Emit event
   emitEvent('lead:qualified', { ...leadData, lead_id: leadId });
@@ -59,7 +59,7 @@ export async function convertLeadToContact(
 ): Promise<Contact> {
   // Create contact from lead data
   const contact = await createContact(workspaceId, {
-    company_id: leadData.company_id || '',
+    workspace_id: leadData.workspace_id || '',
     name: leadData.name,
     email: leadData.email,
     phone: leadData.phone || '',
@@ -69,7 +69,7 @@ export async function convertLeadToContact(
   });
   
   // Log activity
-  await logLeadCreated(workspaceId, leadId, leadData.name, leadData.company_id);
+  await logLeadCreated(workspaceId, leadId, leadData.name, leadData.workspace_id);
   
   // Emit event
   emitEvent('lead:converted', { 
@@ -104,7 +104,7 @@ export async function createDealFromContact(
   const company = await getCompany(workspaceId, companyId);
   
   const deal = await createDeal(workspaceId, {
-    company_id: companyId,
+    workspace_id: companyId,
     contact_id: contactId,
     lead_id: '',
     pipeline_id: dealData.pipeline_id || '',
@@ -149,7 +149,7 @@ export async function createQuoteFromDeal(
   const deal = await getDeal(workspaceId, dealId);
   if (!deal) throw new Error('Deal not found');
   
-  const company = await getCompany(workspaceId, deal.company_id);
+  const company = await getCompany(workspaceId, deal.workspace_id);
   
   // Calculate totals
   const totals = calculateQuoteTotals(
@@ -163,7 +163,6 @@ export async function createQuoteFromDeal(
   const quoteNumber = await generateQuoteNumber(workspaceId);
   
   const quote = await createQuote(workspaceId, {
-    company_id: deal.company_id,
     contact_id: deal.contact_id,
     deal_id: dealId,
     quote_number: quoteNumber,
@@ -183,7 +182,7 @@ export async function createQuoteFromDeal(
   });
   
   // Log activity
-  await logQuoteCreated(workspaceId, quote.quote_id, quote.quote_number, deal.company_id, deal.contact_id, dealId);
+  await logQuoteCreated(workspaceId, quote.quote_id, quote.quote_number, deal.workspace_id, deal.contact_id, dealId);
   
   return quote;
 }
@@ -210,7 +209,6 @@ export async function convertQuoteToInvoice(
   const invoiceNumber = await generateInvoiceNumber(workspaceId);
   
   const invoice = await createInvoice(workspaceId, {
-    company_id: quote.company_id,
     contact_id: quote.contact_id,
     deal_id: quote.deal_id,
     quote_id: quoteId,
@@ -247,7 +245,7 @@ export async function convertQuoteToInvoice(
   });
   
   // Log activity
-  await logInvoiceCreated(workspaceId, invoice.invoice_id, invoice.invoice_number, quote.company_id, quote.contact_id, quote.deal_id);
+  await logInvoiceCreated(workspaceId, invoice.invoice_id, invoice.invoice_number, quote.workspace_id, quote.contact_id, quote.deal_id);
   
   return invoice;
 }
@@ -281,7 +279,7 @@ export async function recordInvoicePayment(
     payment.payment_id, 
     paymentData.amount, 
     invoice.invoice_number, 
-    invoice.company_id, 
+    invoice.workspace_id, 
     invoice.contact_id
   );
   
@@ -344,7 +342,7 @@ export async function convertLeadToInvoice(
   const deal = await createDealFromContact(
     workspaceId, 
     contact.contact_id, 
-    leadData.company_id || '',
+    leadData.workspace_id || '',
     dealData
   );
   

@@ -7,7 +7,7 @@ import { Loader2 } from 'lucide-react';
 
 export function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, loading } = useAuth();
+  const { workspace, user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {

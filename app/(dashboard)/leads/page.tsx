@@ -49,6 +49,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { ResponsiveTable } from '@/components/ui/responsive-table';
+import { DataPagination } from '@/components/ui/data-pagination';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { getLeads, deleteLead } from '@/lib/firebase/database';
 import type { Lead } from '@/lib/db/types';
@@ -57,7 +58,17 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { cn, formatCurrency } from '@/lib/utils';
 import { toast } from 'sonner';
 
-const statusColors: Record<string, string> = {};
+const statusColors: Record<string, string> = {
+  new: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200',
+  contacted: 'bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200',
+  qualified: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200',
+  proposal: 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200',
+  negotiation: 'bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200',
+  won: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200',
+  lost: 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200',
+};
+
+const PAGE_SIZE = 25;
 
 const stageTabs = [
   { value: 'all', label: 'All' },
@@ -73,7 +84,7 @@ const stageTabs = [
 import { useAuth } from '@/lib/firebase/auth-context';
 
 export default function LeadsPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -83,6 +94,7 @@ export default function LeadsPage() {
   const [stageTab, setStageTab] = useState('all');
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [page, setPage] = useState(1);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [advFilters, setAdvFilters] = useState({
     company: '',
@@ -94,8 +106,8 @@ export default function LeadsPage() {
 
   async function load() {
     try {
-      // Pass the logged-in user's company_id to securely filter leads
-      const data = await getLeads(user?.company_id);
+      // Pass the logged-in user's workspace_id to securely filter leads
+      const data = await getLeads(workspace?.id);
       setLeads(data);
     } catch (err: any) {
       console.error('Failed to load leads:', err);
@@ -106,12 +118,14 @@ export default function LeadsPage() {
   }
 
   useEffect(() => {
-    if (user?.company_id) {
+    if (workspace?.id) {
       load();
     } else {
       setLoading(false);
     }
-  }, [user?.company_id]);
+  }, [workspace?.id]);
+
+  useEffect(() => { setPage(1); }, [search, stageTab, advFilters]);
 
   const kpis = useMemo(() => {
     const total = leads.length;
@@ -160,6 +174,11 @@ export default function LeadsPage() {
 
     return list;
   }, [leads, stageTab, search, advFilters]);
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   function clearAdvanced() {
     setAdvFilters({ company: '', source: 'all', stage: 'all', tags: '', wa: 'all' });
@@ -400,7 +419,7 @@ export default function LeadsPage() {
         <Card>
           <CardContent className="p-0">
             <ResponsiveTable
-              data={filtered}
+              data={paginatedData}
               keyExtractor={(lead) => lead.id}
               mobileCardTitle={(lead) => lead.name}
               columns={[
@@ -545,6 +564,15 @@ export default function LeadsPage() {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {filtered.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
       )}
 
       {/* Lead Create/Edit Dialog */}

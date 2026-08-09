@@ -49,7 +49,7 @@ const defaultForm = {
 };
 
 export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState({
     ...defaultForm,
     quotation_number: `Q-${Date.now().toString().slice(-6)}`,
@@ -58,6 +58,7 @@ export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogP
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
+    if (!open) return;
     if (quote) {
       setForm({
         client_name: quote.client_name || '',
@@ -80,7 +81,7 @@ export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogP
         valid_until: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       });
     }
-  }, [quote]);
+  }, [quote, open]);
 
   function set<K extends keyof typeof defaultForm>(key: K, value: (typeof defaultForm)[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -128,7 +129,7 @@ export function QuoteDialog({ open, onOpenChange, onSaved, quote }: QuoteDialogP
         await createQuotation({
           ...form,
           client_id: '',
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
           valid_until: form.valid_until ? new Date(form.valid_until).toISOString() : '',
         });
         toast.success('Quote created');

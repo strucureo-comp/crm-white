@@ -42,7 +42,7 @@ const defaultForm = {
 };
 
 export function SocialPostDialog({ open, onOpenChange, onSaved, post }: SocialPostDialogProps) {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [form, setForm] = useState({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -83,7 +83,7 @@ export function SocialPostDialog({ open, onOpenChange, onSaved, post }: SocialPo
       } else {
         await createSocialPost({
           ...form,
-          company_id: user?.company_id || '',
+          workspace_id: workspace?.id || '',
         });
         toast.success('Post created successfully');
       }

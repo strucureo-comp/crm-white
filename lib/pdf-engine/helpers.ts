@@ -136,7 +136,12 @@ export function hexToRgb(hex: string): [number, number, number] {
   return [(big >> 16) & 255, (big >> 8) & 255, big & 255];
 }
 
+const logoCache = new Map<string, string>();
+
 export function getBase64ImageFromURL(url: string): Promise<string> {
+  const cached = logoCache.get(url);
+  if (cached) return Promise.resolve(cached);
+
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.setAttribute('crossOrigin', 'anonymous');
@@ -146,9 +151,17 @@ export function getBase64ImageFromURL(url: string): Promise<string> {
       canvas.height = img.height;
       const ctx = canvas.getContext('2d');
       ctx?.drawImage(img, 0, 0);
-      resolve(canvas.toDataURL('image/png'));
+      const dataUrl = canvas.toDataURL('image/png');
+      logoCache.set(url, dataUrl);
+      resolve(dataUrl);
     };
     img.onerror = () => reject(new Error(`Failed to load image: ${url}`));
     img.src = url;
   });
+}
+
+export function preloadLogo(url: string): void {
+  if (url && !logoCache.has(url)) {
+    getBase64ImageFromURL(url).catch(() => {});
+  }
 }

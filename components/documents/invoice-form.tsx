@@ -11,14 +11,11 @@ import { ItemsTable } from './items-table';
 import { PricingSummary } from './pricing-summary';
 import { PaymentSection } from './payment-section';
 import { NotesSection } from './notes-section';
-import { LivePreview } from './live-preview';
-import { DocumentLayout } from './document-layout';
 import { useWorkspace } from '@/lib/settings/workspace-context';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { createInvoice, updateInvoice } from '@/lib/firebase/database';
 import type { Invoice, InvoiceStatus } from '@/lib/db/types';
 import type {
-  DocumentTemplate,
   DocumentMeta,
   DocumentClient,
   DocumentItem,
@@ -35,14 +32,10 @@ interface InvoiceFormProps {
 export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
   const router = useRouter();
   const { settings } = useWorkspace();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [saving, setSaving] = useState(false);
   const [sending, setSending] = useState(false);
 
-  // Form state
-  const [template, setTemplate] = useState<DocumentTemplate>(
-    (settings.branding.template_style as DocumentTemplate) || 'modern'
-  );
   const [meta, setMeta] = useState<DocumentMeta>({
     document_number: existingInvoice?.invoice_number || `INV-${Date.now().toString().slice(-6)}`,
     status: existingInvoice?.status || 'draft',
@@ -54,57 +47,63 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
   });
 
   const [client, setClient] = useState<DocumentClient>({
-    company: '',
-    contact_person: '',
-    email: '',
+    company: existingInvoice?.client_company || '',
+    contact_person: existingInvoice?.client_name || '',
+    email: existingInvoice?.client_email || '',
     phone: '',
-    address: '',
-    gstin: '',
+    address: existingInvoice?.client_address || '',
+    gstin: existingInvoice?.client_gstin || '',
   });
 
   const [items, setItems] = useState<DocumentItem[]>(() => {
-    if (existingInvoice?.amount) {
-      return [
-        {
-          id: crypto.randomUUID(),
-          name: existingInvoice.description || 'Service',
-          description: '',
-          quantity: 1,
-          unit: 'flat',
-          unit_price: existingInvoice.amount,
-          total: existingInvoice.amount,
-        },
-      ];
+    if (existingInvoice?.items && existingInvoice.items.length > 0) {
+      return existingInvoice.items.map((item) => ({
+        id: item.item_id || crypto.randomUUID(),
+        name: item.name || '',
+        description: item.description || '',
+        quantity: item.quantity || 1,
+        unit: 'flat',
+        unit_price: item.unit_price || 0,
+        total: item.total || 0,
+      }));
     }
     return [createEmptyItem()];
   });
 
-  const [discountPercent, setDiscountPercent] = useState(0);
+  const [discountPercent, setDiscountPercent] = useState(existingInvoice?.discount_percent || 0);
+  const [taxCgst, setTaxCgst] = useState(existingInvoice?.cgst_percent ?? settings.branding.tax_cgst ?? 0);
+  const [taxSgst, setTaxSgst] = useState(existingInvoice?.sgst_percent ?? settings.branding.tax_sgst ?? 0);
+  const [taxIgst, setTaxIgst] = useState(existingInvoice?.igst_percent ?? settings.branding.tax_igst ?? 0);
 
   const [payment, setPayment] = useState<DocumentPayment>({
-    payment_terms: 'net_30',
-    payment_method: 'bank_transfer',
-    amount_paid: existingInvoice?.paid_at ? existingInvoice.amount : 0,
-    balance_due: 0,
-    payment_date: existingInvoice?.paid_at
+    amount_paid: existingInvoice?.amount_paid ?? (existingInvoice?.paid_at ? existingInvoice.amount : 0),
+    balance_due: existingInvoice?.amount_due ?? 0,
+    payment_date: existingInvoice?.paid_date || (existingInvoice?.paid_at
       ? new Date(existingInvoice.paid_at).toISOString().split('T')[0]
-      : '',
-    transaction_id: '',
+      : ''),
+    transaction_id: existingInvoice?.transaction_id || '',
+    payment_terms: existingInvoice?.payment_terms || 'net_30',
+    payment_method: existingInvoice?.payment_method || 'bank_transfer',
+    custom_bank_name: existingInvoice?.custom_bank_name || '',
+    custom_bank_account: existingInvoice?.custom_bank_account || '',
+    custom_bank_ifsc: existingInvoice?.custom_bank_ifsc || '',
+    custom_upi_id: existingInvoice?.custom_upi_id || '',
   });
 
   const [notes, setNotes] = useState<DocumentNotes>({
     notes: existingInvoice?.notes || '',
-    terms: settings.branding.default_terms || '',
-    internal_notes: '',
+    terms: existingInvoice?.terms ?? settings.branding.default_terms ?? '',
+    internal_notes: existingInvoice?.internal_notes || '',
+    delivery_timeline: existingInvoice?.delivery_timeline || '',
   });
 
   // Calculate pricing
   const pricing = calculatePricing(
     items,
     discountPercent,
-    settings.branding.tax_cgst || 0,
-    settings.branding.tax_sgst || 0,
-    settings.branding.tax_igst || 0
+    taxCgst,
+    taxSgst,
+    taxIgst
   );
 
   // Update payment balance (clamped at zero so overpayment never goes negative)
@@ -129,6 +128,15 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
       }
 
       try {
+        let finalStatus = status;
+        if (payment.amount_paid > 0) {
+          if (payment.amount_paid >= pricing.grand_total) {
+            finalStatus = 'paid';
+          } else {
+            finalStatus = 'partially_paid';
+          }
+        }
+
         const invoiceData = {
           invoice_number: meta.document_number,
           project_id: '',
@@ -137,12 +145,41 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
           client_email: client.email,
           client_company: client.company,
           client_address: client.address,
+          client_gstin: client.gstin,
           amount: pricing.grand_total,
+          subtotal: pricing.subtotal,
+          discount_percent: pricing.discount_percent,
+          discount_amount: pricing.discount_amount,
+          tax_amount: pricing.tax_amount,
+          cgst_percent: pricing.cgst_percent,
+          sgst_percent: pricing.sgst_percent,
+          igst_percent: pricing.igst_percent,
           due_date: meta.due_date || '',
-          status: status,
+          status: finalStatus,
           description: items[0]?.name || '',
           notes: notes.notes,
-          company_id: user?.company_id || '',
+          terms: notes.terms,
+          internal_notes: notes.internal_notes,
+          delivery_timeline: notes.delivery_timeline,
+          payment_terms: payment.payment_terms,
+          payment_method: payment.payment_method,
+          amount_paid: payment.amount_paid,
+          paid_date: payment.payment_date || '',
+          transaction_id: payment.transaction_id || '',
+          custom_bank_name: payment.custom_bank_name || '',
+          custom_bank_account: payment.custom_bank_account || '',
+          custom_bank_ifsc: payment.custom_bank_ifsc || '',
+          custom_upi_id: payment.custom_upi_id || '',
+          workspace_id: workspace?.id || '',
+          items: items.map((item) => ({
+            item_id: item.id,
+            name: item.name,
+            description: item.description,
+            quantity: item.quantity,
+            unit_price: item.unit_price,
+            total: item.total,
+            tax_rate: 0,
+          })),
         };
 
         if (existingInvoice) {
@@ -191,48 +228,32 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
         </div>
       </div>
 
-      {/* Two-Column Layout */}
-      <DocumentLayout
-        leftColumn={
-          <div className="space-y-6">
-            <DocumentHeader
-              meta={meta}
-              onMetaChange={(m) => setMeta((prev) => ({ ...prev, ...m }))}
-              template={template}
-              onTemplateChange={setTemplate}
-              docType="invoice"
-            />
-            <ClientSection client={client} onClientChange={(c) => setClient((prev) => ({ ...prev, ...c }))} />
-            <ItemsTable items={items} onItemsChange={setItems} currency={meta.currency} />
-            <PricingSummary
-              pricing={pricing}
-              onPricingChange={(p) => {
-                if (p.discount_percent !== undefined) setDiscountPercent(p.discount_percent);
-              }}
-              currency={meta.currency}
-            />
-            <PaymentSection
-              payment={payment}
-              onPaymentChange={(p) => setPayment((prev) => ({ ...prev, ...p }))}
-              grandTotal={pricing.grand_total}
-              currency={meta.currency}
-            />
-            <NotesSection notes={notes} onNotesChange={(n) => setNotes((prev) => ({ ...prev, ...n }))} docType="invoice" />
-          </div>
-        }
-        rightColumn={
-          <LivePreview
-            docType="invoice"
-            template={template}
-            meta={meta}
-            client={client}
-            items={items}
-            pricing={pricing}
-            notes={notes}
-            payment={payment}
-          />
-        }
-      />
+      <div className="max-w-4xl mx-auto w-full mt-8 pb-24 space-y-8">
+        <DocumentHeader
+          meta={meta}
+          onMetaChange={(m) => setMeta((prev) => ({ ...prev, ...m }))}
+          docType="invoice"
+        />
+        <ClientSection client={client} onClientChange={(c) => setClient((prev) => ({ ...prev, ...c }))} />
+        <ItemsTable items={items} onItemsChange={setItems} currency={meta.currency} />
+        <PricingSummary
+          pricing={pricing}
+          onPricingChange={(p) => {
+            if (p.discount_percent !== undefined) setDiscountPercent(p.discount_percent);
+            if (p.cgst_percent !== undefined) setTaxCgst(p.cgst_percent);
+            if (p.sgst_percent !== undefined) setTaxSgst(p.sgst_percent);
+            if (p.igst_percent !== undefined) setTaxIgst(p.igst_percent);
+          }}
+          currency={meta.currency}
+        />
+        <PaymentSection
+          payment={payment}
+          onPaymentChange={(p) => setPayment((prev) => ({ ...prev, ...p }))}
+          grandTotal={pricing.grand_total}
+          currency={meta.currency}
+        />
+        <NotesSection notes={notes} onNotesChange={(n) => setNotes((prev) => ({ ...prev, ...n }))} docType="invoice" />
+      </div>
     </div>
   );
 }

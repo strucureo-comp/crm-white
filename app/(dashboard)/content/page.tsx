@@ -47,7 +47,7 @@ export default function ContentHubPage() {
     if (!newItem.title.trim()) return;
     const item = await createContent(workspaceId, {
       workspace_id: workspaceId,
-      company_id: workspaceId,
+      workspace_id: workspaceId,
       type: newItem.type,
       title: newItem.title,
       slug: newItem.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, ''),

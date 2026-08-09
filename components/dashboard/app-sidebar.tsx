@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
-import { getLeads } from '@/lib/firebase/database';
+import { subscribeToLeads } from '@/lib/firebase/database';
 import { useSidebar } from './sidebar-context';
 import { useWorkspace } from '@/lib/settings/workspace-context';
+import { useAuth } from '@/lib/firebase/auth-context';
 import {
   Sheet,
   SheetContent,
@@ -83,7 +84,6 @@ function getNavConfig(leadCount: number): NavConfig {
           { title: 'Leads', href: '/leads', icon: Target, badge: leadCount || undefined },
           { title: 'Contacts', href: '/contacts', icon: Contact2 },
           { title: 'Pipelines', href: '/pipeline', icon: GitBranch },
-          { title: 'Deals', href: '/deals', icon: Handshake },
           { title: 'Funnel', href: '/funnel', icon: Filter },
         ],
       },
@@ -92,21 +92,11 @@ function getNavConfig(leadCount: number): NavConfig {
         items: [
           { title: 'Quotations', href: '/quotes', icon: FileText },
           { title: 'Invoices', href: '/invoices', icon: Receipt },
-          { title: 'Contracts', href: '/contracts', icon: FileSpreadsheet },
+
           { title: 'Payments', href: '/payments', icon: Wallet },
         ],
       },
-      {
-        title: 'Marketing',
-        items: [
-          { title: 'Campaigns', href: '/campaigns', icon: Target },
-          { title: 'Content Hub', href: '/content-hub', icon: Megaphone },
-          { title: 'Social Media', href: '/social', icon: Camera },
-          { title: 'Email Marketing', href: '/email', icon: Mail },
-          { title: 'Marketing Calendar', href: '/marketing-calendar', icon: Calendar },
-          { title: 'Assets', href: '/assets', icon: Image },
-        ],
-      },
+
       {
         title: 'Workspace',
         items: [
@@ -129,8 +119,6 @@ function getNavConfig(leadCount: number): NavConfig {
           { title: 'Connector Hub', href: '/integrations', icon: Puzzle },
           { title: 'WhatsApp', href: '/integrations/whatsapp', icon: MessageSquare },
           { title: 'WhatsApp Chats', href: '/whatsapp-chats', icon: MessageSquare },
-          { title: 'Meta Ads', href: '/integrations/meta', icon: BarChart3 },
-          { title: 'Google Ads', href: '/integrations/google', icon: TrendingUp },
           { title: 'Website Enquiries', href: '/integrations/website-enquiries', icon: Globe },
         ],
       },
@@ -257,18 +245,7 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
       </div>
 
       <div className="border-t p-2 space-y-0.5 shrink-0">
-        <Link
-          href="/ai-assistant"
-          className={cn(
-            'flex items-center gap-3 px-3 py-2 rounded-lg text-sm transition-colors',
-            pathname === '/ai-assistant'
-              ? 'bg-primary/10 text-primary font-medium'
-              : 'text-sidebar-muted-foreground hover:bg-sidebar-muted hover:text-foreground'
-          )}
-        >
-          <Bot size={18} />
-          {!collapsed && <span>AI Assistant</span>}
-        </Link>
+
         <Link
           href="/settings"
           className={cn(
@@ -291,10 +268,16 @@ export function AppSidebar() {
   const { collapsed, setCollapsed, mobileOpen, setMobileOpen } = useSidebar();
   const [leadCount, setLeadCount] = useState(0);
   const { companyName, logoUrl } = useWorkspace();
+  const { workspace, user } = useAuth();
+  const companyId = workspace?.id;
 
   useEffect(() => {
-    getLeads().then((leads) => setLeadCount(leads.length)).catch(() => { });
-  }, []);
+    if (!companyId) return;
+    const unsub = subscribeToLeads(companyId, (leads) => {
+      setLeadCount(leads.length);
+    });
+    return () => unsub();
+  }, [companyId]);
 
   const { topItems, groups: navGroups } = getNavConfig(leadCount);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(

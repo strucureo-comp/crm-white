@@ -52,7 +52,7 @@ export type PriorityLevel = 'low' | 'medium' | 'high';
 
 export type MeetingStatus = 'pending' | 'accepted' | 'declined' | 'completed';
 
-export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled';
+export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'partially_paid' | 'overpaid';
 
 export type ContractTemplateType = 'employment' | 'nda' | 'service' | 'subscription' | 'vendor';
 export type ContractStatus = 'draft' | 'sent' | 'active' | 'expiring' | 'terminated';
@@ -228,6 +228,13 @@ export interface Invoice {
   discount_amount?: number;
   tax?: number;
   tax_rate?: number;
+  discount?: number; // Legacy
+  discount_type?: 'percentage' | 'fixed'; // Legacy
+  discount_percent?: number;
+  cgst_percent?: number;
+  sgst_percent?: number;
+  igst_percent?: number;
+  tax_amount?: number;
   total?: number;
   amount: number;
   currency?: string;
@@ -241,10 +248,23 @@ export interface Invoice {
   status: InvoiceStatus;
   description?: string;
   notes?: string;
-  terms_and_conditions?: string;
+  terms?: string;
+  terms_and_conditions?: string; // Legacy
+  internal_notes?: string;
+  delivery_timeline?: string;
+  client_gstin?: string;
+  client_name?: string;
+  client_email?: string;
+  client_company?: string;
+  client_address?: string;
   payment_qr_url?: string;
   payment_method?: string;
   payment_terms?: string;
+  transaction_id?: string;
+  custom_bank_name?: string;
+  custom_bank_account?: string;
+  custom_bank_ifsc?: string;
+  custom_upi_id?: string;
   billing_address?: string;
   shipping_address?: string;
   recurring?: boolean;
@@ -460,6 +480,8 @@ export interface AiConversation {
 export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected' | 'expired';
 
 export interface QuotationItem {
+  item_id?: string;
+  name?: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -474,14 +496,25 @@ export interface Quotation {
   client_id: string; // Can be empty if manual
   quotation_number: string;
   amount: number;
+  subtotal?: number;
+  discount_percent?: number;
+  discount_amount?: number;
+  tax_amount?: number;
+  cgst_percent?: number;
+  sgst_percent?: number;
+  igst_percent?: number;
   valid_until: string;
   status: QuotationStatus;
   currency: string;
   description?: string;
   items: QuotationItem[];
   notes?: string;
+  terms?: string;
+  internal_notes?: string;
+  delivery_timeline?: string;
+  client_gstin?: string;
 
-  // Manual Client Details (Non-registered)
+  // Manual Client Details \(Non-registered\)
   client_name?: string;
   client_email?: string;
   client_company?: string;
@@ -630,6 +663,7 @@ export type ActivityAction =
   | 'contract_signed'
   | 'campaign_created'
   | 'payment_received'
+  | 'update_invoice' | 'create_invoice'
   | 'user_login' | 'user_created';
 
 export interface ActivityLog {
@@ -883,7 +917,7 @@ export interface Contact {
 export interface NormalizedLead {
   lead_id: string;
   workspace_id: string;
-  company_id: string; // FK → Company (optional)
+  company_id?: string; // FK → Company (optional)
   contact_id: string; // FK → Contact (created when qualified)
   
   // Basic Info
@@ -940,7 +974,7 @@ export interface Deal {
   workspace_id: string;
 
   // Relationships
-  company_id: string;      // FK → Company
+  company_id?: string;      // FK → Company
   contact_id: string;      // FK → Contact
   lead_id?: string;        // FK → Lead (optional)
   pipeline_id: string;     // FK → Pipeline
@@ -988,7 +1022,7 @@ export interface Deal {
 export interface NormalizedQuote {
   quote_id: string;
   workspace_id: string;
-  company_id: string; // FK → Company
+  company_id?: string; // FK → Company
   contact_id: string; // FK → Contact
   deal_id: string; // FK → Deal
   
@@ -1048,7 +1082,7 @@ export type NormalizedQuoteStatus =
 export interface NormalizedInvoice {
   invoice_id: string;
   workspace_id: string;
-  company_id: string; // FK → Company
+  company_id?: string; // FK → Company
   contact_id: string; // FK → Contact
   deal_id: string; // FK → Deal
   quote_id: string; // FK → Quote
@@ -1092,6 +1126,7 @@ export interface NormalizedInvoice {
 
 export interface InvoiceItem {
   item_id: string;
+  name?: string;
   description: string;
   quantity: number;
   unit_price: number;
@@ -1113,7 +1148,7 @@ export type NormalizedInvoiceStatus =
 export interface NormalizedPayment {
   payment_id: string;
   workspace_id: string;
-  company_id: string; // FK → Company
+  company_id?: string; // FK → Company
   contact_id: string; // FK → Contact
   invoice_id: string; // FK → Invoice
   quote_id: string; // FK → Quote

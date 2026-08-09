@@ -45,7 +45,7 @@ const stageColors: Record<string, string> = {
 
 export default function OverviewPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -56,19 +56,19 @@ export default function OverviewPage() {
   const [contentItems, setContentItems] = useState<ContentItem[]>([]);
 
   useEffect(() => {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
     Promise.all([
-      getLeads(user.company_id),
-      getInvoices(user.company_id),
-      getProjects(user.company_id),
-      getUsers(user.company_id),
-      getActivityLogs(user.company_id, 10),
-      getCampaigns(user.company_id),
-      getContentItems(user.company_id),
+      getLeads(workspace?.id),
+      getInvoices(workspace?.id),
+      getProjects(workspace?.id),
+      getUsers(workspace?.id),
+      getActivityLogs(workspace?.id, 10),
+      getCampaigns(workspace?.id),
+      getContentItems(workspace?.id),
     ])
       .then(([l, i, p, u, a, c, ci]) => {
         setLeads(l);
@@ -81,7 +81,7 @@ export default function OverviewPage() {
       })
       .catch(console.error)
       .finally(() => setLoading(false));
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   const activeDeals = leads.filter((l) => l.status !== 'won' && l.status !== 'lost').length;
   const pipelineValue = leads

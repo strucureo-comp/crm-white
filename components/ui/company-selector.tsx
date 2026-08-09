@@ -73,7 +73,7 @@ export function CompanySelector({
     );
   }, [companies, search]);
 
-  const selectedCompany = companies.find(c => c.company_id === value);
+  const selectedCompany = companies.find(c => c.workspace_id === value);
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
@@ -107,10 +107,10 @@ export function CompanySelector({
             <CommandGroup>
               {filteredCompanies.map((company) => (
                 <CommandItem
-                  key={company.company_id}
-                  value={company.company_id}
+                  key={company.workspace_id}
+                  value={company.workspace_id}
                   onSelect={(currentValue) => {
-                    const company = companies.find(c => c.company_id === currentValue);
+                    const company = companies.find(c => c.workspace_id === currentValue);
                     onChange(currentValue, company || null);
                     setOpen(false);
                     setSearch('');
@@ -119,7 +119,7 @@ export function CompanySelector({
                   <Check
                     className={cn(
                       "mr-2 h-4 w-4",
-                      value === company.company_id ? "opacity-100" : "opacity-0"
+                      value === company.workspace_id ? "opacity-100" : "opacity-0"
                     )}
                   />
                   <div className="flex flex-col">

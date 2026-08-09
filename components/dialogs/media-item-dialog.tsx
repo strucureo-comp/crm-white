@@ -68,11 +68,21 @@ export function MediaItemDialog({ open, onOpenChange, onSaved }: MediaItemDialog
         }
         url = dataUrl;
       } else {
+        const { auth } = await import('@/lib/firebase/config');
+        const token = await auth.currentUser?.getIdToken();
+        if (!token) throw new Error('Not authenticated');
+
         const formData = new FormData();
         formData.append('file', file);
         formData.append('bucket', 'media');
         formData.append('path', `uploads/${Date.now()}-${file.name}`);
-        const res = await fetch('/api/upload', { method: 'POST', body: formData });
+        const res = await fetch('/api/upload', { 
+          method: 'POST', 
+          headers: {
+            'Authorization': `Bearer ${token}`
+          },
+          body: formData 
+        });
         const data = await res.json();
         if (!res.ok) {
           toast.error(data.error || 'Upload failed');

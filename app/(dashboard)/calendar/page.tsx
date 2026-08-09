@@ -21,16 +21,16 @@ export type CalendarEvent = DBCalendarEvent;
 const EVENT_COLORS = ['#8b5cf6', '#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#ec4899'];
 
 export default function CalendarAgendaPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [view, setView] = useState<'Month'>('Month');
   const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
 
   React.useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubEvents = subscribeToCalendarEvents(user.company_id, setEvents);
-    const unsubMembers = subscribeToProjectsData(user.company_id, (data) => {
+    if (!workspace?.id) return;
+    const unsubEvents = subscribeToCalendarEvents(workspace?.id, setEvents);
+    const unsubMembers = subscribeToProjectsData(workspace?.id, (data) => {
       setMembers(data.members || []);
       setProjects(data.projects || []);
     });
@@ -54,22 +54,22 @@ export default function CalendarAgendaPage() {
   const handleAddMember = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (!newMemberName.trim() || !user?.company_id) return;
+    if (!newMemberName.trim() || !workspace?.id) return;
     try {
-      const newId = await createMember(user.company_id, { name: newMemberName.trim(), role: 'Member', email: '', avatar: '', projectIds: [] });
+      const newId = await createMember(workspace?.id, { name: newMemberName.trim(), role: 'Member', email: '', avatar: '', projectIds: [] });
       if (newId) { setFormAttendees(prev => [...prev, newId]); setNewMemberName(''); }
     } catch(err) { console.error('Failed to create member:', err); }
   };
 
   const handleCreateEvent = async () => {
-    if (!user?.company_id || !formTitle.trim()) return;
+    if (!workspace?.id || !formTitle.trim()) return;
     const newEvent: Omit<CalendarEvent, 'id'> = {
       title: formTitle, date: formDate || new Date().toISOString().split('T')[0], time: formTime, color: formColor,
       attendees: formAttendees.length > 0 ? formAttendees : (members.length > 0 ? [members[0].id] : []),
       linkedRecord: formProject ? { type: 'project', id: formProject } : null
     };
     try {
-      await createCalendarEvent(user.company_id, newEvent);
+      await createCalendarEvent(workspace?.id, newEvent);
       setIsScheduleOpen(false);
       setFormTitle(''); setFormDate(''); setFormTime('09:00'); setFormColor(EVENT_COLORS[0]); setFormAttendees([]); setFormProject('');
     } catch (e) { console.error("Failed to create event", e); }

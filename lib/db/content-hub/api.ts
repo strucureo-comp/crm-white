@@ -30,7 +30,7 @@ export type ContentItem = {
   description: string; 
   comments: Comment[]; 
   history: HistoryEntry[];
-  company_id?: string;
+  workspace_id?: string;
 };
 
 function contentHubRef(workspaceId: string) {

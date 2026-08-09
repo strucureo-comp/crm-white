@@ -8,7 +8,6 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { createContact, updateContact } from '@/lib/db/contacts/api';
 import type { Contact } from '@/lib/db/types';
-import { useAuth } from '@/lib/firebase/auth-context';
 
 interface ContactDialogProps {
   open: boolean;
@@ -21,7 +20,6 @@ interface ContactDialogProps {
 interface ContactForm {
   name: string;
   email: string;
-  company_id: string;
   phone: string;
   designation: string;
   is_primary: boolean;
@@ -31,7 +29,6 @@ interface ContactForm {
 const defaultForm: ContactForm = {
   name: '',
   email: '',
-  company_id: '',
   phone: '',
   designation: '',
   is_primary: false,
@@ -42,7 +39,6 @@ function contactToForm(c: Contact): ContactForm {
   return {
     name: c.name,
     email: c.email,
-    company_id: c.company_id || '',
     phone: c.phone || '',
     designation: c.designation || '',
     is_primary: c.is_primary || false,
@@ -51,7 +47,6 @@ function contactToForm(c: Contact): ContactForm {
 }
 
 export function ContactDialog({ open, onOpenChange, onSaved, contact, companyId }: ContactDialogProps) {
-  const { user } = useAuth();
   const [form, setForm] = useState<ContactForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
 
@@ -59,9 +54,9 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, companyId 
     if (contact) {
       setForm(contactToForm(contact));
     } else {
-      setForm({ ...defaultForm, company_id: user?.company_id || '' });
+      setForm({ ...defaultForm });
     }
-  }, [contact, open, user]);
+  }, [contact, open]);
 
   function set<K extends keyof ContactForm>(key: K, value: ContactForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -73,8 +68,8 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, companyId 
       toast.error('Workspace is still loading');
       return;
     }
-    if (!form.name.trim() || !form.email.trim() || !form.company_id.trim()) {
-      toast.error('Name, email, and company ID are required');
+    if (!form.name.trim() || !form.email.trim()) {
+      toast.error('Name and email are required');
       return;
     }
     
@@ -83,7 +78,7 @@ export function ContactDialog({ open, onOpenChange, onSaved, contact, companyId 
       const payload = {
         name: form.name,
         email: form.email,
-        company_id: form.company_id,
+        workspace_id: companyId,
         phone: form.phone || '',
         designation: form.designation || '',
         is_primary: form.is_primary,

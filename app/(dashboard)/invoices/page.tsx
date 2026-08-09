@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Search, Download, Eye, MoreHorizontal, Pencil, Trash2, Receipt, Loader2 } from 'lucide-react';
+import { Plus, Search, Download, Eye, MoreHorizontal, Pencil, Trash2, Receipt, Loader2, CreditCard } from 'lucide-react';
 import {
   Select,
   SelectContent,
@@ -26,9 +26,11 @@ import { getInvoices, deleteInvoice } from '@/lib/firebase/database';
 import { useAuth } from '@/lib/firebase/auth-context';
 import type { Invoice } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
+import { DataPagination } from '@/components/ui/data-pagination';
 import { toast } from 'sonner';
 import { formatCurrency } from '@/lib/utils';
 import { generateInvoicePdf, downloadPdf, openPdfPreview } from '@/lib/pdf-engine/generator';
+import { getCompanySettings, preloadLogo } from '@/lib/pdf-engine/helpers';
 
 const statusStyles: Record<string, string> = {
   pending: 'bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400',
@@ -37,27 +39,33 @@ const statusStyles: Record<string, string> = {
   cancelled: 'bg-muted text-muted-foreground',
 };
 
+const PAGE_SIZE = 25;
+
 export default function InvoicesPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [page, setPage] = useState(1);
 
   const load = useCallback(async () => {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
-    const data = await getInvoices(user.company_id);
+    const data = await getInvoices(workspace?.id);
     setInvoices(data);
     setLoading(false);
-  }, [user?.company_id]);
+    // Preload logo in background so PDF generation is instant
+    getCompanySettings().then(s => { if (s.logo_url) preloadLogo(s.logo_url); });
+  }, [workspace?.id]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(() => { setPage(1); }, [search, statusFilter]);
 
   const filtered = invoices.filter((inv) => {
     if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
@@ -70,6 +78,11 @@ export default function InvoicesPage() {
     }
     return true;
   });
+
+  const paginatedData = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filtered.slice(start, start + PAGE_SIZE);
+  }, [filtered, page]);
 
   async function handleDelete(inv: Invoice) {
     setConfirmState({ open: true, id: inv.id });
@@ -132,7 +145,7 @@ export default function InvoicesPage() {
         <Card>
           <CardContent className="p-0">
             <ResponsiveTable
-              data={filtered}
+              data={paginatedData}
               keyExtractor={(inv) => inv.id}
               mobileCardTitle={(inv) => inv.invoice_number}
               columns={[
@@ -188,21 +201,52 @@ export default function InvoicesPage() {
                         <DropdownMenuItem onClick={() => router.push(`/invoices/${inv.id}`)}>
                           <Pencil size={14} className="mr-2" /> Edit
                         </DropdownMenuItem>
+                        {inv.status !== 'paid' && (
+                          <DropdownMenuItem onClick={async () => {
+                            const id = toast.loading('Redirecting to checkout…');
+                            try {
+                              const res = await fetch('/api/payments/checkout', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({
+                                  invoiceId: inv.id,
+                                  amount: inv.amount,
+                                  currency: inv.currency,
+                                  description: inv.invoice_number,
+                                  workspaceId: inv.workspace_id
+                                })
+                              });
+                              const data = await res.json();
+                              if (data.url) {
+                                window.location.href = data.url;
+                              } else {
+                                throw new Error(data.error);
+                              }
+                            } catch (e: any) {
+                              toast.error(e.message || 'Failed to checkout', { id });
+                            }
+                          }}>
+                            <CreditCard size={14} className="mr-2" /> Pay with Stripe
+                          </DropdownMenuItem>
+                        )}
                         <DropdownMenuItem onClick={async () => {
+                          const id = toast.loading('Generating PDF…');
                           try {
                             const pdf = await generateInvoicePdf(inv, null, null);
                             await downloadPdf(pdf, `Invoice-${inv.invoice_number}.pdf`);
-                            toast.success('Invoice downloaded');
-                          } catch { toast.error('Failed to generate PDF'); }
+                            toast.success('Invoice downloaded', { id });
+                          } catch { toast.error('Failed to generate PDF', { id }); }
                         }}>
                           <Download size={14} className="mr-2" /> Download
                         </DropdownMenuItem>
                         <DropdownMenuItem onClick={async () => {
+                          const id = toast.loading('Generating preview…');
                           try {
                             const pdf = await generateInvoicePdf(inv, null, null);
                             const url = await openPdfPreview(pdf);
                             window.open(url, '_blank');
-                          } catch { toast.error('Failed to generate preview'); }
+                            toast.dismiss(id);
+                          } catch { toast.error('Failed to generate preview', { id }); }
                         }}>
                           <Eye size={14} className="mr-2" /> Preview
                         </DropdownMenuItem>
@@ -234,6 +278,15 @@ export default function InvoicesPage() {
         description="Are you sure you want to delete this invoice? This action cannot be undone."
         onConfirm={onDeleteConfirm}
       />
+
+      {filtered.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={filtered.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
+      )}
     </div>
   );
 }

@@ -49,6 +49,9 @@ import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { formatCurrency } from '@/lib/utils';
+import { DataPagination } from '@/components/ui/data-pagination';
+
+const PAGE_SIZE = 25;
 
 const pipelineStages: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal", 'negotiation', 'won', 'lost'];
 
@@ -78,7 +81,7 @@ function daysBetween(dateStr: string): number {
 }
 
 export default function DealsPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('all');
@@ -92,17 +95,20 @@ export default function DealsPage() {
   const [editingLead, setEditingLead] = useState<Lead | null>(null);
   const [deleting, setDeleting] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ open: boolean; id?: string; loading?: boolean }>({ open: false });
+  const [page, setPage] = useState(1);
+  const [expandedColumns, setExpandedColumns] = useState<Record<string, boolean>>({});
+  const KANBAN_PAGE_SIZE = 25;
 
   const load = useCallback(async () => {
-    if (!user?.company_id) {
+    if (!workspace?.id) {
       setLoading(false);
       return;
     }
     setLoading(true);
     try {
       const [leadData, pipelineData] = await Promise.all([
-        getLeads(user.company_id),
-        getPipelines(user.company_id),
+        getLeads(workspace?.id),
+        getPipelines(workspace?.id),
       ]);
       setLeads(leadData);
       setPipelines(pipelineData);
@@ -111,11 +117,13 @@ export default function DealsPage() {
     } finally {
       setLoading(false);
     }
-  }, [user?.company_id]);
+  }, [workspace?.id]);
 
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => { setPage(1); setExpandedColumns({}); }, [search, selectedPipelineId, activeStage]);
 
   const selectedPipeline = useMemo(
     () => pipelines.find(p => p.id === selectedPipelineId),
@@ -146,6 +154,11 @@ export default function DealsPage() {
 
     return result;
   }, [leads, selectedPipelineId, selectedPipeline, search, activeStage]);
+
+  const paginatedLeads = useMemo(() => {
+    const start = (page - 1) * PAGE_SIZE;
+    return filteredLeads.slice(start, start + PAGE_SIZE);
+  }, [filteredLeads, page]);
 
   const openStatuses: LeadStatus[] = ['new', 'contacted', 'qualified', "proposal", 'negotiation'];
 
@@ -401,14 +414,14 @@ export default function DealsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredLeads.length === 0 && (
+              {paginatedLeads.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={10} className="text-center text-muted-foreground py-12">
                     No deals found
                   </TableCell>
                 </TableRow>
               )}
-              {filteredLeads.map((lead) => {
+              {paginatedLeads.map((lead) => {
                 const daysInStage = daysBetween(lead.updated_at || lead.created_at);
                 const needsFollowUp = lead.next_follow_up && new Date(lead.next_follow_up) <= now;
                 return (
@@ -492,14 +505,17 @@ export default function DealsPage() {
         <DragDropContext onDragEnd={onDragEnd}>
           <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-4">
             {pipelineStages.map((stage) => {
-              const stageLeads = grouped[stage] || [];
+              const allStageLeads = grouped[stage] || [];
+              const isExpanded = expandedColumns[stage] || false;
+              const visibleLeads = isExpanded ? allStageLeads : allStageLeads.slice(0, KANBAN_PAGE_SIZE);
+              const hiddenCount = allStageLeads.length - visibleLeads.length;
               return (
                 <div key={stage} className="flex-shrink-0 w-72 flex flex-col">
                   <div className="flex items-center justify-between mb-3 shrink-0">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-semibold">{stageLabels[stage]}</h3>
                       <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
-                        {stageLeads.length}
+                        {allStageLeads.length}
                       </span>
                     </div>
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => { setEditingLead(null); setDialogOpen(true); }}>
@@ -513,7 +529,7 @@ export default function DealsPage() {
                         ref={provided.innerRef}
                         className={`space-y-3 flex-1 transition-colors rounded-xl min-h-[150px] p-1 -m-1 ${snapshot.isDraggingOver ? 'bg-muted/50' : ''}`}
                       >
-                        {stageLeads.map((lead, index) => (
+                        {visibleLeads.map((lead, index) => (
                           <Draggable key={lead.id} draggableId={lead.id} index={index}>
                             {(provided, snapshot) => (
                               <div
@@ -600,10 +616,26 @@ export default function DealsPage() {
                           </Draggable>
                         ))}
                         {provided.placeholder}
-                        {stageLeads.length === 0 && (
+                        {allStageLeads.length === 0 && (
                           <div className="border-2 border-dashed rounded-lg p-4 text-center mt-2">
                             <p className="text-xs text-muted-foreground">No deals</p>
                           </div>
+                        )}
+                        {hiddenCount > 0 && (
+                          <button
+                            onClick={() => setExpandedColumns(prev => ({ ...prev, [stage]: true }))}
+                            className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-2 rounded-lg hover:bg-muted/50 transition-colors"
+                          >
+                            Show {hiddenCount} more
+                          </button>
+                        )}
+                        {isExpanded && allStageLeads.length > KANBAN_PAGE_SIZE && (
+                          <button
+                            onClick={() => setExpandedColumns(prev => ({ ...prev, [stage]: false }))}
+                            className="w-full text-center text-xs text-muted-foreground hover:text-foreground py-2 rounded-lg hover:bg-muted/50 transition-colors"
+                          >
+                            Show less
+                          </button>
                         )}
                       </div>
                     )}
@@ -613,6 +645,15 @@ export default function DealsPage() {
             })}
           </div>
         </DragDropContext>
+      )}
+
+      {viewMode === 'list' && filteredLeads.length > PAGE_SIZE && (
+        <DataPagination
+          page={page}
+          totalItems={filteredLeads.length}
+          pageSize={PAGE_SIZE}
+          onPageChange={setPage}
+        />
       )}
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>

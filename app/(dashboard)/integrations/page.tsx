@@ -35,6 +35,7 @@ interface ConnectorDef {
   href: string;
   platform: string;
   features: string[];
+  hidden?: boolean;
 }
 
 const connectors: ConnectorDef[] = [
@@ -57,6 +58,7 @@ const connectors: ConnectorDef[] = [
     href: '/integrations/meta',
     platform: 'meta_ads',
     features: ['Campaign creation', 'Audience targeting', 'Performance stats', 'Budget management'],
+    hidden: true,
   },
   {
     id: 'google_ads',
@@ -67,6 +69,7 @@ const connectors: ConnectorDef[] = [
     href: '/integrations/google',
     platform: 'google_ads',
     features: ['GAQL queries', 'Budget management', 'Ad group creation', 'Performance tracking'],
+    hidden: true,
   },
   {
     id: 'website_enquiries',
@@ -110,6 +113,7 @@ export default function IntegrationsPage() {
   const isConnected = (platform: string) =>
     connectedApps.some((a) => a.platform === platform && a.status === 'connected');
 
+  const visibleConnectors = connectors.filter((c) => !c.hidden);
   const connectedCount = connectedApps.filter((a) => a.status === 'connected').length;
   const activeWebhooks = webhooks.filter((w) => w.status === 'active').length;
 
@@ -143,7 +147,7 @@ export default function IntegrationsPage() {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Available</p>
-                <p className="text-2xl font-bold">{connectors.length}</p>
+                <p className="text-2xl font-bold">{visibleConnectors.length}</p>
               </div>
               <Zap className="h-8 w-8 text-primary" />
             </div>
@@ -187,7 +191,7 @@ export default function IntegrationsPage() {
 
         <TabsContent value="all" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {connectors.map((connector) => {
+            {visibleConnectors.map((connector) => {
               const connected = isConnected(connector.platform);
               return (
                 <Card key={connector.id} className="relative overflow-hidden hover:shadow-md transition-shadow">
@@ -246,7 +250,7 @@ export default function IntegrationsPage() {
 
         <TabsContent value="connected" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {connectors
+            {visibleConnectors
               .filter((c) => isConnected(c.platform))
               .map((connector) => (
                 <Card key={connector.id} className="hover:shadow-md transition-shadow">
@@ -271,7 +275,7 @@ export default function IntegrationsPage() {
                   </CardContent>
                 </Card>
               ))}
-            {connectors.filter((c) => isConnected(c.platform)).length === 0 && (
+            {visibleConnectors.filter((c) => isConnected(c.platform)).length === 0 && (
               <Card className="col-span-2">
                 <CardContent className="py-12 text-center">
                   <CheckCircle className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
@@ -287,7 +291,7 @@ export default function IntegrationsPage() {
 
         <TabsContent value="available" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {connectors
+            {visibleConnectors
               .filter((c) => !isConnected(c.platform))
               .map((connector) => (
                 <Card key={connector.id} className="hover:shadow-md transition-shadow">
@@ -309,7 +313,7 @@ export default function IntegrationsPage() {
                   </CardContent>
                 </Card>
               ))}
-            {connectors.filter((c) => !isConnected(c.platform)).length === 0 && (
+            {visibleConnectors.filter((c) => !isConnected(c.platform)).length === 0 && (
               <Card className="col-span-2">
                 <CardContent className="py-12 text-center">
                   <Zap className="h-12 w-12 text-muted-foreground mx-auto mb-4" />

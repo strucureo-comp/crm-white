@@ -57,7 +57,7 @@ const PERSONAS = ['Founder', 'CEO', 'Marketing Manager', 'Sales Manager', 'Agenc
 const INITIAL_DATA: ContentItem[] = [];
 
 export default function ContentHubPage() {
-  const { user } = useAuth();
+  const { workspace, user } = useAuth();
   const [isMounted, setIsMounted] = useState(false);
   useEffect(() => setIsMounted(true), []);
 
@@ -65,13 +65,13 @@ export default function ContentHubPage() {
   const [items, setItems] = useState<ContentItem[]>(INITIAL_DATA);
   
   useEffect(() => {
-    if (!user?.company_id) return;
-    const unsubscribe = subscribeToContentHub(user.company_id, (data) => {
+    if (!workspace?.id) return;
+    const unsubscribe = subscribeToContentHub(workspace?.id, (data) => {
       setItems(data);
       setSelectedItem(prev => data.find(i => i.id === prev?.id) || null);
     });
     return () => unsubscribe();
-  }, [user?.company_id]);
+  }, [workspace?.id]);
   const [stages, setStages] = useState<StageInfo[]>(DEFAULT_STAGES);
   const [activeTab, setActiveTab] = useState('pipeline');
 
@@ -138,14 +138,14 @@ export default function ContentHubPage() {
 
   // --- Functions ---
   const updateItemStatus = async (id: string, newStatus: string, actionNote: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     const item = items.find(i => i.id === id);
     if (!item) return;
     
     const newHistory = [{ date: new Date().toISOString().split('T')[0], action: actionNote, user: 'Current User' }, ...(item.history || [])];
     
     try {
-      await updateContentItem(user.company_id, id, {
+      await updateContentItem(workspace?.id, id, {
         status: newStatus,
         history: newHistory
       });
@@ -214,7 +214,7 @@ export default function ContentHubPage() {
   };
 
   const saveContentItem = async () => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     if (!formTitle.trim()) {
       toast.error('Title is required');
       return;
@@ -223,7 +223,7 @@ export default function ContentHubPage() {
     try {
       if (editingItem && editingItem.id) {
         const newHistory = [{ date: new Date().toISOString().split('T')[0], action: 'Updated details', user: 'Current User' }, ...(editingItem.history || [])];
-        await updateContentItem(user.company_id, editingItem.id, {
+        await updateContentItem(workspace?.id, editingItem.id, {
           title: formTitle,
           type: formType,
           campaign: formCampaign,
@@ -252,7 +252,7 @@ export default function ContentHubPage() {
           comments: [],
           history: [{ date: new Date().toISOString().split('T')[0], action: 'Created item', user: 'Current User' }]
         };
-        await createContentItem(user.company_id, newItem);
+        await createContentItem(workspace?.id, newItem);
         toast.success('Content created');
       }
       setIsCreateModalOpen(false);
@@ -262,9 +262,9 @@ export default function ContentHubPage() {
   };
 
   const deleteItem = async (id: string) => {
-    if (!user?.company_id) return;
+    if (!workspace?.id) return;
     try {
-      await deleteContentItem(user.company_id, id);
+      await deleteContentItem(workspace?.id, id);
       toast.success('Content deleted');
       if (selectedItem?.id === id) setIsDetailDrawerOpen(false);
       if (editingItem?.id === id) setIsCreateModalOpen(false);
@@ -274,7 +274,7 @@ export default function ContentHubPage() {
   };
 
   const addComment = async () => {
-    if (!user?.company_id || !commentText.trim() || !selectedItem || !selectedItem.id) return;
+    if (!workspace?.id || !commentText.trim() || !selectedItem || !selectedItem.id) return;
     
     const newComment: Comment = {
       id: Date.now().toString(),
@@ -288,7 +288,7 @@ export default function ContentHubPage() {
       const newComments = [...(selectedItem.comments || []), newComment];
       const newHistory = [{ date: new Date().toISOString().split('T')[0], action: 'Added comment', user: 'Current User' }, ...(selectedItem.history || [])];
       
-      await updateContentItem(user.company_id, selectedItem.id, {
+      await updateContentItem(workspace?.id, selectedItem.id, {
         comments: newComments,
         history: newHistory
       });

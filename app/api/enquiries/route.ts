@@ -14,7 +14,7 @@ const MAX_LENGTHS = { name: 100, email: 254, subject: 200, message: 5000, phone:
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { name, email, subject, message, phone, company_id } = body;
+    const { name, email, subject, message, phone, workspace_id } = body;
 
     if (!name || !email || !message) {
       return NextResponse.json(
@@ -23,9 +23,9 @@ export async function POST(request: Request) {
       );
     }
 
-    if (!company_id) {
+    if (!workspace_id) {
       return NextResponse.json(
-        { error: 'Missing company_id — enquiries must be associated with a workspace' },
+        { error: 'Missing workspace_id — enquiries must be associated with a workspace' },
         { status: 400 }
       );
     }
@@ -52,7 +52,7 @@ export async function POST(request: Request) {
     }
 
     const enquiryId = await createEnquiry({
-      company_id: sanitize(company_id),
+      workspace_id: sanitize(workspace_id),
       name: sanitize(name),
       email: sanitize(email),
       subject: subject ? sanitize(String(subject).slice(0, MAX_LENGTHS.subject)) : 'New Website Enquiry',
