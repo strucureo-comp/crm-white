@@ -1,6 +1,6 @@
 'use client';
 
-import { ref, get, set, push, update, query, orderByChild, equalTo } from 'firebase/database';
+import { ref, get, set, push, update, remove, query, orderByChild, equalTo } from 'firebase/database';
 import { database } from '@/lib/firebase/config';
 import type { Workspace, WorkspaceMember, WorkspaceRole } from '@/lib/db/types';
 import { ensureDefaultRoles } from '@/lib/db/roles/api';
@@ -107,6 +107,37 @@ export async function getUserWorkspace(userId: string): Promise<Workspace | null
   }
 }
 
+export async function getUserWorkspaces(userId: string): Promise<Workspace[]> {
+  try {
+    const membersRef = ref(database, WORKSPACE_MEMBERS_PATH);
+    const memberSnapshot = await get(membersRef);
+    
+    if (!memberSnapshot.exists()) return [];
+
+    const data = memberSnapshot.val();
+    const workspaceIds = new Set<string>();
+    
+    for (const [key, value] of Object.entries(data)) {
+      if (value && typeof value === 'object' && (value as any).user_id === userId) {
+        workspaceIds.add((value as any).workspace_id);
+      }
+    }
+
+    if (workspaceIds.size === 0) return [];
+
+    const workspaces: Workspace[] = [];
+    for (const wid of workspaceIds) {
+      const ws = await getWorkspace(wid);
+      if (ws) workspaces.push(ws);
+    }
+    
+    return workspaces;
+  } catch (error) {
+    console.error('Error fetching user workspaces:', error);
+    return [];
+  }
+}
+
 export async function updateWorkspace(
   workspaceId: string,
   updates: Partial<Workspace>
@@ -128,6 +159,51 @@ export async function completeWorkspaceSetup(workspaceId: string): Promise<boole
     setup_completed: true,
     setup_step: 5,
   });
+}
+
+export async function deleteWorkspace(workspaceId: string): Promise<boolean> {
+  try {
+    // Basic nodes to delete
+    const pathsToDelete = [
+      `${WORKSPACES_PATH}/${workspaceId}`,
+      `workspaces/${workspaceId}`,
+      `workspace_members`,
+      `invites`
+    ];
+    
+    // 1. Delete all workspace_members for this workspace
+    const membersRef = ref(database, WORKSPACE_MEMBERS_PATH);
+    const memberSnap = await get(membersRef);
+    if (memberSnap.exists()) {
+      const data = memberSnap.val();
+      for (const [key, value] of Object.entries(data)) {
+        if ((value as any).workspace_id === workspaceId) {
+          await remove(ref(database, `${WORKSPACE_MEMBERS_PATH}/${key}`));
+        }
+      }
+    }
+    
+    // 2. Delete all invites for this workspace
+    const invitesRef = ref(database, 'invites');
+    const invitesSnap = await get(invitesRef);
+    if (invitesSnap.exists()) {
+      const data = invitesSnap.val();
+      for (const [key, value] of Object.entries(data)) {
+        if ((value as any).workspace_id === workspaceId) {
+          await remove(ref(database, `invites/${key}`));
+        }
+      }
+    }
+    
+    // 3. Delete the workspace object itself and all its nested subcollections
+    // In our structure, workspaces/{id} contains leads, invoices, etc.
+    await remove(ref(database, `workspaces/${workspaceId}`));
+    
+    return true;
+  } catch (error) {
+    console.error('Error deleting workspace:', error);
+    return false;
+  }
 }
 
 // ===== WORKSPACE MEMBERS =====

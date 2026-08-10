@@ -4,6 +4,7 @@ import { SidebarProvider } from '@/components/dashboard/sidebar-context';
 import { AuthGuard } from '@/components/dashboard/auth-guard';
 import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { PermissionsProvider } from '@/components/context/permissions-context';
+import { InvitesModal } from '@/components/dashboard/invites-modal';
 
 export default function DashboardLayout({
   children,
@@ -24,6 +25,7 @@ export default function DashboardLayout({
                 </ErrorBoundary>
               </main>
             </div>
+            <InvitesModal />
           </div>
         </SidebarProvider>
       </PermissionsProvider>

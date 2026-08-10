@@ -17,6 +17,14 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
   LayoutDashboard,
   Users,
   Contact2,
@@ -36,6 +44,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronDown,
+  ChevronsUpDown,
   Receipt,
   X,
   Activity,
@@ -145,12 +154,13 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
   companyName: string;
 }) {
   const { hasPermission } = usePermissions();
+  const { availableWorkspaces, switchWorkspace, workspace } = useAuth();
   const { topItems, groups: navGroups } = getNavConfig(leadCount, hasPermission);
 
-  return (
-    <>
-      <div className="flex items-center gap-2 px-4 h-16 border-b shrink-0">
-        <div className="flex items-center gap-2 min-w-0">
+  const WorkspaceSelector = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button className="flex items-center gap-2 min-w-0 hover:bg-sidebar-muted p-1 rounded-md transition-colors w-full text-left">
           {companyLogo ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={companyLogo} alt={companyName} className="w-8 h-8 rounded-lg object-contain shrink-0" />
@@ -160,11 +170,46 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
             </div>
           )}
           {!collapsed && (
-            <span className="font-semibold text-lg tracking-tight whitespace-nowrap">
-              {companyName || 'CRM'}
-            </span>
+            <div className="flex flex-col flex-1 min-w-0">
+              <span className="font-semibold text-sm tracking-tight truncate">
+                {companyName || 'CRM'}
+              </span>
+              <span className="text-xs text-sidebar-muted-foreground truncate">
+                {workspace?.setup_completed ? 'Active Workspace' : 'Setup Required'}
+              </span>
+            </div>
           )}
-        </div>
+          {!collapsed && <ChevronsUpDown size={14} className="text-sidebar-muted-foreground ml-auto shrink-0" />}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-64">
+        <DropdownMenuLabel>Workspaces</DropdownMenuLabel>
+        <DropdownMenuSeparator />
+        {availableWorkspaces?.map((ws) => (
+          <DropdownMenuItem 
+            key={ws.id}
+            onClick={() => switchWorkspace(ws.id)}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <div className="w-6 h-6 rounded bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+              {ws.name.charAt(0)}
+            </div>
+            <div className="flex flex-col flex-1 min-w-0">
+              <span className="text-sm font-medium truncate">{ws.name}</span>
+            </div>
+            {ws.id === workspace?.id && (
+              <div className="w-2 h-2 rounded-full bg-green-500 ml-auto shrink-0" />
+            )}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  return (
+    <>
+      <div className="flex items-center gap-2 px-4 h-16 border-b shrink-0">
+        <WorkspaceSelector />
         <button
           onClick={() => onToggleGroup('__collapse__')}
           className="ml-auto p-1.5 rounded-md hover:bg-sidebar-muted text-sidebar-muted-foreground shrink-0 hidden lg:block"

@@ -21,9 +21,11 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getWorkspaceSettings, saveWorkspaceSettings, clearSettingsCache } from '@/lib/settings/api';
 import { updateWorkspace } from '@/lib/workspace/api';
-import type { WorkspaceSettings, GeneralSettings, BrandingSettings, AppearanceSettings, NotificationSettings, TeamSettings, ApiKey } from '@/lib/settings/types';
+import { WorkspaceSettings, GeneralSettings, BrandingSettings, AppearanceSettings, NotificationSettings, TeamSettings, ApiKey } from '@/lib/settings/types';
 import { DEFAULT_WORKSPACE_SETTINGS, DEFAULT_GENERAL_SETTINGS, DEFAULT_BRANDING_SETTINGS, DEFAULT_APPEARANCE_SETTINGS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_TEAM_SETTINGS } from '@/lib/settings/types';
 import { toast } from 'sonner';
+import { InviteMemberDialog } from '@/components/dashboard/invite-member-dialog';
+import { DeleteWorkspaceDialog } from '@/components/dashboard/delete-workspace-dialog';
 import {
   TIMEZONES, CURRENCIES, COUNTRIES, STATES_BY_COUNTRY, LANGUAGES,
   DATE_FORMATS, NUMBER_FORMATS, WEEK_DAYS, FINANCIAL_YEARS,
@@ -647,6 +649,19 @@ export default function SettingsPage() {
               <FieldHelper text="Export your settings as JSON, import from a file, or reset everything to defaults" />
             </CardContent>
           </Card>
+          <Card className="border-destructive/50">
+            <CardHeader><CardTitle className="text-lg text-destructive">Danger Zone</CardTitle></CardHeader>
+            <CardContent>
+              <div className="flex flex-col gap-2">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Permanently delete this workspace and all of its data. This action cannot be undone.
+                </p>
+                <div>
+                  <DeleteWorkspaceDialog />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </TabsContent>
 
         <TabsContent value="notifications" className="space-y-4 mt-4">
@@ -1073,7 +1088,7 @@ export default function SettingsPage() {
             <CardHeader>
               <div className="flex items-center justify-between">
                 <CardTitle className="text-lg">Team Management</CardTitle>
-                <Button size="sm"><Users size={14} className="mr-2" /> Invite Member</Button>
+                <InviteMemberDialog />
               </div>
             </CardHeader>
             <CardContent className="space-y-6">

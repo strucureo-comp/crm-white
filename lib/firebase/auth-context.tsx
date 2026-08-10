@@ -13,7 +13,8 @@ import { ref, set, get, child } from 'firebase/database';
 import { auth, database } from './config';
 import { User, UserRole } from '@/lib/db/types';
 import { createUser } from './database';
-import { getUserWorkspace, createWorkspace, findWorkspaceByName, createWorkspaceMember } from '@/lib/workspace/api';
+import { getUserWorkspace, getUserWorkspaces, createWorkspace, findWorkspaceByName, createWorkspaceMember } from '@/lib/workspace/api';
+import { getPendingInvitesByEmail, Invite } from '@/lib/workspace/invites';
 import type { Workspace } from '@/lib/db/types';
 
 interface AuthContextType {
@@ -26,8 +27,12 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
+  resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
   refreshUser: () => Promise<void>;
   refreshWorkspace: () => Promise<void>;
+  availableWorkspaces: Workspace[];
+  pendingInvites: Invite[];
+  switchWorkspace: (workspaceId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -38,6 +43,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
+  const [availableWorkspaces, setAvailableWorkspaces] = useState<Workspace[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<Invite[]>([]);
 
   const fetchUser = async (firebaseUser: FirebaseUser) => {
     try {
@@ -68,7 +75,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         };
       }
       
+      
       setUser(resolvedUser);
+      
+      // Load pending invites
+      try {
+        const invites = await getPendingInvitesByEmail(resolvedUser.email);
+        setPendingInvites(invites);
+      } catch (e) {
+        console.error('Error fetching pending invites:', e);
+      }
+      
       return resolvedUser;
     } catch (error) {
       const errorMsg = error instanceof Error ? error.message : String(error);
@@ -150,12 +167,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
       
+      
       setWorkspace(ws);
+      
+      // Load all available workspaces
+      try {
+        const workspaces = await getUserWorkspaces(userId);
+        if (ws && !workspaces.some(w => w.id === ws!.id)) {
+            workspaces.unshift(ws);
+        }
+        setAvailableWorkspaces(workspaces);
+      } catch (e) {
+        console.error('Error fetching all workspaces:', e);
+      }
+      
     } catch (error) {
       console.error('Error fetching workspace:', error);
       setWorkspace(null);
     } finally {
       setWorkspaceLoading(false);
+    }
+  };
+
+  const switchWorkspace = async (workspaceId: string) => {
+    if (!user) return;
+    try {
+      // 1. Update the user document in database
+      const userRef = ref(database, `users/${user.id}`);
+      await import('firebase/database').then(({ update }) => {
+        update(userRef, { company_id: workspaceId });
+      });
+      // 2. Update local state
+      setUser(prev => prev ? { ...prev, company_id: workspaceId } : null);
+      // 3. Re-fetch workspace data
+      await fetchWorkspace(user.id, workspaceId);
+    } catch (error) {
+      console.error('Failed to switch workspace:', error);
     }
   };
 
@@ -322,6 +369,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         resetPassword,
         refreshUser,
         refreshWorkspace,
+        availableWorkspaces,
+        pendingInvites,
+        switchWorkspace,
       }}
     >
       {children}
