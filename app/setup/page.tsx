@@ -110,25 +110,25 @@ export default function SetupPage() {
         // Update workspace name
         await updateWorkspace(workspace.id, { name: companyName });
         // Save general settings
-        await updateGeneralSettings({
+        await updateGeneralSettings(workspace.id, {
           company_name: companyName,
           default_currency: currency,
           currency_symbol: currencySymbol,
           timezone,
         });
       } else if (currentStep === 1) {
-        await updateGeneralSettings({
+        await updateGeneralSettings(workspace.id, {
           company_name: companyName,
           timezone,
         });
       } else if (currentStep === 3) {
-        await updateGeneralSettings({
+        await updateGeneralSettings(workspace.id, {
           company_name: companyName,
           default_currency: currency,
           currency_symbol: currencySymbol,
           timezone,
         });
-        await updateBrandingSettings({
+        await updateBrandingSettings(workspace.id, {
           gst_number: gstNumber,
           pan_number: panNumber,
         });
