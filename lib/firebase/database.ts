@@ -1448,7 +1448,7 @@ export async function getLeads(workspaceId?: string): Promise<Lead[]> {
     const leads: Lead[] = [];
     
     for (const [key, val] of Object.entries(data)) {
-      if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
+      if (val && typeof val === 'object' && ((val as any).workspace_id === workspaceId || (val as any).company_id === workspaceId)) {
         leads.push({ id: key, ...val } as Lead);
       }
     }
@@ -1467,7 +1467,7 @@ export function subscribeToLeads(workspaceId: string, callback: (leads: Lead[]) 
       const data = snapshot.val();
       const leads: Lead[] = [];
       for (const [key, val] of Object.entries(data)) {
-        if (val && typeof val === 'object' && (val as any).workspace_id === workspaceId) {
+        if (val && typeof val === 'object' && ((val as any).workspace_id === workspaceId || (val as any).company_id === workspaceId)) {
           leads.push({ id: key, ...(val as object) } as Lead);
         }
       }
