@@ -96,7 +96,7 @@ async function saveEnquiry(enquiry) {
   };
 
   // Write enquiry to Firebase RTDB
-  const dbUrl = `${FIREBASE_DB_URL}/enquiries/${id}.json`;
+  const dbUrl = `${FIREBASE_DB_URL}/workspaces/${sanitize(enquiry.company_id)}/enquiries/${id}.json`;
   const data = JSON.stringify(record);
 
   const result = await new Promise((resolve, reject) => {
@@ -146,7 +146,7 @@ async function saveEnquiry(enquiry) {
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       };
-      const leadUrl = `${FIREBASE_DB_URL}/leads/${leadId}.json`;
+      const leadUrl = `${FIREBASE_DB_URL}/workspaces/${sanitize(enquiry.company_id)}/leads/${leadId}.json`;
       const leadData = JSON.stringify(leadRecord);
       await new Promise((resolve, reject) => {
         const url = new URL(leadUrl);
