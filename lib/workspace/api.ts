@@ -126,7 +126,7 @@ export async function getUserWorkspaces(userId: string): Promise<Workspace[]> {
     if (workspaceIds.size === 0) return [];
 
     const workspaces: Workspace[] = [];
-    for (const wid of workspaceIds) {
+    for (const wid of Array.from(workspaceIds)) {
       const ws = await getWorkspace(wid);
       if (ws) workspaces.push(ws);
     }

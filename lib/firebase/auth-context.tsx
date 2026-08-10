@@ -27,7 +27,6 @@ interface AuthContextType {
   signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
-  resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
   refreshUser: () => Promise<void>;
   refreshWorkspace: () => Promise<void>;
   availableWorkspaces: Workspace[];
@@ -79,11 +78,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(resolvedUser);
       
       // Load pending invites
-      try {
-        const invites = await getPendingInvitesByEmail(resolvedUser.email);
-        setPendingInvites(invites);
-      } catch (e) {
-        console.error('Error fetching pending invites:', e);
+      if (resolvedUser) {
+        try {
+          const invites = await getPendingInvitesByEmail(resolvedUser.email);
+          setPendingInvites(invites);
+        } catch (e) {
+          console.error('Error fetching pending invites:', e);
+        }
       }
       
       return resolvedUser;

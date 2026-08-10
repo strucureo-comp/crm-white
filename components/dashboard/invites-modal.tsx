@@ -46,7 +46,7 @@ export function InvitesModal() {
 
   return (
     <Dialog open={true}>
-      <DialogContent className="sm:max-w-md" closable={false}>
+      <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Workspace Invitations</DialogTitle>
           <DialogDescription>
