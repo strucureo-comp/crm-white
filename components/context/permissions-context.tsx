@@ -57,6 +57,11 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
   const permissions = activeRole?.permissions || null;
 
   const hasPermission = (module: string, action: 'view' | 'edit' | 'delete') => {
+    // Admins and Workspace Owners always have full access, even if roles are missing
+    if (user?.role === 'Admin' || user?.role === 'admin' || workspace?.owner_id === user?.id) {
+      return true;
+    }
+
     if (!permissions) return false;
     const modPerms = permissions[module];
     if (!modPerms) return false;

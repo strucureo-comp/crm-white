@@ -35,7 +35,7 @@ export function usePermissions() {
     if (loading) return false;
     
     // Admins always have full access
-    if (user?.role === 'Admin' || user?.role === 'admin' || user?.role === 'owner') {
+    if (user?.role === 'Admin' || user?.role === 'admin' || workspace?.owner_id === user?.id) {
       return true;
     }
     
