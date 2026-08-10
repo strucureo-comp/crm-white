@@ -1162,6 +1162,7 @@ export type NormalizedInvoiceStatus =
 
 // ===== PAYMENT (Enhanced) =====
 export interface NormalizedPayment {
+  payment_type?: string;
   payment_id: string;
   workspace_id: string;
   company_id?: string; // FK → Company

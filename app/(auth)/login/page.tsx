@@ -9,26 +9,57 @@ import { useState, useEffect, FormEvent } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
+import { getWorkspaceSettings } from '@/lib/settings/api';
+import { getUser } from '@/lib/firebase/database';
 
 export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [requires2FA, setRequires2FA] = useState(false);
+  const [twoFaCode, setTwoFaCode] = useState('');
+  const [twoFaVerified, setTwoFaVerified] = useState(false);
+  const [totpSecret, setTotpSecret] = useState('');
+  const [checking2FA, setChecking2FA] = useState(false);
   const { signIn, user, loading, workspace, workspaceLoading } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
-    if (loading || workspaceLoading) return;
-    if (user) {
-      // If workspace exists and setup is complete, go to dashboard
-      if (workspace?.setup_completed) {
-        router.replace('/dashboard');
-      } else {
-        router.replace('/setup');
+    if (loading || workspaceLoading || checking2FA) return;
+    
+    if (user && workspace?.id) {
+      if (!requires2FA && !twoFaVerified) {
+        setChecking2FA(true);
+        // Check 2FA
+        Promise.all([
+          getWorkspaceSettings(workspace.id),
+          getUser(user.uid)
+        ]).then(([wsSettings, dbUser]) => {
+          if (wsSettings?.security?.two_factor_enabled && dbUser?.totp_secret) {
+            setTotpSecret(dbUser.totp_secret);
+            setRequires2FA(true);
+          } else {
+            setTwoFaVerified(true);
+          }
+          setChecking2FA(false);
+        }).catch(err => {
+          console.error('Error checking 2FA', err);
+          setTwoFaVerified(true);
+          setChecking2FA(false);
+        });
+        return;
+      }
+      
+      if (twoFaVerified) {
+        if (workspace?.setup_completed) {
+          router.replace('/dashboard');
+        } else {
+          router.replace('/setup');
+        }
       }
     }
-  }, [user, loading, workspace, workspaceLoading, router]);
+  }, [user, loading, workspace, workspaceLoading, router, requires2FA, twoFaVerified, checking2FA]);
 
   if (loading || workspaceLoading || user) {
     return (
@@ -37,6 +68,29 @@ export default function LoginPage() {
       </div>
     );
   }
+
+  
+  const handleVerify2FA = async (e: FormEvent) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      const res = await fetch('/api/auth/2fa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: twoFaCode, secret: totpSecret })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTwoFaVerified(true);
+        setRequires2FA(false);
+      } else {
+        toast.error('Invalid 2FA code');
+      }
+    } catch (err) {
+      toast.error('Failed to verify code');
+    }
+    setSubmitting(false);
+  };
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -70,7 +124,24 @@ export default function LoginPage() {
 
         <Card>
           <CardContent className="pt-6">
-            <form onSubmit={handleSubmit} className="space-y-4">
+            
+              {requires2FA ? (
+                <form onSubmit={handleVerify2FA} className="space-y-4">
+                  <div className="space-y-2 text-center pb-4">
+                     <p className="text-sm text-muted-foreground">Enter the 6-digit code from your authenticator app.</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="twoFaCode">Verification Code</Label>
+                    <Input id="twoFaCode" type="text" placeholder="123456" maxLength={6} className="text-center text-xl tracking-widest" value={twoFaCode} onChange={(e) => setTwoFaCode(e.target.value)} />
+                  </div>
+                  <Button type="submit" className="w-full" disabled={submitting || twoFaCode.length < 6}>
+                    {submitting && <Loader2 size={16} className="mr-2 animate-spin" />}
+                    Verify Code
+                  </Button>
+                </form>
+              ) : (
+                <form onSubmit={handleSubmit} className="space-y-4">
+
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
@@ -102,6 +173,7 @@ export default function LoginPage() {
                 Sign In
               </Button>
             </form>
+              )}
             <div className="mt-4 text-center text-sm text-muted-foreground">
               Don&apos;t have an account?{' '}
               <a href="/register" className="text-primary hover:underline">Sign up</a>

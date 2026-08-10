@@ -61,7 +61,7 @@ export default function InvoicesPage() {
     setInvoices(data);
     setLoading(false);
     // Preload logo in background so PDF generation is instant
-    getCompanySettings().then(s => { if (s.logo_url) preloadLogo(s.logo_url); });
+    getCompanySettings(workspace?.id || user?.company_id || '').then(s => { if (s.logo_url) preloadLogo(s.logo_url); });
   }, [workspace?.id]);
 
   useEffect(() => { load(); }, [load]);
@@ -232,7 +232,7 @@ export default function InvoicesPage() {
                         <DropdownMenuItem onClick={async () => {
                           const id = toast.loading('Generating PDF…');
                           try {
-                            const pdf = await generateInvoicePdf(inv, null, null);
+                            const pdf = await generateInvoicePdf(workspace?.id || user?.company_id || '', inv, null, null);
                             await downloadPdf(pdf, `Invoice-${inv.invoice_number}.pdf`);
                             toast.success('Invoice downloaded', { id });
                           } catch { toast.error('Failed to generate PDF', { id }); }
@@ -242,7 +242,7 @@ export default function InvoicesPage() {
                         <DropdownMenuItem onClick={async () => {
                           const id = toast.loading('Generating preview…');
                           try {
-                            const pdf = await generateInvoicePdf(inv, null, null);
+                            const pdf = await generateInvoicePdf(workspace?.id || user?.company_id || '', inv, null, null);
                             const url = await openPdfPreview(pdf);
                             window.open(url, '_blank');
                             toast.dismiss(id);

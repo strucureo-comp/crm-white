@@ -57,10 +57,11 @@ function drawDivider(doc: jsPDF, y: number) {
 // ─── Quotation PDF ────────────────────────────────────────────────────────────
 
 export async function generateQuotationPdf(
+  workspaceId: string,
   quotation: Quotation,
   client:    User | null
 ): Promise<jsPDF> {
-  const s   = await getCompanySettings();
+  const s   = await getCompanySettings(workspaceId);
   const cur = s.default_currency || 'INR';
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
@@ -262,11 +263,12 @@ export async function generateQuotationPdf(
 // ─── Invoice PDF ──────────────────────────────────────────────────────────────
 
 export async function generateInvoicePdf(
+  workspaceId: string,
   invoice:  Invoice,
   client:   User | null,
   project:  Project | null
 ): Promise<jsPDF> {
-  const s   = await getCompanySettings();
+  const s   = await getCompanySettings(workspaceId);
   const cur = s.default_currency || 'INR';
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });

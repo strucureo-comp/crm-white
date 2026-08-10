@@ -126,6 +126,14 @@ export default function SettingsPage() {
   const [appearance, setAppearance] = useState<AppearanceSettings>(DEFAULT_APPEARANCE_SETTINGS);
   const [sessionTimeout, setSessionTimeout] = useState('30');
   const [twoFactor, setTwoFactor] = useState(false);
+  const [setup2faOpen, setSetup2faOpen] = useState(false);
+  const [setup2faStep, setSetup2faStep] = useState(1);
+  const [qrCode, setQrCode] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const [verifyCode, setVerifyCode] = useState('');
+  const [setupLoading, setSetupLoading] = useState(false);
+
+  const [ipWhitelist, setIpWhitelist] = useState<string[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
   const [copiedKey, setCopiedKey] = useState('');
   const [branding, setBranding] = useState<BrandingSettings>(DEFAULT_BRANDING_SETTINGS);
@@ -140,6 +148,73 @@ export default function SettingsPage() {
 
   const markDirty = useCallback(() => { setHasUnsavedChanges(true); }, []);
 
+  const handleEnable2fa = async (v: boolean) => {
+    if (!v) {
+      setTwoFactor(false);
+      markDirty();
+      return;
+    }
+    
+    // Attempt to generate 2FA secret
+    setSetupLoading(true);
+    setSetup2faOpen(true);
+    setSetup2faStep(1);
+    try {
+      const res = await fetch('/api/auth/2fa/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: user?.email })
+      });
+      const data = await res.json();
+      if (data.secret && data.qrCode) {
+        setTotpSecret(data.secret);
+        setQrCode(data.qrCode);
+        setSetup2faStep(2);
+      } else {
+        toast.error('Failed to generate 2FA secret');
+        setSetup2faOpen(false);
+      }
+    } catch (err) {
+      toast.error('Failed to generate 2FA secret');
+      setSetup2faOpen(false);
+    }
+    setSetupLoading(false);
+  };
+
+  const handleVerify2fa = async () => {
+    setSetupLoading(true);
+    try {
+      const res = await fetch('/api/auth/2fa/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token: verifyCode, secret: totpSecret })
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('Two-Factor Authentication enabled');
+        setTwoFactor(true);
+        markDirty();
+        setSetup2faOpen(false);
+        // We'd ideally save totpSecret to user's profile here
+        // For MVP, we'll store it in localStorage or let the user object handle it
+        if (workspace?.id && user?.id) {
+            import('@/lib/firebase/database').then(({ wsItemRef }) => {
+                import('firebase/database').then(({ update }) => {
+                    const ref = wsItemRef(workspace.id, 'users', user.id);
+                    update(ref, { totp_secret: totpSecret });
+                });
+            });
+        }
+      } else {
+        toast.error('Invalid verification code');
+      }
+    } catch (err) {
+      toast.error('Failed to verify code');
+    }
+    setSetupLoading(false);
+  };
+
+
   useEffect(() => {
     const handler = (e: BeforeUnloadEvent) => { if (hasUnsavedChanges) e.preventDefault(); };
     window.addEventListener('beforeunload', handler);
@@ -150,7 +225,9 @@ export default function SettingsPage() {
     if (!user?.id) return;
     const loadSettings = async () => {
       try {
-        const ws = await getWorkspaceSettings();
+        const workspaceId = workspace?.id || user?.company_id;
+        if (!workspaceId) return;
+        const ws = await getWorkspaceSettings(workspaceId);
         setGeneral(ws.general);
         setBranding(ws.branding);
         setWorkspaceName(ws.general.workspace_name);
@@ -250,7 +327,7 @@ export default function SettingsPage() {
           two_factor_enabled: twoFactor,
           password_strength: 'medium',
           login_notifications: true,
-          ip_whitelist: [],
+          ip_whitelist: ipWhitelist,
         },
         team: teamSettings,
         api: {
@@ -258,7 +335,9 @@ export default function SettingsPage() {
         },
         updated_at: new Date().toISOString(),
       };
-      await saveWorkspaceSettings(ws);
+      const workspaceId = workspace?.id || user?.company_id;
+      if (!workspaceId) throw new Error('No workspace ID found');
+      await saveWorkspaceSettings(workspaceId, ws);
       clearSettingsCache();
       setSaveState('saved');
       setHasUnsavedChanges(false);
@@ -619,7 +698,7 @@ export default function SettingsPage() {
                 <div className="space-y-3 pt-3">
                   <div className="flex items-center justify-between">
                     <div><p className="text-sm font-medium">Two-Factor Authentication</p><p className="text-xs text-muted-foreground">Add an extra layer of security to your account</p></div>
-                    <Switch checked={twoFactor} onCheckedChange={(v) => { setTwoFactor(v); markDirty(); }} />
+                    <Switch checked={twoFactor} onCheckedChange={handleEnable2fa} />
                   </div>
                   <Separator />
                   <div className="space-y-2">
@@ -629,6 +708,51 @@ export default function SettingsPage() {
                       <span className="text-xs text-muted-foreground">A reset link will be sent to your email</span>
                     </div>
                   </div>
+                  <Separator />
+                  <div className="space-y-2 pt-2">
+                    <Label>IP Whitelist</Label>
+                    <div className="space-y-2">
+                      {ipWhitelist.map((ip, i) => (
+                        <div key={i} className="flex items-center gap-2">
+                          <Input value={ip} readOnly className="font-mono text-sm" />
+                          <Button variant="ghost" size="icon" onClick={() => {
+                            setIpWhitelist(prev => prev.filter((_, idx) => idx !== i));
+                            markDirty();
+                          }}>
+                            <X size={14} />
+                          </Button>
+                        </div>
+                      ))}
+                      <div className="flex items-center gap-2">
+                        <Input 
+                          placeholder="e.g. 192.168.1.1" 
+                          id="new-ip"
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter') {
+                              e.preventDefault();
+                              const val = e.currentTarget.value.trim();
+                              if (val && !ipWhitelist.includes(val)) {
+                                setIpWhitelist([...ipWhitelist, val]);
+                                e.currentTarget.value = '';
+                                markDirty();
+                              }
+                            }
+                          }}
+                        />
+                        <Button variant="outline" onClick={() => {
+                          const input = document.getElementById('new-ip') as HTMLInputElement;
+                          const val = input.value.trim();
+                          if (val && !ipWhitelist.includes(val)) {
+                            setIpWhitelist([...ipWhitelist, val]);
+                            input.value = '';
+                            markDirty();
+                          }
+                        }}>Add</Button>
+                      </div>
+                      <p className="text-xs text-muted-foreground">Only these IP addresses will be allowed to access this workspace. Leave empty to allow all.</p>
+                    </div>
+                  </div>
+
                 </div>
               </CollapsibleSection>
               <CollapsibleSection title="Sessions" helper="Manage your active sessions" defaultOpen={false}>

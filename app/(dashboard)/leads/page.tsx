@@ -82,9 +82,11 @@ const stageTabs = [
 ] as const;
 
 import { useAuth } from '@/lib/firebase/auth-context';
+import { usePermissions } from '@/components/context/permissions-context';
 
 export default function LeadsPage() {
   const { workspace, user } = useAuth();
+  const { hasPermission } = usePermissions();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);

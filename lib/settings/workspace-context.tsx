@@ -97,7 +97,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       try {
         setLoading(true);
         setError(null);
-        const fetched = await getWorkspaceSettings();
+        const fetched = await getWorkspaceSettings(user.company_id);
         if (!cancelled) {
           setSettings(fetched);
         }
@@ -139,7 +139,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     clearSettingsCache();
     try {
       setLoading(true);
-      const fetched = await getWorkspaceSettings();
+      const fetched = await getWorkspaceSettings(user?.company_id || '');
       setSettings(fetched);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh settings');

@@ -21,58 +21,58 @@ import {
   ApiSettings,
 } from './types';
 
-const SETTINGS_PATH = 'system_settings/workspace';
+// Cache mapped by workspaceId
+let cachedSettingsMap: Record<string, WorkspaceSettings> = {};
+let fetchPromiseMap: Record<string, Promise<WorkspaceSettings>> = {};
 
+function getSettingsPath(workspaceId: string) {
+  return `workspaces/${workspaceId}/settings`;
+}
 // ─── Cache ──────────────────────────────────────────────────────────
-let cachedSettings: WorkspaceSettings | null = null;
-let fetchPromise: Promise<WorkspaceSettings> | null = null;
 
 // ─── Core Read/Write ────────────────────────────────────────────────
 
-export async function getWorkspaceSettings(): Promise<WorkspaceSettings> {
-  if (cachedSettings) return cachedSettings;
+export async function getWorkspaceSettings(workspaceId: string): Promise<WorkspaceSettings> {
+  if (!workspaceId) return { ...DEFAULT_WORKSPACE_SETTINGS };
+  if (cachedSettingsMap[workspaceId]) return cachedSettingsMap[workspaceId];
 
   // Deduplicate concurrent fetches
-  if (fetchPromise) return fetchPromise;
+  if (fetchPromiseMap[workspaceId]) return fetchPromiseMap[workspaceId];
 
-  fetchPromise = (async () => {
+  fetchPromiseMap[workspaceId] = (async () => {
     try {
-      const settingsRef = ref(database, SETTINGS_PATH);
+      const settingsRef = ref(database, getSettingsPath(workspaceId));
       const snapshot = await get(settingsRef);
 
       if (snapshot.exists()) {
         const data = snapshot.val();
-        cachedSettings = deepMerge(DEFAULT_WORKSPACE_SETTINGS, data);
+        cachedSettingsMap[workspaceId] = deepMerge(DEFAULT_WORKSPACE_SETTINGS, data);
       } else {
-        // Backfill from old company_branding key
-        const legacyRef = ref(database, 'system_settings/company_branding');
-        const legacySnap = await get(legacyRef);
-
-        if (legacySnap.exists()) {
-          const legacy = legacySnap.val();
-          cachedSettings = migrateLegacySettings(legacy);
-          // Save migrated settings
-          await saveWorkspaceSettings(cachedSettings);
-        } else {
-          cachedSettings = { ...DEFAULT_WORKSPACE_SETTINGS };
-        }
+        // Since we are scoping to workspace, if missing we just return default
+        // Legacy migration could be added here if needed per workspace
+        cachedSettingsMap[workspaceId] = { ...DEFAULT_WORKSPACE_SETTINGS };
       }
     } catch (error) {
       console.error('Error fetching workspace settings:', error);
-      cachedSettings = { ...DEFAULT_WORKSPACE_SETTINGS };
+      cachedSettingsMap[workspaceId] = { ...DEFAULT_WORKSPACE_SETTINGS };
     }
-    fetchPromise = null;
-    return cachedSettings!;
+    return cachedSettingsMap[workspaceId];
   })();
 
-  return fetchPromise;
+  try {
+    const result = await fetchPromiseMap[workspaceId];
+    return result;
+  } finally {
+    delete fetchPromiseMap[workspaceId];
+  }
 }
 
-export async function saveWorkspaceSettings(settings: WorkspaceSettings): Promise<boolean> {
+export async function saveWorkspaceSettings(workspaceId: string, settings: WorkspaceSettings): Promise<boolean> {
+  if (!workspaceId) return false;
   try {
-    const settingsRef = ref(database, SETTINGS_PATH);
+    const settingsRef = ref(database, getSettingsPath(workspaceId));
     await set(settingsRef, { ...settings, updated_at: new Date().toISOString() });
-    cachedSettings = { ...settings, updated_at: new Date().toISOString() };
+    cachedSettingsMap[workspaceId] = { ...settings, updated_at: new Date().toISOString() };
     return true;
   } catch (error) {
     console.error('Error saving workspace settings:', error);
@@ -80,53 +80,58 @@ export async function saveWorkspaceSettings(settings: WorkspaceSettings): Promis
   }
 }
 
-export function clearSettingsCache(): void {
-  cachedSettings = null;
-  fetchPromise = null;
+export function clearSettingsCache(workspaceId?: string): void {
+  if (workspaceId) {
+    delete cachedSettingsMap[workspaceId];
+    delete fetchPromiseMap[workspaceId];
+  } else {
+    cachedSettingsMap = {};
+    fetchPromiseMap = {};
+  }
 }
 
 // ─── Section Updates ────────────────────────────────────────────────
 
-export async function updateGeneralSettings(data: Partial<GeneralSettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateGeneralSettings(workspaceId: string, data: Partial<GeneralSettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.general = { ...settings.general, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
-export async function updateBrandingSettings(data: Partial<BrandingSettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateBrandingSettings(workspaceId: string, data: Partial<BrandingSettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.branding = { ...settings.branding, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
-export async function updateAppearanceSettings(data: Partial<AppearanceSettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateAppearanceSettings(workspaceId: string, data: Partial<AppearanceSettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.appearance = { ...settings.appearance, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
-export async function updateNotificationSettings(data: Partial<NotificationSettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateNotificationSettings(workspaceId: string, data: Partial<NotificationSettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.notifications = { ...settings.notifications, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
-export async function updateSecuritySettings(data: Partial<SecuritySettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateSecuritySettings(workspaceId: string, data: Partial<SecuritySettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.security = { ...settings.security, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
-export async function updateTeamSettings(data: Partial<TeamSettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateTeamSettings(workspaceId: string, data: Partial<TeamSettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.team = { ...settings.team, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
-export async function updateApiSettings(data: Partial<ApiSettings>): Promise<boolean> {
-  const settings = await getWorkspaceSettings();
+export async function updateApiSettings(workspaceId: string, data: Partial<ApiSettings>): Promise<boolean> {
+  const settings = await getWorkspaceSettings(workspaceId);
   settings.api = { ...settings.api, ...data };
-  return saveWorkspaceSettings(settings);
+  return saveWorkspaceSettings(workspaceId, settings);
 }
 
 // ─── Convenience Accessors (for PDF, Email, etc.) ──────────────────

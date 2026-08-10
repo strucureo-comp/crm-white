@@ -52,11 +52,10 @@ let cachedSettings: CompanySettings | null = null;
  * Get company settings as a flat object (for PDF engine compatibility).
  * Reads from the new workspace settings API.
  */
-export async function getCompanySettings(): Promise<CompanySettings> {
-  if (cachedSettings) return cachedSettings;
+export async function getCompanySettings(workspaceId: string): Promise<CompanySettings> {
   try {
-    const workspace = await getWorkspaceSettings();
-    cachedSettings = {
+    const workspace = await getWorkspaceSettings(workspaceId);
+    return {
       ...DEFAULT_SETTINGS,
       company_name: workspace.general.company_name,
       legal_name: workspace.general.legal_name,
@@ -101,14 +100,13 @@ export async function getCompanySettings(): Promise<CompanySettings> {
       social_links: workspace.branding.social_links,
       support_contact: workspace.branding.support_contact,
     };
-    return cachedSettings;
-  } catch {
+  } catch (err) {
+    console.error('Error getting company settings:', err);
     return DEFAULT_SETTINGS;
   }
 }
 
 export function clearSettingsCache(): void {
-  cachedSettings = null;
 }
 
 export function formatCurrency(amount: number, settings: CompanySettings): string {

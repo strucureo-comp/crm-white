@@ -62,7 +62,7 @@ export default function QuotesPage() {
       const data = await getQuotations(workspace?.id);
       setQuotations(data);
       // Preload logo in background so PDF generation is instant
-      getCompanySettings().then(s => { if (s.logo_url) preloadLogo(s.logo_url); });
+      getCompanySettings(workspace?.id || user?.company_id || '').then(s => { if (s.logo_url) preloadLogo(s.logo_url); });
     } catch {
       toast.error('Failed to load quotes');
     } finally {
@@ -224,7 +224,7 @@ export default function QuotesPage() {
                         <DropdownMenuItem onClick={async () => {
                           const id = toast.loading('Generating PDF…');
                           try {
-                            const pdf = await generateQuotationPdf(q, null);
+                            const pdf = await generateQuotationPdf(workspace?.id || user?.company_id || '', q, null);
                             await downloadPdf(pdf, `${q.quotation_number}.pdf`);
                             toast.success('Quote downloaded', { id });
                           } catch { toast.error('Failed to generate PDF', { id }); }
@@ -234,7 +234,7 @@ export default function QuotesPage() {
                         <DropdownMenuItem onClick={async () => {
                           const id = toast.loading('Generating preview…');
                           try {
-                            const pdf = await generateQuotationPdf(q, null);
+                            const pdf = await generateQuotationPdf(workspace?.id || user?.company_id || '', q, null);
                             const url = await openPdfPreview(pdf);
                             window.open(url, '_blank');
                             toast.dismiss(id);

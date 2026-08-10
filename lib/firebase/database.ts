@@ -2646,3 +2646,37 @@ export async function logActivity(log: Omit<ActivityLog, 'id' | 'created_at' | '
     return null;
   }
 }
+
+
+
+export async function checkPermission(userId: string, workspaceId: string, module: string, action: 'view' | 'edit' | 'delete'): Promise<boolean> {
+  try {
+    const user = await getUser(userId);
+    if (!user) return false;
+    
+    // Admin always has full access
+    if (user.role === 'Admin' || user.role === 'admin' || user.role === 'owner') return true;
+    
+    // Get roles for workspace
+    const rolesSnapshot = await get(wsRef(workspaceId, 'roles'));
+    if (!rolesSnapshot.exists()) return false;
+    
+    let userRole = null;
+    rolesSnapshot.forEach((child) => {
+      const role = { id: child.key, ...child.val() };
+      // Map exact name or id
+      if (role.name === user.role || role.id === user.role) {
+        userRole = role;
+      }
+    });
+    
+    if (!userRole || !userRole.permissions || !userRole.permissions[module]) {
+      return false;
+    }
+    
+    return userRole.permissions[module][action] === true;
+  } catch (error) {
+    console.error('Error checking permission:', error);
+    return false;
+  }
+}
