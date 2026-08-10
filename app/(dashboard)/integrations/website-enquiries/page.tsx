@@ -241,7 +241,7 @@ export default function WebsiteEnquiriesPage() {
                       </tr>
                     </thead>
                     <tbody className="text-muted-foreground">
-                      <tr className="border-b"><td className="py-1.5 font-mono">workspace_id</td><td>string</td><td>Yes</td><td>—</td></tr>
+                      <tr className="border-b"><td className="py-1.5 font-mono">company_id</td><td>string</td><td>Yes</td><td>—</td></tr>
                       <tr className="border-b"><td className="py-1.5 font-mono">name</td><td>string</td><td>Yes</td><td>100</td></tr>
                       <tr className="border-b"><td className="py-1.5 font-mono">email</td><td>string</td><td>Yes</td><td>254</td></tr>
                       <tr className="border-b"><td className="py-1.5 font-mono">phone</td><td>string</td><td>No</td><td>30</td></tr>
@@ -317,7 +317,7 @@ export default function WebsiteEnquiriesPage() {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      workspace_id: '${companyId}',
+      company_id: '${companyId}',
       ...data,
     }),
   });

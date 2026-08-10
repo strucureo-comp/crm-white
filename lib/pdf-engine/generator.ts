@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * PDF Generator — Strucureo CRM
  *

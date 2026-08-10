@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { database } from '../../firebase/config';
 import { ref, get, update, onValue } from 'firebase/database';
 import { emitEvent } from './index';

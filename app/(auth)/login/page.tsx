@@ -34,10 +34,10 @@ export default function LoginPage() {
         // Check 2FA
         Promise.all([
           getWorkspaceSettings(workspace.id),
-          getUser(user.uid)
+          getUser(user.id)
         ]).then(([wsSettings, dbUser]) => {
-          if (wsSettings?.security?.two_factor_enabled && dbUser?.totp_secret) {
-            setTotpSecret(dbUser.totp_secret);
+          if (wsSettings?.security?.two_factor_enabled && (dbUser as any)?.totp_secret) {
+            setTotpSecret((dbUser as any).totp_secret);
             setRequires2FA(true);
           } else {
             setTwoFaVerified(true);

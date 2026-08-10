@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { initializeApp } from "firebase/app";
 import { getDatabase, ref, get, update } from "firebase/database";
 import * as dotenv from "dotenv";

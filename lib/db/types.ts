@@ -238,7 +238,6 @@ export interface Invoice {
   client_id?: string;
   contact_id?: string;
   workspace_id?: string;
-  workspace_id?: string;
   deal_id?: string;
   quote_id?: string;
   invoice_number: string;
@@ -249,8 +248,6 @@ export interface Invoice {
   discount_amount?: number;
   tax?: number;
   tax_rate?: number;
-  discount?: number; // Legacy
-  discount_type?: 'percentage' | 'fixed'; // Legacy
   discount_percent?: number;
   cgst_percent?: number;
   sgst_percent?: number;
