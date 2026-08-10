@@ -20,6 +20,7 @@ import { ThemeSwitcher } from '@/components/dashboard/theme-switcher';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getWorkspaceSettings, saveWorkspaceSettings, clearSettingsCache } from '@/lib/settings/api';
+import { updateWorkspace } from '@/lib/workspace/api';
 import type { WorkspaceSettings, GeneralSettings, BrandingSettings, AppearanceSettings, NotificationSettings, TeamSettings, ApiKey } from '@/lib/settings/types';
 import { DEFAULT_WORKSPACE_SETTINGS, DEFAULT_GENERAL_SETTINGS, DEFAULT_BRANDING_SETTINGS, DEFAULT_APPEARANCE_SETTINGS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_TEAM_SETTINGS } from '@/lib/settings/types';
 import { toast } from 'sonner';
@@ -339,6 +340,13 @@ export default function SettingsPage() {
       const workspaceId = workspace?.id || user?.company_id;
       if (!workspaceId) throw new Error('No workspace ID found');
       await saveWorkspaceSettings(workspaceId, ws);
+      
+      // Update core workspace data to sync sidebar
+      await updateWorkspace(workspaceId, {
+        name: workspaceName,
+        logo_url: branding.logo_url || null
+      });
+
       clearSettingsCache();
       setSaveState('saved');
       setHasUnsavedChanges(false);
