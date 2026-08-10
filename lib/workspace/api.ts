@@ -3,6 +3,7 @@
 import { ref, get, set, push, update, query, orderByChild, equalTo } from 'firebase/database';
 import { database } from '@/lib/firebase/config';
 import type { Workspace, WorkspaceMember, WorkspaceRole } from '@/lib/db/types';
+import { ensureDefaultRoles } from '@/lib/db/roles/api';
 
 const WORKSPACES_PATH = 'workspaces';
 const WORKSPACE_MEMBERS_PATH = 'workspace_members';
@@ -36,6 +37,9 @@ export async function createWorkspace(
 
     // Add owner as workspace member
     await createWorkspaceMember(workspaceId, ownerId, 'owner');
+
+    // Seed default RBAC roles
+    await ensureDefaultRoles(workspaceId);
 
     return workspace;
   } catch (error) {

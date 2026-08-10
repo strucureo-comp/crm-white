@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import { subscribeToLeads } from '@/lib/firebase/database';
+import { usePermissions } from '@/components/context/permissions-context';
 import { useSidebar } from './sidebar-context';
 import { useWorkspace } from '@/lib/settings/workspace-context';
 import { useAuth } from '@/lib/firebase/auth-context';
@@ -70,7 +71,11 @@ interface NavConfig {
   groups: NavGroup[];
 }
 
-function getNavConfig(leadCount: number): NavConfig {
+function getNavConfig(leadCount: number, hasPermission: (module: string, action: 'view' | 'edit' | 'delete') => boolean): NavConfig {
+  // Filter items based on permissions
+  const filterByPermission = (items: NavItem[], module: string) => 
+    hasPermission(module, 'view') ? items : [];
+
   return {
     topItems: [
       { title: 'Dashboard', href: '/dashboard', icon: Hexagon },
@@ -81,48 +86,52 @@ function getNavConfig(leadCount: number): NavConfig {
       {
         title: 'CRM',
         items: [
-          { title: 'Leads', href: '/leads', icon: Target, badge: leadCount || undefined },
-          { title: 'Contacts', href: '/contacts', icon: Contact2 },
-          { title: 'Pipelines', href: '/pipeline', icon: GitBranch },
-          { title: 'Funnel', href: '/funnel', icon: Filter },
+          ...filterByPermission([{ title: 'Leads', href: '/leads', icon: Target, badge: leadCount || undefined }], 'leads'),
+          ...filterByPermission([
+            { title: 'Contacts', href: '/contacts', icon: Contact2 },
+            { title: 'Pipelines', href: '/pipeline', icon: GitBranch },
+            { title: 'Funnel', href: '/funnel', icon: Filter },
+          ], 'contracts') // Reusing contracts perms for general CRM for now
         ],
       },
       {
         title: 'Revenue Hub',
         items: [
-          { title: 'Quotations', href: '/quotes', icon: FileText },
-          { title: 'Invoices', href: '/invoices', icon: Receipt },
-
-          { title: 'Payments', href: '/payments', icon: Wallet },
+          ...filterByPermission([
+            { title: 'Quotations', href: '/quotes', icon: FileText },
+            { title: 'Invoices', href: '/invoices', icon: Receipt },
+          ], 'contracts'),
+          ...filterByPermission([
+            { title: 'Payments', href: '/payments', icon: Wallet },
+          ], 'payments')
         ],
       },
-
       {
         title: 'Workspace',
-        items: [
+        items: filterByPermission([
           { title: 'Projects', href: '/projects', icon: Briefcase },
           { title: 'Tasks', href: '/tasks', icon: CheckSquare },
           { title: 'Calendar', href: '/calendar', icon: Calendar },
           { title: 'Team', href: '/team', icon: Users2 },
-        ],
+        ], 'workspace')
       },
       {
         title: 'Analytics',
-        items: [
+        items: filterByPermission([
           { title: 'Analytics Dashboard', href: '/analytics', icon: BarChart3 },
           { title: 'Reports', href: '/reports', icon: FileText },
-        ],
+        ], 'analytics')
       },
       {
         title: 'Integration Hub',
-        items: [
+        items: filterByPermission([
           { title: 'Connector Hub', href: '/integrations', icon: Puzzle },
           { title: 'WhatsApp', href: '/integrations/whatsapp', icon: MessageSquare },
           { title: 'WhatsApp Chats', href: '/whatsapp-chats', icon: MessageSquare },
           { title: 'Website Enquiries', href: '/integrations/website-enquiries', icon: Globe },
-        ],
+        ], 'workspace')
       },
-    ]
+    ].filter(g => g.items.length > 0)
   };
 }
 
@@ -135,7 +144,8 @@ function SidebarNav({ collapsed, onToggleGroup, expandedGroups, leadCount, pathn
   companyLogo: string;
   companyName: string;
 }) {
-  const { topItems, groups: navGroups } = getNavConfig(leadCount);
+  const { hasPermission } = usePermissions();
+  const { topItems, groups: navGroups } = getNavConfig(leadCount, hasPermission);
 
   return (
     <>
@@ -279,7 +289,8 @@ export function AppSidebar() {
     return () => unsub();
   }, [companyId]);
 
-  const { topItems, groups: navGroups } = getNavConfig(leadCount);
+  const { hasPermission } = usePermissions();
+  const { topItems, groups: navGroups } = getNavConfig(leadCount, hasPermission);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(
     Object.fromEntries(navGroups.map((g) => [g.title, true]))
   );

@@ -52,11 +52,12 @@ import type {
   Contract,
 } from '@/lib/db/types';
 
-function cleanData(data: any) {
+// Utility function to remove undefined values before saving to Firebase
+export function cleanData<T extends object>(data: T): T {
   const cleaned = { ...data };
-  Object.keys(cleaned).forEach((key) => {
-    if (cleaned[key] === undefined) {
-      delete cleaned[key];
+  Object.keys(cleaned).forEach(key => {
+    if (cleaned[key as keyof T] === undefined) {
+      delete cleaned[key as keyof T];
     }
   });
   return cleaned;
@@ -64,9 +65,8 @@ function cleanData(data: any) {
 
 // ===== Workspace-scoped path helpers =====
 // All entities live under workspaces/${workspaceId}/${entity}
-// workspaceId IS the workspace ID (confirmed by event bridge pattern)
-
-function wsRef(workspaceId: string, entity: string) {
+// Helper function for workspace-scoped paths (companyId IS the workspace ID)
+export function wsRef(workspaceId: string, entity: string) {
   return ref(database, `workspaces/${workspaceId}/${entity}`);
 }
 

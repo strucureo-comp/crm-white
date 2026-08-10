@@ -57,7 +57,28 @@ export type InvoiceStatus = 'pending' | 'paid' | 'overdue' | 'cancelled' | 'part
 export type ContractTemplateType = 'employment' | 'nda' | 'service' | 'subscription' | 'vendor';
 export type ContractStatus = 'draft' | 'sent' | 'active' | 'expiring' | 'terminated';
 
-export type MemberStatus = 'active' | 'inactive';
+
+export interface ModulePermissions {
+  view: boolean;
+  edit: boolean;
+  delete: boolean;
+}
+
+export interface Role {
+  id: string;
+  workspace_id: string;
+  name: string;
+  description: string;
+  is_system?: boolean;
+  permissions: {
+    [module: string]: ModulePermissions;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export type MemberStatus = 'active' | 'inactive' | 'invited';
+
 
 
 export type NotificationType = 'project' | 'payment' | 'support' | 'meeting' | 'system';
@@ -66,7 +87,7 @@ export type TransactionType = 'income' | 'expense';
 
 export interface Transaction {
   id: string;
-  company_id: string;
+  workspace_id: string;
   type: TransactionType;
   amount: number;
   category: string;
@@ -95,7 +116,7 @@ export interface User {
 
 export interface Project {
   id: string;
-  company_id: string;
+  workspace_id: string;
   client_id: string;
   title: string;
   description: string;
@@ -176,7 +197,7 @@ export interface ProjectUpdate {
 
 export interface SupportRequest {
   id: string;
-  company_id: string;
+  workspace_id: string;
   project_id?: string;
   client_id: string;
   subject: string;
@@ -198,7 +219,7 @@ export interface SupportMessage {
 
 export interface MeetingRequest {
   id: string;
-  company_id: string;
+  workspace_id: string;
   project_id?: string;
   client_id: string;
   requested_date: string;
@@ -217,7 +238,7 @@ export interface Invoice {
   client_id?: string;
   contact_id?: string;
   workspace_id?: string;
-  company_id?: string;
+  workspace_id?: string;
   deal_id?: string;
   quote_id?: string;
   invoice_number: string;
@@ -290,7 +311,7 @@ export interface Contract {
   status: ContractStatus;
   variables: Record<string, any>;
   content?: string;
-  company_id: string;
+  workspace_id: string;
   created_at: string;
   updated_at: string;
 }
@@ -309,10 +330,11 @@ export interface Payment {
 
 export interface TeamMember {
   id: string;
-  company_id: string;
+  workspace_id: string;
   name: string;
   email: string;
-  role: string;
+  role: string; // Contains role_id
+  role_id?: string;
   monthly_salary: number;
   joined_date: string;
   status: MemberStatus;
@@ -333,7 +355,7 @@ export interface SalaryPayment {
 export interface Notification {
   id: string;
   user_id: string;
-  company_id: string;
+  workspace_id: string;
   title: string;
   message: string;
   type: NotificationType;
@@ -369,9 +391,8 @@ export type ContentStatus = 'Draft' | 'draft' | 'In Review' | 'in_review' | 'Sch
 
 export interface ContentItem {
   id: string;
-  company_id: string;
+  workspace_id: string;
   content_id?: string;
-  workspace_id?: string;
   title: string;
   type: string;
   slug?: string;
@@ -398,9 +419,8 @@ export interface MediaItem {
 
 export interface CalendarEvent {
   id: string;
-  company_id: string;
+  workspace_id: string;
   event_id?: string;
-  workspace_id?: string;
   title: string;
   type: string;
   date?: string;
@@ -435,9 +455,8 @@ export interface Integration {
 
 export interface AutomationRule {
   id: string;
-  company_id: string;
+  workspace_id: string;
   rule_id?: string;
-  workspace_id?: string;
   name?: string;
   description?: string;
   trigger: string;
@@ -490,7 +509,7 @@ export interface QuotationItem {
 
 export interface Quotation {
   id: string;
-  company_id: string;
+  workspace_id: string;
   project_id?: string;
   project_title?: string; // Snapshot or manual
   client_id: string; // Can be empty if manual
@@ -549,9 +568,8 @@ export type CampaignChannel = 'email' | 'social' | 'paid' | 'sms';
 
 export interface Campaign {
   id: string;
-  company_id: string;
+  workspace_id: string;
   campaign_id?: string;
-  workspace_id?: string;
   name: string;
   description?: string;
   channel: CampaignChannel;
@@ -584,9 +602,8 @@ export type SocialPlatform = 'facebook' | 'instagram' | 'linkedin' | 'twitter' |
 
 export interface SocialPost {
   id: string;
-  company_id: string;
+  workspace_id: string;
   post_id?: string;
-  workspace_id?: string;
   platform: SocialPlatform;
   content: string;
   media_url?: string;
@@ -650,7 +667,7 @@ export interface Pipeline {
   is_active?: boolean;
   entity_type?: "deal";
   created_by?: string;
-  company_id?: string;
+  workspace_id?: string;
 }
 
 export type ActivityAction =
@@ -674,7 +691,7 @@ export interface ActivityLog {
   entity_id?: string;
   user_id: string;
   user_name: string;
-  company_id?: string;
+  workspace_id?: string;
   title?: string;
   date?: string;
   time?: string;
@@ -697,9 +714,8 @@ export interface EmailTemplate {
 
 export interface EmailCampaign {
   id: string;
-  company_id: string;
+  workspace_id: string;
   campaign_id?: string;
-  workspace_id?: string;
   name: string;
   subject: string;
   preview_text?: string;
@@ -731,7 +747,7 @@ export type EnquiryStatus = 'new' | 'read' | 'replied' | 'converted';
 
 export interface Enquiry {
   id: string;
-  company_id?: string;
+  workspace_id?: string;
   name: string;
   email: string;
   subject: string;
@@ -747,7 +763,7 @@ export type TaskStatus = 'todo' | 'in_progress' | 'done';
 
 export interface TaskItem {
   id: string;
-  company_id: string;
+  workspace_id: string;
   title: string;
   project?: string;
   priority: TaskPriority;
@@ -803,7 +819,7 @@ export type LeadPriority =
 
 export interface Lead {
   id: string;
-  company_id: string;
+  workspace_id: string;
 
   // Contact Information
   name: string;
@@ -892,7 +908,7 @@ export interface Company {
 // ===== CONTACT (New Entity) =====
 export interface Contact {
   contact_id: string;
-  company_id: string;
+  workspace_id: string;
 
   // Basic Information
   name: string;
@@ -1502,7 +1518,7 @@ export interface Watcher {
 
 // ===== 7. ACTIVITY FEED =====
 // ActivityLog interface already exists above with all required fields:
-// activity_id, workspace_id, type, title, description, company_id, contact_id,
+// activity_id, workspace_id, type, title, description, workspace_id, contact_id,
 // deal_id, quote_id, invoice_id, project_id, task_id, user_id, metadata
 
 // ===== 8. APPROVAL WORKFLOW =====
@@ -1610,7 +1626,6 @@ export interface Subscription {
   subscription_id: string;
   workspace_id: string;
   contact_id: string;
-  company_id: string;
   plan_id: string;
   status: string;
   start_date: string;
@@ -1645,7 +1660,6 @@ export interface Product {
 export interface PurchaseOrder {
   purchase_order_id: string;
   workspace_id: string;
-  company_id: string;
   contact_id: string;
   order_number: string;
   items: InvoiceItem[];
@@ -1660,7 +1674,6 @@ export interface PurchaseOrder {
 export interface ContractLegacy {
   contract_id: string;
   workspace_id: string;
-  company_id: string;
   contact_id: string;
   deal_id: string;
   title: string;
@@ -1687,7 +1700,6 @@ export interface CallLog {
   call_log_id: string;
   workspace_id: string;
   contact_id: string;
-  company_id: string;
   direction: string;
   duration: number;
   notes: string;
@@ -1885,7 +1897,6 @@ export interface PortalUser {
   portal_user_id: string;
   workspace_id: string;
   contact_id: string;
-  company_id: string;
   role: string;
   last_login_at: string;
 }

@@ -13,28 +13,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getActivityLogs } from '@/lib/firebase/database';
-import { ActivityLog } from '@/lib/db/types';
+import { ActivityLog, Role, ModulePermissions } from '@/lib/db/types';
 import { subscribeToProjectsData, createMember, updateMember, deleteMember } from '@/lib/db/projects/api';
+import { subscribeToRoles, updateRole, createRole, deleteRole } from '@/lib/db/roles/api';
 
 type PermissionType = 'v' | 'e' | 'd';
 
-interface ModulePermissions {
-  v: boolean;
-  e: boolean;
-  d: boolean;
-}
 
-interface Role {
-  id: string;
-  name: string;
-  modules: {
-    contracts: ModulePermissions;
-    payments: ModulePermissions;
-    marketing: ModulePermissions;
-    workspace: ModulePermissions;
-    analytics: ModulePermissions;
-  };
-}
 
 interface UIMember {
   id: string;
@@ -55,65 +40,14 @@ interface ActivityItem {
   time: string;
 }
 
-const MOCK_ROLES: Role[] = [
-  {
-    id: 'r1', name: 'Admin',
-    modules: {
-      contracts: { v: false, e: true, d: false },
-      payments: { v: false, e: true, d: false },
-      marketing: { v: false, e: true, d: false },
-      workspace: { v: false, e: true, d: false },
-      analytics: { v: false, e: true, d: false },
-    }
-  },
-  {
-    id: 'r2', name: 'Manager',
-    modules: {
-      contracts: { v: false, e: true, d: false },
-      payments: { v: true, e: false, d: false },
-      marketing: { v: false, e: true, d: false },
-      workspace: { v: true, e: false, d: false },
-      analytics: { v: false, e: true, d: false },
-    }
-  },
-  {
-    id: 'r3', name: 'Sales Rep',
-    modules: {
-      contracts: { v: false, e: true, d: false },
-      payments: { v: false, e: false, d: true },
-      marketing: { v: false, e: false, d: true },
-      workspace: { v: true, e: false, d: false },
-      analytics: { v: true, e: false, d: false },
-    }
-  },
-  {
-    id: 'r4', name: 'Viewer',
-    modules: {
-      contracts: { v: true, e: false, d: false },
-      payments: { v: true, e: false, d: false },
-      marketing: { v: true, e: false, d: false },
-      workspace: { v: true, e: false, d: false },
-      analytics: { v: true, e: false, d: false },
-    }
-  },
-  {
-    id: 'r5', name: 'Member',
-    modules: {
-      contracts: { v: true, e: false, d: false },
-      payments: { v: true, e: false, d: false },
-      marketing: { v: true, e: false, d: false },
-      workspace: { v: true, e: false, d: false },
-      analytics: { v: true, e: false, d: false },
-    }
-  }
-];
 
 const MOCK_MEMBERS: UIMember[] = [];
 
 const MOCK_ACTIVITY: ActivityItem[] = [];
 
-const MODULE_NAMES = ['contracts', 'payments', 'marketing', 'workspace', 'analytics'] as const;
+const MODULE_NAMES = ['contracts', 'payments', 'marketing', 'workspace', 'analytics', 'leads'] as const;
 type ModuleKey = typeof MODULE_NAMES[number];
+const MODULE_LABELS: Record<string, string> = { contracts: 'Contracts', payments: 'Payments', marketing: 'Marketing', workspace: 'Workspace Settings', analytics: 'Analytics', leads: 'Leads' };
 
 const AVATAR_COLORS = ['#8b5cf6', '#ec4899', '#3b82f6', '#10b981', '#f59e0b'];
 
@@ -131,8 +65,8 @@ export default function TeamPage() {
   const [searchMember, setSearchMember] = useState('');
   const [filterRole, setFilterRole] = useState('All');
   const [filterStatus, setFilterStatus] = useState('All');
-  const [roles, setRoles] = useState<Role[]>(MOCK_ROLES);
-  const [selectedRoleId, setSelectedRoleId] = useState<string>('r3');
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [selectedRoleId, setSelectedRoleId] = useState<string>('');
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved'>('idle');
   const [editedRole, setEditedRole] = useState<Role | null>(null);
   const [filterAction, setFilterAction] = useState('All');
@@ -142,6 +76,17 @@ export default function TeamPage() {
     if (!workspace?.id) return;
     getActivityLogs(workspace?.id).then(setActivityLogs).catch(console.error);
   }, [user]);
+
+  useEffect(() => {
+    if (!workspace?.id) return;
+    const unsub = subscribeToRoles(workspace.id, (data) => {
+      setRoles(data);
+      if (data.length > 0 && !selectedRoleId) {
+        setSelectedRoleId(data[0].id);
+      }
+    });
+    return () => unsub();
+  }, [workspace?.id]);
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -192,20 +137,29 @@ export default function TeamPage() {
   const togglePermission = (mod: ModuleKey, perm: PermissionType) => {
     if (!editedRole) return;
     const newRole = { ...editedRole };
-    newRole.modules[mod] = { v: false, e: false, d: false };
-    newRole.modules[mod][perm] = true;
+    newRole.permissions[mod] = { view: false, edit: false, delete: false };
+    if (perm === 'v') newRole.permissions[mod].view = true;
+    if (perm === 'e') { newRole.permissions[mod].view = true; newRole.permissions[mod].edit = true; }
+    if (perm === 'd') { newRole.permissions[mod].view = true; newRole.permissions[mod].edit = true; newRole.permissions[mod].delete = true; }
     setEditedRole(newRole);
     setSaveState('idle');
   };
 
-  const handleSaveRole = () => {
-    if (!editedRole) return;
+  const handleSaveRole = async () => {
+    if (!editedRole || !workspace?.id) return;
     setSaveState('saving');
-    setTimeout(() => {
-      setRoles(prev => prev.map(r => r.id === editedRole.id ? editedRole : r));
+    try {
+      await updateRole(workspace.id, editedRole.id, {
+        name: editedRole.name,
+        description: editedRole.description,
+        permissions: editedRole.permissions
+      });
       setSaveState('saved');
       setTimeout(() => setSaveState('idle'), 2000);
-    }, 800);
+    } catch (err) {
+      toast.error('Failed to save role');
+      setSaveState('idle');
+    }
   };
 
   const filteredMembers = members.filter(m => {
@@ -351,21 +305,124 @@ export default function TeamPage() {
           </Card>
         </TabsContent>
 
-        {/* Roles Tab */}
-        <TabsContent value="roles">
-          <Card className="min-h-[400px] flex flex-col items-center justify-center p-8 text-center border-dashed">
-            <div className="bg-primary/10 w-16 h-16 rounded-full flex items-center justify-center mb-4">
-              <Shield className="w-8 h-8 text-primary" />
-            </div>
-            <h3 className="text-xl font-semibold mb-2">Granular Permissions Coming Soon</h3>
-            <p className="text-muted-foreground max-w-sm mb-6">
-              We are building a comprehensive Role-Based Access Control (RBAC) system. Soon you will be able to customize exact view, edit, and delete permissions for every module.
-            </p>
-            <Button variant="outline" disabled>
-              <Activity className="w-4 h-4 mr-2" />
-              In Development
-            </Button>
-          </Card>
+                {/* Roles Tab */}
+        <TabsContent value="roles" className="space-y-4">
+          <div className="flex flex-col md:flex-row gap-6">
+            <Card className="w-full md:w-64 shrink-0">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+                  Roles
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div className="flex flex-col">
+                  {roles.map(role => (
+                    <button
+                      key={role.id}
+                      onClick={() => setSelectedRoleId(role.id)}
+                      className={`text-left px-4 py-3 text-sm transition-colors border-l-2 hover:bg-muted/50 ${
+                        selectedRoleId === role.id 
+                          ? 'border-primary bg-primary/5 font-medium text-primary' 
+                          : 'border-transparent text-muted-foreground'
+                      }`}
+                    >
+                      {role.name}
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="flex-1">
+              {editedRole ? (
+                <>
+                  <CardHeader className="flex flex-row items-start justify-between border-b pb-4">
+                    <div>
+                      <CardTitle className="text-lg">{editedRole.name}</CardTitle>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {editedRole.description || 'Configure access levels for this role'}
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={handleSaveRole} 
+                      disabled={saveState === 'saving' || saveState === 'saved'}
+                    >
+                      {saveState === 'saving' ? (
+                        <Activity className="w-4 h-4 mr-2 animate-spin" />
+                      ) : saveState === 'saved' ? (
+                        <Check className="w-4 h-4 mr-2 text-green-500" />
+                      ) : (
+                        <Save className="w-4 h-4 mr-2" />
+                      )}
+                      {saveState === 'saved' ? 'Saved' : 'Save Changes'}
+                    </Button>
+                  </CardHeader>
+                  <CardContent className="p-0">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b bg-muted/30">
+                          <th className="p-4 text-sm font-medium">Module</th>
+                          <th className="p-4 text-sm font-medium text-center">View</th>
+                          <th className="p-4 text-sm font-medium text-center">Edit</th>
+                          <th className="p-4 text-sm font-medium text-center">Delete</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {MODULE_NAMES.map(mod => {
+                          const perms = editedRole.permissions[mod] || { view: false, edit: false, delete: false };
+                          const canView = perms.view;
+                          const canEdit = perms.edit;
+                          const canDelete = perms.delete;
+
+                          return (
+                            <tr key={mod} className="hover:bg-muted/30 transition-colors">
+                              <td className="p-4 text-sm font-medium capitalize">
+                                {MODULE_LABELS[mod] || mod}
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => togglePermission(mod, 'v')}
+                                  className={`w-6 h-6 rounded-full inline-flex items-center justify-center border transition-colors ${
+                                    canView ? 'bg-primary border-primary text-primary-foreground' : 'border-input hover:border-primary/50'
+                                  }`}
+                                >
+                                  {canView && <Check size={12} />}
+                                </button>
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => togglePermission(mod, 'e')}
+                                  className={`w-6 h-6 rounded-full inline-flex items-center justify-center border transition-colors ${
+                                    canEdit ? 'bg-primary border-primary text-primary-foreground' : 'border-input hover:border-primary/50'
+                                  }`}
+                                >
+                                  {canEdit && <Check size={12} />}
+                                </button>
+                              </td>
+                              <td className="p-4 text-center">
+                                <button
+                                  onClick={() => togglePermission(mod, 'd')}
+                                  className={`w-6 h-6 rounded-full inline-flex items-center justify-center border transition-colors ${
+                                    canDelete ? 'bg-destructive border-destructive text-destructive-foreground' : 'border-input hover:border-destructive/50'
+                                  }`}
+                                >
+                                  {canDelete && <Check size={12} />}
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </CardContent>
+                </>
+              ) : (
+                <div className="h-full min-h-[400px] flex items-center justify-center text-muted-foreground">
+                  Select a role to edit its permissions
+                </div>
+              )}
+            </Card>
+          </div>
         </TabsContent>
 
         {/* Activity Tab */}
