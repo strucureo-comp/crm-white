@@ -76,7 +76,7 @@ interface WorkspaceContextType {
 const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined);
 
 export function WorkspaceProvider({ children }: { children: ReactNode }) {
-  const { user, loading: authLoading } = useAuth();
+  const { user, workspace, loading: authLoading } = useAuth();
   const [settings, setSettings] = useState<WorkspaceSettings>(DEFAULT_WORKSPACE_SETTINGS);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +85,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (authLoading) return;
 
-    if (!user) {
+    if (!user || !workspace?.id) {
       setSettings(DEFAULT_WORKSPACE_SETTINGS);
       setLoading(false);
       return;
@@ -97,7 +97,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       try {
         setLoading(true);
         setError(null);
-        const fetched = await getWorkspaceSettings(user.company_id);
+        const fetched = await getWorkspaceSettings(workspace.id);
         if (!cancelled) {
           setSettings(fetched);
         }
@@ -111,7 +111,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     })();
 
     return () => { cancelled = true; };
-  }, [user, authLoading]);
+  }, [user, workspace?.id, authLoading]);
 
   // Apply appearance settings (theme, font size) to the document
   useEffect(() => {
@@ -136,59 +136,67 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   }, [settings.appearance.font_size, settings.appearance.compact_mode]);
 
   const refresh = useCallback(async () => {
+    if (!workspace?.id) return;
     clearSettingsCache();
     try {
       setLoading(true);
-      const fetched = await getWorkspaceSettings(user?.company_id || '');
+      const fetched = await getWorkspaceSettings(workspace.id);
       setSettings(fetched);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to refresh settings');
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [workspace?.id]);
 
   const updateGeneral = useCallback(async (data: Partial<GeneralSettings>) => {
-    const ok = await updateGeneralSettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateGeneralSettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, general: { ...prev.general, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const updateBranding = useCallback(async (data: Partial<BrandingSettings>) => {
-    const ok = await updateBrandingSettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateBrandingSettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, branding: { ...prev.branding, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const updateAppearance = useCallback(async (data: Partial<AppearanceSettings>) => {
-    const ok = await updateAppearanceSettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateAppearanceSettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, appearance: { ...prev.appearance, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const updateNotifications = useCallback(async (data: Partial<NotificationSettings>) => {
-    const ok = await updateNotificationSettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateNotificationSettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, notifications: { ...prev.notifications, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const updateSecurity = useCallback(async (data: Partial<SecuritySettings>) => {
-    const ok = await updateSecuritySettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateSecuritySettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, security: { ...prev.security, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const updateTeam = useCallback(async (data: Partial<TeamSettings>) => {
-    const ok = await updateTeamSettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateTeamSettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, team: { ...prev.team, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const updateApi = useCallback(async (data: Partial<ApiSettings>) => {
-    const ok = await updateApiSettings(data);
+    if (!workspace?.id) return false;
+    const ok = await updateApiSettings(workspace.id, data);
     if (ok) setSettings(prev => ({ ...prev, api: { ...prev.api, ...data } }));
     return ok;
-  }, []);
+  }, [workspace?.id]);
 
   const replaceSettings = useCallback(async (newSettings: WorkspaceSettings) => {
     const ok = await saveWorkspaceSettings(newSettings);
