@@ -16,7 +16,7 @@ const { URL } = require('url');
 // ---------------------------------------------------------------------------
 const PORT = parseInt(process.env.ENQUIRIES_PORT || '3443', 10);
 const HOST = process.env.ENQUIRIES_HOST || '0.0.0.0';
-const FIREBASE_DB_URL = process.env.FIREBASE_DATABASE_URL || 'https://crm-whitelab-default-rtdb.firebaseio.com';
+const FIREBASE_DB_URL = process.env.FIREBASE_DATABASE_URL || 'https://crm-whitelab-default-rtdb.asia-southeast1.firebasedatabase.app';
 const CORS_ORIGIN = process.env.CORS_ORIGIN || '*';
 
 // SSL Certificate paths

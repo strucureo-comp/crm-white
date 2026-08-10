@@ -75,14 +75,12 @@ export default function WebsiteEnquiriesPage() {
     }
   };
 
-  const webhookUrl = typeof window !== 'undefined'
-    ? `${window.location.origin}/api/enquiries`
-    : '/api/enquiries';
+  const webhookUrl = 'https://crm-api.t4gverse.com/api/enquiries';
 
   const sampleCurl = `curl -X POST ${webhookUrl} \\
   -H "Content-Type: application/json" \\
   -d '{
-    "workspace_id": "${companyId}",
+    "company_id": "${companyId}",
     "name": "John Doe",
     "email": "john@example.com",
     "phone": "+91 98765 43210",
@@ -91,7 +89,7 @@ export default function WebsiteEnquiriesPage() {
   }'`;
 
   const sampleHtml = `<form action="${webhookUrl}" method="POST">
-  <input type="hidden" name="workspace_id" value="${companyId}" />
+  <input type="hidden" name="company_id" value="${companyId}" />
   <input name="name" placeholder="Your Name" required />
   <input name="email" type="email" placeholder="Email" required />
   <input name="phone" placeholder="Phone (optional)" />
