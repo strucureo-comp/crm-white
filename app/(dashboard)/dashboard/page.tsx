@@ -2,8 +2,10 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { KpiCard } from '@/components/dashboard/kpi-card';
-import { Users, DollarSign, Receipt, Mail, TrendingUp, Zap, CheckCircle, Clock, Activity } from 'lucide-react';
+import { Users, DollarSign, Receipt, Mail, TrendingUp, Zap, CheckCircle, Clock, Activity, Target, Plus, Calendar, FileText, CheckCircle2, ShieldAlert, X, Filter, Building2, Bell, Presentation, PhoneCall, Search, ArrowRight, CheckSquare, PlusCircle, RefreshCw, CircleDollarSign } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
