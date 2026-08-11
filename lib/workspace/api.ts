@@ -251,13 +251,43 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
   }
 }
 
-export async function getUserWorkspaceRole(userId: string): Promise<{ workspace: Workspace; role: WorkspaceRole } | null> {
+export async function getWorkspaceMembersWithDetails(workspaceId: string): Promise<Array<{id: string, name: string, email: string, role: string}>> {
+  try {
+    const members = await getWorkspaceMembers(workspaceId);
+    if (members.length === 0) return [];
+
+    // Fetch user details for all members
+    const result = [];
+    for (const m of members) {
+      try {
+        const userSnap = await get(ref(database, `users/${m.user_id}`));
+        if (userSnap.exists()) {
+          const user = userSnap.val();
+          result.push({
+            id: m.id,
+            name: user.full_name || 'Unknown User',
+            email: user.email || '',
+            role: m.role,
+          });
+        }
+      } catch (e) {
+        console.error('Failed to fetch user details for member', m.user_id);
+      }
+    }
+    return result;
+  } catch (error) {
+    console.error('Error in getWorkspaceMembersWithDetails:', error);
+    return [];
+  }
+}
+
+export async function getUserWorkspaceRole(userId: string, workspaceId?: string): Promise<{ workspace: Workspace; role: WorkspaceRole } | null> {
   try {
     const memberSnapshot = await get(ref(database, WORKSPACE_MEMBERS_PATH));
     if (!memberSnapshot.exists()) return null;
 
     const members = memberSnapshot.val() as Record<string, WorkspaceMember>;
-    const userMembership = Object.values(members).find(m => m.user_id === userId);
+    const userMembership = Object.values(members).find(m => m.user_id === userId && (!workspaceId || m.workspace_id === workspaceId));
 
     if (!userMembership) return null;
 

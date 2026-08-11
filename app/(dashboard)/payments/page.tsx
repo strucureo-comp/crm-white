@@ -9,6 +9,8 @@ import {
   MoreHorizontal, Eye, Pencil, Trash
 } from 'lucide-react';
 import { createPayment, updatePayment, deletePayment, subscribeToPayments } from '@/lib/db/payments/api';
+import { subscribeToCompanies } from '@/lib/db/companies/api';
+import { subscribeToContacts } from '@/lib/db/contacts/api';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +29,7 @@ export default function PaymentsPage() {
   const { workspace, user } = useAuth();
   const workspaceId = workspace?.id || '';
   const [payments, setPayments] = useState<NormalizedPayment[]>([]);
+  const [entityMap, setEntityMap] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [methodFilter, setMethodFilter] = useState<'All' | PaymentMethod>('All');
@@ -44,12 +47,33 @@ export default function PaymentsPage() {
       return;
     }
     setLoading(true);
-    const unsubscribe = subscribeToPayments(workspaceId, (data) => {
+    const unsubscribePayments = subscribeToPayments(workspaceId, (data) => {
       data.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
       setPayments(data);
       setLoading(false);
     });
-    return () => unsubscribe();
+    
+    const unsubscribeCompanies = subscribeToCompanies(workspaceId, (companies) => {
+      setEntityMap(prev => {
+        const newMap = { ...prev };
+        companies.forEach(c => newMap[c.id] = c.name);
+        return newMap;
+      });
+    });
+
+    const unsubscribeContacts = subscribeToContacts(workspaceId, (contacts) => {
+      setEntityMap(prev => {
+        const newMap = { ...prev };
+        contacts.forEach(c => newMap[c.contact_id] = c.name);
+        return newMap;
+      });
+    });
+
+    return () => {
+      unsubscribePayments();
+      unsubscribeCompanies();
+      unsubscribeContacts();
+    };
   }, [workspaceId]);
 
   useEffect(() => { setPage(1); }, [search, methodFilter, statusFilter]);
@@ -262,7 +286,7 @@ export default function PaymentsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium text-sm text-foreground truncate">{txn.workspace_id}</p>
+                    <p className="font-medium text-sm text-foreground truncate">{entityMap[txn.workspace_id] || txn.workspace_id}</p>
                     <span className={`text-sm font-bold ${
                       txn.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
                       txn.status === 'failed' ? 'text-rose-600 dark:text-rose-400' :
@@ -328,7 +352,7 @@ export default function PaymentsPage() {
                 <tbody>
                   {pendingFollowUps.map((p, i) => (
                     <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                      <td className="p-3 py-2 font-medium">{p.workspace_id}</td>
+                      <td className="p-3 py-2 font-medium">{entityMap[p.workspace_id] || p.workspace_id}</td>
                       <td className="p-3 py-2 text-right">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           p.status === 'failed' 
@@ -412,7 +436,7 @@ export default function PaymentsPage() {
               {paginatedPayments.map(txn => (
                 <tr key={txn.payment_id} className="hover:bg-muted/30 transition-colors">
                   <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">{txn.payment_id}</td>
-                  <td className="px-4 py-3 font-medium">{txn.workspace_id}</td>
+                  <td className="px-4 py-3 font-medium">{entityMap[txn.workspace_id] || txn.workspace_id}</td>
                   <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400 hidden lg:table-cell">{txn.invoice_id}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${

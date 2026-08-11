@@ -1493,7 +1493,7 @@ export async function createLead(lead: Omit<Lead, 'id' | 'lead_id' | 'created_at
     await set(newRef, data);
 
     try {
-      await createContact(lead.workspace_id || 'default', {
+      const contact = await createContact(lead.workspace_id || 'default', {
         name: lead.name,
         email: lead.email,
         workspace_id: lead.workspace_id || '',
@@ -1501,6 +1501,10 @@ export async function createLead(lead: Omit<Lead, 'id' | 'lead_id' | 'created_at
         is_primary: true,
         notes: lead.notes || '',
       });
+      // Store the contact ID on the lead
+      if (contact && (contact as any).contact_id) {
+        await update(newRef, { contact_id: (contact as any).contact_id });
+      }
     } catch (contactError) {
       console.error('Failed to auto-create contact for lead:', contactError);
     }
@@ -2608,6 +2612,17 @@ export async function getActivityLogs(workspaceId: string, limitCount: number = 
 
 export async function createActivityLog(data: Omit<ActivityLog, 'id' | 'created_at'>): Promise<string | null> {
   return logActivity(data);
+}
+
+export async function deleteActivityLog(workspaceId: string, id: string): Promise<boolean> {
+  try {
+    if (!workspaceId) return false;
+    await remove(wsItemRef(workspaceId, 'activity_logs', id));
+    return true;
+  } catch (error) {
+    console.error('Error deleting activity log:', error);
+    return false;
+  }
 }
 
 export async function logActivity(log: Omit<ActivityLog, 'id' | 'created_at' | 'user_id' | 'user_name'> & { user_id?: string; user_name?: string }): Promise<string | null> {

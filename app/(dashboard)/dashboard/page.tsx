@@ -146,7 +146,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="space-y-1">
                     {stage.leads.slice(0, 3).map((lead) => (
-                      <div key={lead.id} className="p-2 rounded-lg border bg-card hover:shadow-sm transition-shadow cursor-pointer" onClick={() => router.push('/leads')}>
+                      <div key={lead.id} className="p-2 rounded-lg border bg-card hover:shadow-sm transition-shadow cursor-pointer" onClick={() => router.push('/pipeline')}>
                         <p className="text-xs font-medium truncate">{lead.name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">{lead.company || '—'}</p>
                         <p className="text-[10px] font-medium mt-1">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</p>
@@ -261,21 +261,36 @@ export default function DashboardPage() {
           <CardContent>
             {activityLogs.length > 0 ? (
               <div className="space-y-4">
-                {activityLogs.slice(0, 8).map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
-                    <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm">{log.description}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground">{log.user_name}</span>
-                        <span className="text-xs text-muted-foreground">·</span>
-                        <span className="text-xs text-muted-foreground">
-                          {new Date(log.created_at).toLocaleDateString()}
-                        </span>
+                {activityLogs.slice(0, 8).map((log) => {
+                  const getLink = (type: string) => {
+                    switch (type) {
+                      case 'lead': return '/leads';
+                      case 'deal': return '/pipeline';
+                      case 'project': return '/projects';
+                      case 'invoice': return '/invoices';
+                      case 'contact': return '/contacts';
+                      case 'quote': return '/quotations';
+                      default: return '#';
+                    }
+                  };
+                  const linkHref = getLink(log.entity_type);
+                  return (
+                  <div key={log.id} className="pb-3 border-b last:border-0 last:pb-0">
+                    <Link href={linkHref} className="flex items-start gap-3 hover:opacity-80 transition-opacity">
+                      <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm">{log.description}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground">{log.user_name}</span>
+                          <span className="text-xs text-muted-foreground">·</span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(log.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
                       </div>
-                    </div>
+                    </Link>
                   </div>
-                ))}
+                )})}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">No recent activity</p>

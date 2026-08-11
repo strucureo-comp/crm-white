@@ -191,6 +191,16 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleToggleTaskStatus = async (task: Task) => {
+    if (!workspace?.id) return;
+    const newStatus = task.status === 'Done' ? 'To Do' : 'Done';
+    try {
+      await updateTask(workspace.id, task.id, { status: newStatus });
+    } catch (e) {
+      toast.error('Failed to update task status');
+    }
+  };
+
   const toggleFormMember = (id: string, e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -474,7 +484,7 @@ export default function ProjectsPage() {
                                     return (
                                       <tr key={task.id} className="hover:bg-muted/30 transition-colors">
                                         <td className="w-12 px-4 py-3 text-center">
-                                          <input type="checkbox" checked={task.status === 'Done'} readOnly className="w-4 h-4 rounded border-muted-foreground text-primary focus:ring-primary" />
+                                          <input type="checkbox" checked={task.status === 'Done'} onChange={() => handleToggleTaskStatus(task)} className="w-4 h-4 rounded border-muted-foreground text-primary focus:ring-primary cursor-pointer" />
                                         </td>
                                         <td className={`px-4 py-3 font-medium ${task.status === 'Done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                                           {task.title}

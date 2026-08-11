@@ -36,16 +36,22 @@ export function PermissionsProvider({ children }: { children: React.ReactNode })
     });
 
     const unsubProjects = subscribeToProjectsData(workspace.id, (data) => {
-      if (user?.email) {
-        const member = (data.members || []).find(m => (m.email || '').toLowerCase() === user.email?.toLowerCase());
-        if (member) {
-          setUserRoleId(member.role || null);
-        } else if (user.role === 'admin' || workspace.owner_id === user.id) {
-          // Fallback to Admin role for workspace owners
-          setUserRoleId('Admin');
-        }
+      // Check for user role using workspace member
+      if (user?.id && workspace?.id) {
+        import('@/lib/workspace/api').then(({ getUserWorkspaceRole }) => {
+          getUserWorkspaceRole(user.id, workspace.id).then(userRole => {
+            if (userRole) {
+              setUserRoleId(userRole.role);
+            } else if (user.role === 'admin' || workspace.owner_id === user.id) {
+              // Fallback to Admin role for workspace owners
+              setUserRoleId('Admin');
+            }
+            setLoading(false);
+          });
+        });
+      } else {
+        setLoading(false);
       }
-      setLoading(false);
     });
 
     return () => {

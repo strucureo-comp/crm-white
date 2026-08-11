@@ -32,7 +32,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import { getActivityLogs, getTasks, createActivityLog } from '@/lib/firebase/database';
+import { getActivityLogs, getTasks, createActivityLog, deleteActivityLog } from '@/lib/firebase/database';
 import { useAuth } from '@/lib/firebase/auth-context';
 import type { ActivityLog, TaskItem, ActivityAction } from '@/lib/db/types';
 import { toast } from 'sonner';
@@ -186,34 +186,60 @@ export default function ActivityPage() {
   const allActivities = useMemo(() => {
     const fromTasks = rawTasks
       .filter((t) => t.status !== 'done' && t.due_date)
-      .map((t) => ({
-        id: `task-${t.id}`,
-        type: 'task' as ActivityType,
-        title: t.title,
-        description: t.description || '',
-        company: t.project || 'Internal',
-        date: t.due_date!,
-        time: formatTime(t.due_date!),
+      .map((t) => {
+        const normalizedDate = format(parseISO(t.due_date!), 'yyyy-MM-dd');
+        return {
+          id: `task-${t.id}`,
+          type: 'task' as ActivityType,
+          title: t.title,
+          description: t.description || '',
+          company: t.project || 'Internal',
+          date: normalizedDate,
+          time: formatTime(t.due_date!),
+          sortTime: format(parseISO(t.due_date!), 'HH:mm'),
+          duration: 0,
+          priority: (t.priority === 'critical' ? 'critical' : t.priority === 'high' ? 'high' : t.priority === 'medium' ? 'medium' : 'low') as 'low' | 'medium' | 'high' | 'critical',
+          status: (t.status === 'done' ? 'completed' : 'pending') as 'completed' | 'pending',
+          owner: t.assignee || 'Unassigned',
+        };
+      });
+    const fromLogs = logs.map((l) => {
+      let normalizedDate = '';
+      if (l.date && l.date.length === 10) {
+        normalizedDate = l.date;
+      } else {
+        normalizedDate = format(parseISO(l.created_at), 'yyyy-MM-dd');
+      }
+
+      let sortTime = '';
+      let displayTime = '';
+      if (l.time && l.time.match(/^\d{1,2}:\d{2}$/)) {
+        sortTime = l.time.padStart(5, '0'); // pad 9:00 to 09:00
+        const [hh, mm] = l.time.split(':');
+        const h = parseInt(hh, 10);
+        displayTime = `${h % 12 || 12}:${mm} ${h >= 12 ? 'PM' : 'AM'}`;
+      } else {
+        sortTime = format(parseISO(l.created_at), 'HH:mm');
+        displayTime = format(parseISO(l.created_at), 'h:mm a');
+      }
+
+      return {
+        id: `log-${l.id}`,
+        type: (l.entity_type === 'meeting' ? 'meeting' :
+              l.entity_type === 'task' ? 'task' :
+              l.entity_type === 'project' ? 'deadline' : 'followup') as ActivityType,
+        title: l.title || l.description,
+        description: l.action.replace(/_/g, ' '),
+        company: l.entity_type,
+        date: normalizedDate,
+        time: displayTime,
+        sortTime: sortTime,
         duration: 0,
-        priority: (t.priority === 'critical' ? 'critical' : t.priority === 'high' ? 'high' : t.priority === 'medium' ? 'medium' : 'low') as 'low' | 'medium' | 'high' | 'critical',
-        status: (t.status === 'done' ? 'completed' : 'pending') as 'completed' | 'pending',
-        owner: t.assignee || 'Unassigned',
-      }));
-    const fromLogs = logs.map((l) => ({
-      id: `log-${l.id}`,
-      type: (l.entity_type === 'meeting' ? 'meeting' :
-            l.entity_type === 'task' ? 'task' :
-            l.entity_type === 'project' ? 'deadline' : 'followup') as ActivityType,
-      title: l.title || l.description,
-      description: l.action.replace(/_/g, ' '),
-      company: l.entity_type,
-      date: l.date || l.created_at,
-      time: l.time || formatTime(l.created_at),
-      duration: 0,
-      priority: (l.metadata?.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
-      status: 'pending' as 'pending',
-      owner: l.user_name,
-    }));
+        priority: (l.metadata?.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
+        status: 'pending' as 'pending',
+        owner: l.user_name,
+      };
+    });
     return [...fromTasks, ...fromLogs];
   }, [rawTasks, logs]);
 
@@ -244,7 +270,7 @@ export default function ActivityPage() {
   }, [pendingActivities, activeTab]);
 
   const sorted = useMemo(() => {
-    return [...filtered].sort((a, b) => a.time.localeCompare(b.time));
+    return [...filtered].sort((a, b) => a.sortTime.localeCompare(b.sortTime));
   }, [filtered]);
 
   const badges = useMemo(() => ({
@@ -277,7 +303,13 @@ export default function ActivityPage() {
     return groups;
   }, [upcomingActivities]);
 
-  function handleDelete(id: string) {
+  async function handleDelete(id: string) {
+    if (id.startsWith('log-')) {
+      const dbId = id.replace('log-', '');
+      if (workspace?.id) {
+        await deleteActivityLog(workspace.id, dbId);
+      }
+    }
     setLogs((prev) => prev.filter((l) => `log-${l.id}` !== id));
     toast.success('Activity deleted');
   }
@@ -302,7 +334,6 @@ export default function ActivityPage() {
                 <CalendarIcon size={16} />
                 <span className="font-semibold">TODAY&apos;S SCHEDULE</span>
                 <span className="text-muted-foreground">({format(date, 'MMM d, yyyy')})</span>
-                <span className="text-xs ml-2 text-red-500">Debug Company ID: {workspace?.id || 'EMPTY'}</span>
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

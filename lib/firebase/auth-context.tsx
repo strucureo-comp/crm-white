@@ -341,9 +341,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signOut = async () => {
-    await firebaseSignOut(auth);
-    setUser(null);
-    setFirebaseUser(null);
+    try {
+      await firebaseSignOut(auth);
+    } catch (e) {
+      console.error('Sign out error:', e);
+    } finally {
+      setUser(null);
+      setFirebaseUser(null);
+      setWorkspace(null);
+      window.location.href = '/auth/login';
+    }
   };
 
   const resetPassword = async (email: string) => {

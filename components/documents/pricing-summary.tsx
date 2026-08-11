@@ -28,8 +28,13 @@ export function PricingSummary({ pricing, onPricingChange, currency }: PricingSu
             min="0"
             max="100"
             step="0.5"
-            value={pricing.discount_percent}
-            onChange={(e) => onPricingChange({ discount_percent: parseFloat(e.target.value) || 0 })}
+            value={pricing.discount_percent === 0 ? '' : pricing.discount_percent}
+            onChange={(e) => {
+              let val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              val = isNaN(val) ? 0 : val;
+              val = Math.min(100, Math.max(0, val));
+              onPricingChange({ discount_percent: val });
+            }}
           />
         </div>
         <div className="space-y-2">
@@ -48,8 +53,12 @@ export function PricingSummary({ pricing, onPricingChange, currency }: PricingSu
             min="0"
             max="50"
             step="0.5"
-            value={pricing.cgst_percent}
-            onChange={(e) => onPricingChange({ cgst_percent: parseFloat(e.target.value) || 0 })}
+            value={pricing.cgst_percent === 0 ? '' : pricing.cgst_percent}
+            onChange={(e) => {
+              let val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              val = isNaN(val) ? 0 : val;
+              onPricingChange({ cgst_percent: Math.max(0, val) });
+            }}
           />
         </div>
         <div className="space-y-2">
@@ -59,8 +68,12 @@ export function PricingSummary({ pricing, onPricingChange, currency }: PricingSu
             min="0"
             max="50"
             step="0.5"
-            value={pricing.sgst_percent}
-            onChange={(e) => onPricingChange({ sgst_percent: parseFloat(e.target.value) || 0 })}
+            value={pricing.sgst_percent === 0 ? '' : pricing.sgst_percent}
+            onChange={(e) => {
+              let val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              val = isNaN(val) ? 0 : val;
+              onPricingChange({ sgst_percent: Math.max(0, val) });
+            }}
           />
         </div>
         <div className="space-y-2">
@@ -70,8 +83,12 @@ export function PricingSummary({ pricing, onPricingChange, currency }: PricingSu
             min="0"
             max="50"
             step="0.5"
-            value={pricing.igst_percent}
-            onChange={(e) => onPricingChange({ igst_percent: parseFloat(e.target.value) || 0 })}
+            value={pricing.igst_percent === 0 ? '' : pricing.igst_percent}
+            onChange={(e) => {
+              let val = e.target.value === '' ? 0 : parseFloat(e.target.value);
+              val = isNaN(val) ? 0 : val;
+              onPricingChange({ igst_percent: Math.max(0, val) });
+            }}
           />
         </div>
       </div>

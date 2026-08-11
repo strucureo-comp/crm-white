@@ -235,7 +235,7 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
             </div>
             <div className="col-span-2">
               <Label htmlFor="estimated_value">Estimated Value ($)</Label>
-              <Input id="estimated_value" type="number" min={0} value={form.estimated_value} onChange={(e) => set('estimated_value', Number(e.target.value))} />
+              <Input id="estimated_value" type="number" min={0} value={form.estimated_value === 0 ? '' : form.estimated_value} onChange={(e) => set('estimated_value', e.target.value === '' ? 0 : Number(e.target.value))} />
             </div>
             <div className="col-span-2">
               <Label htmlFor="notes">Notes</Label>

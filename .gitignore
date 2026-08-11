@@ -40,3 +40,5 @@ next-env.d.ts
 # local tooling
 .claude/
 .tmp-browser-mcp/
+testsprite_tests/tmp/
+testsprite_tests/tmp/config.json

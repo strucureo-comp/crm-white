@@ -56,6 +56,10 @@ export function initEventBridge(companyId: string): () => void {
 
           const contact = await convertLeadToContact(companyId, id, normalizedLead);
           if (contact) {
+            // Update the lead with the new contact_id so it doesn't trigger again
+            await update(companyRef(companyId, `leads/${id}`), {
+              contact_id: contact.contact_id || contact.id || 'converted'
+            });
             emitEvent('lead:qualified', {
               leadId: id,
               contactId: contact.contact_id,

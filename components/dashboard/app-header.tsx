@@ -13,6 +13,9 @@ import {
   User,
   ChevronDown,
   X,
+  Briefcase,
+  Check as CheckIcon,
+  UserPlus,
 } from 'lucide-react';
 import { ThemeSwitcher } from './theme-switcher';
 import { GlobalSearch } from './global-search';
@@ -38,6 +41,9 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { getNotifications, markNotificationAsRead } from '@/lib/firebase/database';
 import type { Notification } from '@/lib/db/types';
 import { format } from 'date-fns';
+import { getPendingInvitesByEmail, updateInviteStatus, type Invite } from '@/lib/workspace/invites';
+import { createWorkspaceMember } from '@/lib/workspace/api';
+import { toast } from 'sonner';
 
 const breadcrumbs: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -63,11 +69,18 @@ const breadcrumbs: Record<string, string> = {
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, workspace } = useAuth();
+  const { user, signOut, workspace, availableWorkspaces, switchWorkspace } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [notifList, setNotifList] = useState<Notification[]>([]);
   const [notifOpen, setNotifOpen] = useState(false);
+  const [pendingInvites, setPendingInvites] = useState<Invite[]>([]);
+
+  const loadInvites = useCallback(async () => {
+    if (!user?.email) return;
+    const invites = await getPendingInvitesByEmail(user.email).catch(() => []);
+    setPendingInvites(invites);
+  }, [user?.email]);
 
   const loadNotifs = useCallback(async () => {
     if (!user?.id) return;
@@ -76,7 +89,31 @@ export function AppHeader() {
     setNotificationCount(notifications.filter((n) => !n.read).length);
   }, [user?.id, workspace?.id]);
 
-  useEffect(() => { loadNotifs(); }, [loadNotifs]);
+  useEffect(() => { loadNotifs(); loadInvites(); }, [loadNotifs, loadInvites]);
+
+  const handleAcceptInvite = async (invite: Invite) => {
+    if (!user?.id) return;
+    try {
+      await createWorkspaceMember(invite.workspace_id, user.id, invite.role as any);
+      await updateInviteStatus(invite.id, 'accepted');
+      toast.success(`Joined ${invite.workspace_name}!`);
+      // Reload workspace list to include the new workspace
+      // Actually switch workspace will be available on reload or through context refresh
+      window.location.reload();
+    } catch (e) {
+      toast.error('Failed to accept invite');
+    }
+  };
+
+  const handleDeclineInvite = async (invite: Invite) => {
+    try {
+      await updateInviteStatus(invite.id, 'declined');
+      setPendingInvites(prev => prev.filter(i => i.id !== invite.id));
+      toast.success('Invite declined');
+    } catch (e) {
+      toast.error('Failed to decline invite');
+    }
+  };
 
   const { setMobileOpen } = useSidebar();
 
@@ -212,6 +249,43 @@ export function AppHeader() {
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
+              {availableWorkspaces && availableWorkspaces.length > 1 && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-muted-foreground">Switch Workspace</DropdownMenuLabel>
+                  {availableWorkspaces.map(ws => (
+                    <DropdownMenuItem
+                      key={ws.id}
+                      onClick={() => switchWorkspace(ws.id)}
+                      className="justify-between"
+                    >
+                      <div className="flex items-center">
+                        <Briefcase size={14} className="mr-2" />
+                        <span className="truncate max-w-[140px]">{ws.name}</span>
+                      </div>
+                      {ws.id === workspace?.id && <CheckIcon size={14} />}
+                    </DropdownMenuItem>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
+              {pendingInvites.length > 0 && (
+                <>
+                  <DropdownMenuLabel className="text-xs text-amber-600 dark:text-amber-400">Pending Invites</DropdownMenuLabel>
+                  {pendingInvites.map(invite => (
+                    <div key={invite.id} className="px-2 py-1.5 text-sm flex flex-col gap-2">
+                      <div className="flex items-center gap-2">
+                        <UserPlus size={14} className="text-muted-foreground" />
+                        <span className="font-medium truncate max-w-[150px]">{invite.workspace_name}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="default" className="h-7 text-xs flex-1" onClick={() => handleAcceptInvite(invite)}>Accept</Button>
+                        <Button size="sm" variant="outline" className="h-7 text-xs flex-1" onClick={() => handleDeclineInvite(invite)}>Decline</Button>
+                      </div>
+                    </div>
+                  ))}
+                  <DropdownMenuSeparator />
+                </>
+              )}
               <DropdownMenuItem onClick={() => router.push('/settings')}>
                 <User size={16} className="mr-2" />
                 Profile

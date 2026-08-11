@@ -20,7 +20,7 @@ import { ThemeSwitcher } from '@/components/dashboard/theme-switcher';
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { getWorkspaceSettings, saveWorkspaceSettings, clearSettingsCache } from '@/lib/settings/api';
-import { updateWorkspace } from '@/lib/workspace/api';
+import { updateWorkspace, getWorkspaceMembersWithDetails } from '@/lib/workspace/api';
 import { WorkspaceSettings, GeneralSettings, BrandingSettings, AppearanceSettings, NotificationSettings, TeamSettings, ApiKey } from '@/lib/settings/types';
 import { DEFAULT_WORKSPACE_SETTINGS, DEFAULT_GENERAL_SETTINGS, DEFAULT_BRANDING_SETTINGS, DEFAULT_APPEARANCE_SETTINGS, DEFAULT_NOTIFICATION_SETTINGS, DEFAULT_TEAM_SETTINGS } from '@/lib/settings/types';
 import { toast } from 'sonner';
@@ -136,6 +136,8 @@ export default function SettingsPage() {
   const [totpSecret, setTotpSecret] = useState('');
   const [verifyCode, setVerifyCode] = useState('');
   const [setupLoading, setSetupLoading] = useState(false);
+
+  const [workspaceMembersList, setWorkspaceMembersList] = useState<Array<{id: string, name: string, email: string, role: string}>>([]);
 
   const [ipWhitelist, setIpWhitelist] = useState<string[]>([]);
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([]);
@@ -280,6 +282,9 @@ export default function SettingsPage() {
         setApiKeys(ws.api.keys);
         setTaxSystem(ws.branding.tax_system || 'none');
         if (ws.updated_at) setLastUpdated(ws.updated_at);
+        
+        const actualMembers = await getWorkspaceMembersWithDetails(workspaceId);
+        setWorkspaceMembersList(actualMembers);
       } catch { console.warn('Could not load workspace settings'); }
     };
     loadSettings();
@@ -1107,14 +1112,14 @@ export default function SettingsPage() {
               </CollapsibleSection>
               <CollapsibleSection title="Members" helper="People in this workspace" defaultOpen={false}>
                 <div className="space-y-3 pt-3">
-                  {teamSettings.members.length === 0 ? (
+                  {workspaceMembersList.length === 0 ? (
                     <div className="text-center py-6">
                       <Users size={32} className="mx-auto text-muted-foreground/50 mb-2" />
                       <p className="text-sm text-muted-foreground">No team members yet</p>
                       <p className="text-xs text-muted-foreground/70 mt-1">Invite people to start collaborating</p>
                     </div>
                   ) : (
-                    teamSettings.members.map((m) => (
+                    workspaceMembersList.map((m) => (
                       <div key={m.id} className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
                         <div className="flex items-center gap-3">
                           <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-xs font-medium text-primary">{m.name.charAt(0)}</div>
