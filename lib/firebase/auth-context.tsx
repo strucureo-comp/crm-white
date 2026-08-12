@@ -261,10 +261,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => unsubscribe();
   }, []);
 
-  // Fetch workspace when user changes
+  // Fetch workspace and pending invites when user changes
   useEffect(() => {
     if (user && !loading) {
       fetchWorkspace(user.id, user.company_id);
+      getPendingInvitesByEmail(user.email)
+        .then(invites => setPendingInvites(invites))
+        .catch(e => console.warn('Could not fetch pending invites:', e));
     }
   }, [user, loading]);
 

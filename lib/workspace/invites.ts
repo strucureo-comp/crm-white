@@ -33,21 +33,40 @@ export async function sendInvite(workspaceId: string, workspaceName: string, ema
 }
 
 export async function getPendingInvitesByEmail(email: string): Promise<Invite[]> {
-  const invitesRef = ref(database, 'invites');
-  const q = query(invitesRef, orderByChild('email'), equalTo(email.toLowerCase()));
-  const snapshot = await get(q);
-  
-  if (!snapshot.exists()) return [];
-  
-  const invites: Invite[] = [];
-  snapshot.forEach((child) => {
-    const invite = child.val() as Invite;
-    if (invite.status === 'pending') {
-      invites.push(invite);
+  try {
+    const invitesRef = ref(database, 'invites');
+    const q = query(invitesRef, orderByChild('email'), equalTo(email.toLowerCase()));
+    const snapshot = await get(q);
+    
+    if (!snapshot.exists()) return [];
+    
+    const invites: Invite[] = [];
+    snapshot.forEach((child) => {
+      const invite = child.val() as Invite;
+      if (invite.status === 'pending') {
+        invites.push(invite);
+      }
+    });
+    
+    return invites;
+  } catch (error: any) {
+    // If Firebase index is missing, it throws. Fallback to client-side filtering.
+    if (error?.message?.includes('Index not defined')) {
+      console.warn('Falling back to client-side filtering for invites due to missing index.');
+      const snapshot = await get(ref(database, 'invites'));
+      if (!snapshot.exists()) return [];
+      
+      const invites: Invite[] = [];
+      snapshot.forEach((child) => {
+        const invite = child.val() as Invite;
+        if (invite.status === 'pending' && invite.email.toLowerCase() === email.toLowerCase()) {
+          invites.push(invite);
+        }
+      });
+      return invites;
     }
-  });
-  
-  return invites;
+    throw error;
+  }
 }
 
 export async function getWorkspaceInvites(workspaceId: string): Promise<Invite[]> {
