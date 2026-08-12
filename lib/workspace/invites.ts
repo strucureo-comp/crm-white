@@ -21,7 +21,7 @@ export async function sendInvite(workspaceId: string, workspaceName: string, ema
     id: inviteId,
     workspace_id: workspaceId,
     workspace_name: workspaceName,
-    email: email.toLowerCase(),
+    email: email.trim().toLowerCase(),
     role,
     invited_by: invitedBy,
     status: 'pending',
@@ -35,7 +35,7 @@ export async function sendInvite(workspaceId: string, workspaceName: string, ema
 export async function getPendingInvitesByEmail(email: string): Promise<Invite[]> {
   try {
     const invitesRef = ref(database, 'invites');
-    const q = query(invitesRef, orderByChild('email'), equalTo(email.toLowerCase()));
+    const q = query(invitesRef, orderByChild('email'), equalTo(email.trim().toLowerCase()));
     const snapshot = await get(q);
     
     if (!snapshot.exists()) return [];
@@ -59,7 +59,7 @@ export async function getPendingInvitesByEmail(email: string): Promise<Invite[]>
       const invites: Invite[] = [];
       snapshot.forEach((child) => {
         const invite = child.val() as Invite;
-        if (invite.status === 'pending' && invite.email.toLowerCase() === email.toLowerCase()) {
+        if (invite.status === 'pending' && invite.email?.trim().toLowerCase() === email.trim().toLowerCase()) {
           invites.push(invite);
         }
       });

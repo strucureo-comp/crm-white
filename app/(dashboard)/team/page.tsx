@@ -16,6 +16,7 @@ import { getActivityLogs } from '@/lib/firebase/database';
 import { ActivityLog, Role, ModulePermissions } from '@/lib/db/types';
 import { subscribeToProjectsData, createMember, updateMember, deleteMember } from '@/lib/db/projects/api';
 import { subscribeToRoles, updateRole, createRole, deleteRole } from '@/lib/db/roles/api';
+import { sendInvite } from '@/lib/workspace/invites';
 
 type PermissionType = 'v' | 'e' | 'd';
 
@@ -175,7 +176,11 @@ export default function TeamPage() {
     e.preventDefault();
     if (!inviteName || !inviteEmail || !workspace?.id) return;
     try {
-      await createMember(workspace?.id, { name: inviteName, email: inviteEmail, role: inviteRole, avatar: '', projectIds: [] });
+      if (workspace?.id) {
+        await sendInvite(workspace.id, workspace.name || 'Workspace', inviteEmail.trim(), inviteRole, user?.id || '');
+      }
+      await createMember(workspace?.id, { name: inviteName, email: inviteEmail.trim(), role: inviteRole, avatar: '', projectIds: [] });
+      toast.success('Invitation sent successfully!');
       setIsInviteModalOpen(false);
       setInviteName('');
       setInviteEmail('');
