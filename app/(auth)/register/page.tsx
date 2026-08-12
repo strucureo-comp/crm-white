@@ -53,10 +53,13 @@ export default function RegisterPage() {
     }
     setSubmitting(true);
     const fullName = `${firstName} ${lastName}`.trim();
-    const { error } = await signUp(email, password, fullName, company || undefined);
+    const result = await signUp(email, password, fullName, company || undefined);
     setSubmitting(false);
-    if (error) {
-      toast.error(error.message);
+    if (result.error) {
+      toast.error(result.error.message);
+    } else if (result.hasInvites) {
+      toast.success('Account created! You have pending workspace invitations.');
+      router.push('/setup');
     } else {
       toast.success('Account created successfully');
       router.push('/setup');

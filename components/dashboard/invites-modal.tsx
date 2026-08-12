@@ -7,10 +7,13 @@ import { Button } from '@/components/ui/button';
 import { updateInviteStatus } from '@/lib/workspace/invites';
 import { createWorkspaceMember } from '@/lib/workspace/api';
 import { toast } from 'sonner';
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 export function InvitesModal() {
-  const { user, pendingInvites, refreshUser, switchWorkspace } = useAuth();
+  const { user, pendingInvites, refreshUser, switchWorkspace, refreshWorkspace } = useAuth();
   const [processing, setProcessing] = useState(false);
+  const router = useRouter();
 
   if (!pendingInvites || pendingInvites.length === 0 || !user) {
     return null;
@@ -24,6 +27,8 @@ export function InvitesModal() {
       toast.success('Invitation accepted! Switching workspace...');
       await refreshUser();
       await switchWorkspace(workspaceId);
+      // Redirect to dashboard since the user now has a workspace
+      router.push('/dashboard');
     } catch (e) {
       toast.error('Failed to accept invitation');
     } finally {
@@ -44,17 +49,36 @@ export function InvitesModal() {
     }
   };
 
+  const handleSkipAndCreateWorkspace = async () => {
+    setProcessing(true);
+    try {
+      // Decline all pending invites
+      for (const invite of pendingInvites) {
+        await updateInviteStatus(invite.id, 'declined');
+      }
+      toast.info('Invites declined. Setting up your own workspace...');
+      await refreshUser();
+      // The setup page will now proceed with normal workspace creation
+      // since there are no more pending invites
+      router.push('/setup');
+    } catch (e) {
+      toast.error('Something went wrong');
+    } finally {
+      setProcessing(false);
+    }
+  };
+
   return (
     <Dialog open={true}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="sm:max-w-md" onInteractOutside={(e) => e.preventDefault()}>
         <DialogHeader>
           <DialogTitle>Workspace Invitations</DialogTitle>
           <DialogDescription>
-            You have been invited to join the following workspaces.
+            You have been invited to join the following workspaces. Accept an invite to get started, or skip to create your own workspace.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4 py-4">
+        <div className="space-y-3 py-4">
           {pendingInvites.map((invite) => (
             <div key={invite.id} className="flex items-center justify-between p-3 border rounded-lg">
               <div>
@@ -66,12 +90,26 @@ export function InvitesModal() {
                   Decline
                 </Button>
                 <Button size="sm" disabled={processing} onClick={() => handleAccept(invite.id, invite.workspace_id, invite.role)}>
+                  {processing && <Loader2 size={14} className="mr-1 animate-spin" />}
                   Accept
                 </Button>
               </div>
             </div>
           ))}
         </div>
+
+        <DialogFooter className="flex-col sm:flex-col gap-2">
+          <div className="w-full border-t pt-3">
+            <Button
+              variant="ghost"
+              className="w-full text-muted-foreground"
+              disabled={processing}
+              onClick={handleSkipAndCreateWorkspace}
+            >
+              Skip &amp; Create My Own Workspace
+            </Button>
+          </div>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );

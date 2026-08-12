@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import { updateWorkspace } from '@/lib/workspace/api';
 import { updateGeneralSettings, updateBrandingSettings } from '@/lib/settings/api';
+import { InvitesModal } from '@/components/dashboard/invites-modal';
 
 const STEPS = [
   { id: 0, title: 'Company Info', icon: Building2, description: 'Tell us about your business' },
@@ -22,7 +23,7 @@ const STEPS = [
 ];
 
 export default function SetupPage() {
-  const { user, loading: authLoading, workspace, workspaceLoading, refreshWorkspace } = useAuth();
+  const { user, loading: authLoading, workspace, workspaceLoading, refreshWorkspace, pendingInvites } = useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -69,6 +70,15 @@ export default function SetupPage() {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // If user has pending invites and no workspace yet, show the invites modal
+  if (pendingInvites && pendingInvites.length > 0 && !workspace) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
+        <InvitesModal />
       </div>
     );
   }

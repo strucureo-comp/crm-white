@@ -24,7 +24,7 @@ interface AuthContextType {
   workspace: Workspace | null;
   workspaceLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null }>;
+  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null; hasInvites?: boolean }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
   refreshUser: () => Promise<void>;
@@ -270,10 +270,45 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     existingWorkspaceId?: string
   ) => {
     try {
+      // Check for pending invites BEFORE creating Firebase Auth user
+      // so we know whether to skip workspace creation
+      let invitesForEmail: Invite[] = [];
+      try {
+        invitesForEmail = await getPendingInvitesByEmail(email);
+      } catch (e) {
+        // If index is missing or query fails, proceed without invites
+        console.warn('Could not check pending invites during sign-up:', e);
+      }
+
+      const hasInvites = invitesForEmail.length > 0;
+
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // The first user who signs up gets marked as 'admin' (unless they are invited to an existing company)
+      // If the user has pending invites, skip workspace creation entirely.
+      // The invite acceptance flow will assign them to the correct workspace.
+      if (hasInvites) {
+        const userData: Omit<User, 'id' | 'user_id'> = {
+          company_id: '',
+          email: newUser.email!,
+          full_name: fullName,
+          role: 'client',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
+
+        await createUser(newUser.uid, userData);
+        
+        // Load invites into state so the InvitesModal can show them
+        setPendingInvites(invitesForEmail);
+        
+        // Fetch user data
+        await refreshUser();
+        
+        return { error: null, hasInvites: true };
+      }
+
+      // No invites — proceed with normal workspace creation flow
       let finalRole: UserRole = existingCompanyId ? 'client' : 'admin';
 
       let resolvedCompanyId = existingCompanyId || '';
@@ -285,14 +320,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (existingCompany) {
           resolvedWorkspaceId = existingCompany.workspaceId;
           resolvedCompanyId = existingCompany.companyId;
-          finalRole = 'admin'; // Changed from 'client' to 'admin' so they share full data access
-          // Add user to workspace first so they have permission to read companies
+          finalRole = 'admin';
           await createWorkspaceMember(resolvedWorkspaceId, newUser.uid, 'admin');
         }
       }
 
       if (!resolvedWorkspaceId) {
-        // 1. When a brand new company signs up, create workspace first
         const wsName = companyName || `${fullName}'s Workspace`;
         const workspace = await createWorkspace(wsName, newUser.uid);
         
@@ -300,7 +333,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           resolvedWorkspaceId = workspace.id;
           setWorkspace(workspace);
           
-          // Create the new record in the companies table
           const { createCompany } = await import('@/lib/db/companies/api');
           const newCompany = await createCompany(workspace.id, {
             name: companyName || `${fullName}'s Company`,
@@ -316,7 +348,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2 & 3. Link the user to the new or existing company_id
       const userData: Omit<User, 'id' | 'user_id'> = {
         company_id: resolvedCompanyId,
         email: newUser.email!,
@@ -328,13 +359,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       await createUser(newUser.uid, userData);
       
-      // Fix the race condition: fetch the fresh data now that DB writes are done
       await refreshUser();
       if (resolvedWorkspaceId) {
         await fetchWorkspace(newUser.uid, resolvedCompanyId);
       }
 
-      return { error: null };
+      return { error: null, hasInvites: false };
     } catch (error) {
       return { error: error as Error };
     }
