@@ -74,14 +74,7 @@ export default function SetupPage() {
     );
   }
 
-  // If user has pending invites and no workspace yet, show the invites modal
-  if (pendingInvites && pendingInvites.length > 0 && !workspace) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background p-4">
-        <InvitesModal />
-      </div>
-    );
-  }
+  const hasInvites = pendingInvites && pendingInvites.length > 0;
 
   if (!workspace) {
     return (
@@ -395,6 +388,7 @@ export default function SetupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
+      {hasInvites && <InvitesModal />}
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">

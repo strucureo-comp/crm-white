@@ -13,9 +13,10 @@ import { Loader2 } from 'lucide-react';
 export function InvitesModal() {
   const { user, pendingInvites, refreshUser, switchWorkspace, refreshWorkspace } = useAuth();
   const [processing, setProcessing] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const router = useRouter();
 
-  if (!pendingInvites || pendingInvites.length === 0 || !user) {
+  if (!pendingInvites || pendingInvites.length === 0 || !user || hidden) {
     return null;
   }
 
@@ -41,6 +42,7 @@ export function InvitesModal() {
     try {
       await updateInviteStatus(inviteId, 'declined');
       toast.success('Invitation declined');
+      setHidden(true);
       await refreshUser();
     } catch (e) {
       toast.error('Failed to decline invitation');
@@ -57,6 +59,7 @@ export function InvitesModal() {
         await updateInviteStatus(invite.id, 'declined');
       }
       toast.info('Invites declined. Setting up your own workspace...');
+      setHidden(true);
       await refreshUser();
       // The setup page will now proceed with normal workspace creation
       // since there are no more pending invites

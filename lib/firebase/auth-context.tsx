@@ -22,6 +22,7 @@ interface AuthContextType {
   firebaseUser: FirebaseUser | null;
   loading: boolean;
   workspace: Workspace | null;
+  workspaceRole: string | null;
   workspaceLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null; hasInvites?: boolean }>;
@@ -41,6 +42,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [firebaseUser, setFirebaseUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [workspaceRole, setWorkspaceRole] = useState<string | null>(null);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [availableWorkspaces, setAvailableWorkspaces] = useState<Workspace[]>([]);
   const [pendingInvites, setPendingInvites] = useState<Invite[]>([]);
@@ -171,6 +173,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       setWorkspace(ws);
       
+      // Fetch workspace role
+      if (ws) {
+        const { getUserWorkspaceRole } = await import('@/lib/workspace/api');
+        const roleData = await getUserWorkspaceRole(userId, ws.id);
+        if (roleData) {
+          setWorkspaceRole(roleData.role);
+        } else {
+          setWorkspaceRole(null);
+        }
+      } else {
+        setWorkspaceRole(null);
+      }
+      
       // Load all available workspaces
       try {
         const workspaces = await getUserWorkspaces(userId);
@@ -232,6 +247,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         setFirebaseUser(null);
         setUser(null);
         setWorkspace(null);
+        setWorkspaceRole(null);
         try {
           await fetch('/api/auth/session', { method: 'DELETE' });
         } catch (e) {
@@ -271,44 +287,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   ) => {
     try {
       // Check for pending invites BEFORE creating Firebase Auth user
-      // so we know whether to skip workspace creation
+      // Fetch pending invites to pass in the return object so the frontend knows to show the modal
       let invitesForEmail: Invite[] = [];
       try {
         invitesForEmail = await getPendingInvitesByEmail(email);
       } catch (e) {
-        // If index is missing or query fails, proceed without invites
         console.warn('Could not check pending invites during sign-up:', e);
       }
-
       const hasInvites = invitesForEmail.length > 0;
 
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // If the user has pending invites, skip workspace creation entirely.
-      // The invite acceptance flow will assign them to the correct workspace.
-      if (hasInvites) {
-        const userData: Omit<User, 'id' | 'user_id'> = {
-          company_id: '',
-          email: newUser.email!,
-          full_name: fullName,
-          role: 'client',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
-
-        await createUser(newUser.uid, userData);
-        
-        // Load invites into state so the InvitesModal can show them
-        setPendingInvites(invitesForEmail);
-        
-        // Fetch user data
-        await refreshUser();
-        
-        return { error: null, hasInvites: true };
-      }
-
-      // No invites — proceed with normal workspace creation flow
+      // Always proceed with normal workspace creation flow
       let finalRole: UserRole = existingCompanyId ? 'client' : 'admin';
 
       let resolvedCompanyId = existingCompanyId || '';
@@ -364,7 +355,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchWorkspace(newUser.uid, resolvedCompanyId);
       }
 
-      return { error: null, hasInvites: false };
+      if (hasInvites) {
+        setPendingInvites(invitesForEmail);
+      }
+
+      return { error: null, hasInvites };
     } catch (error) {
       return { error: error as Error };
     }
@@ -379,6 +374,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(null);
       setFirebaseUser(null);
       setWorkspace(null);
+      setWorkspaceRole(null);
       window.location.href = '/auth/login';
     }
   };
@@ -400,6 +396,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         firebaseUser,
         loading,
         workspace,
+        workspaceRole,
         workspaceLoading,
         signIn,
         signUp,

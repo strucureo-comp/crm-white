@@ -69,7 +69,7 @@ const breadcrumbs: Record<string, string> = {
 export function AppHeader() {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, signOut, workspace, availableWorkspaces, switchWorkspace } = useAuth();
+  const { user, workspace, workspaceRole, availableWorkspaces, switchWorkspace, signOut } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [notifList, setNotifList] = useState<Notification[]>([]);
@@ -230,7 +230,7 @@ export function AppHeader() {
                 <div className="hidden md:flex flex-col items-start text-sm">
                   <span className="font-medium leading-none">{user?.full_name || 'User'}</span>
                   <span className="text-xs text-muted-foreground leading-none mt-1">
-                    {user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—'}
+                    {workspaceRole ? workspaceRole.charAt(0).toUpperCase() + workspaceRole.slice(1) : (user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : '—')}
                   </span>
                 </div>
                 <ChevronDown size={14} className="text-muted-foreground" />
