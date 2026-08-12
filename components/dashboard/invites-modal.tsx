@@ -11,7 +11,7 @@ import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
 
 export function InvitesModal() {
-  const { user, pendingInvites, refreshUser, switchWorkspace, refreshWorkspace } = useAuth();
+  const { user, pendingInvites, refreshUser, switchWorkspace, createInitialWorkspace } = useAuth();
   const [processing, setProcessing] = useState(false);
   const [hidden, setHidden] = useState(false);
   const router = useRouter();
@@ -59,11 +59,10 @@ export function InvitesModal() {
         await updateInviteStatus(invite.id, 'declined');
       }
       toast.info('Invites declined. Setting up your own workspace...');
+      await createInitialWorkspace();
       setHidden(true);
-      await refreshUser();
-      // The setup page will now proceed with normal workspace creation
-      // since there are no more pending invites
-      router.push('/setup');
+      // Setup page will now see workspace is loaded and render the wizard
+      router.refresh();
     } catch (e) {
       toast.error('Something went wrong');
     } finally {

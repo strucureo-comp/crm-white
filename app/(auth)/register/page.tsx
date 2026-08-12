@@ -15,7 +15,6 @@ export default function RegisterPage() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
-  const [company, setCompany] = useState('');
   const [password, setPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const { signUp, user, loading, workspace, workspaceLoading } = useAuth();
@@ -53,7 +52,7 @@ export default function RegisterPage() {
     }
     setSubmitting(true);
     const fullName = `${firstName} ${lastName}`.trim();
-    const result = await signUp(email, password, fullName, company || undefined);
+    const result = await signUp(email, password, fullName);
     setSubmitting(false);
     if (result.error) {
       toast.error(result.error.message);
@@ -95,10 +94,6 @@ export default function RegisterPage() {
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input id="email" type="email" placeholder="you@company.com" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="company">Company Name</Label>
-                <Input id="company" placeholder="Your Company Name" value={company} onChange={(e) => setCompany(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>

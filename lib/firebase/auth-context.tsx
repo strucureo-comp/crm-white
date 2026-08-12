@@ -25,7 +25,8 @@ interface AuthContextType {
   workspaceRole: string | null;
   workspaceLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
-  signUp: (email: string, password: string, fullName: string, companyName?: string) => Promise<{ error: Error | null; hasInvites?: boolean }>;
+  signUp: (email: string, password: string, fullName: string) => Promise<{ error: Error | null; hasInvites?: boolean }>;
+  createInitialWorkspace: () => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ error: Error | null; success: boolean }>;
   refreshUser: () => Promise<void>;
@@ -281,13 +282,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     email: string, 
     password: string, 
     fullName: string, 
-    companyName?: string,
     existingCompanyId?: string,
     existingWorkspaceId?: string
   ) => {
     try {
       // Check for pending invites BEFORE creating Firebase Auth user
-      // Fetch pending invites to pass in the return object so the frontend knows to show the modal
       let invitesForEmail: Invite[] = [];
       try {
         invitesForEmail = await getPendingInvitesByEmail(email);
@@ -299,25 +298,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userCredential = await createUserWithEmailAndPassword(auth, email, password);
       const newUser = userCredential.user;
 
-      // Always proceed with normal workspace creation flow
-      let finalRole: UserRole = existingCompanyId ? 'client' : 'admin';
+      // If the user has pending invites, skip workspace creation entirely.
+      if (hasInvites) {
+        const userData: Omit<User, 'id' | 'user_id'> = {
+          company_id: '',
+          email: newUser.email!,
+          full_name: fullName,
+          role: 'client',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        };
 
+        await createUser(newUser.uid, userData);
+        setPendingInvites(invitesForEmail);
+        await refreshUser();
+        
+        return { error: null, hasInvites: true };
+      }
+
+      // No invites — auto-create a workspace and company
+      let finalRole: UserRole = existingCompanyId ? 'client' : 'admin';
       let resolvedCompanyId = existingCompanyId || '';
       let resolvedWorkspaceId = existingWorkspaceId || '';
 
-      if (!existingWorkspaceId && companyName) {
-        const { findCompanyGlobalByName } = await import('@/lib/workspace/api');
-        const existingCompany = await findCompanyGlobalByName(companyName);
-        if (existingCompany) {
-          resolvedWorkspaceId = existingCompany.workspaceId;
-          resolvedCompanyId = existingCompany.companyId;
-          finalRole = 'admin';
-          await createWorkspaceMember(resolvedWorkspaceId, newUser.uid, 'admin');
-        }
-      }
-
       if (!resolvedWorkspaceId) {
-        const wsName = companyName || `${fullName}'s Workspace`;
+        const wsName = `${fullName}'s Workspace`;
         const workspace = await createWorkspace(wsName, newUser.uid);
         
         if (workspace) {
@@ -326,8 +331,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           
           const { createCompany } = await import('@/lib/db/companies/api');
           const newCompany = await createCompany(workspace.id, {
-            name: companyName || `${fullName}'s Company`,
-            legal_name: companyName || `${fullName}'s Company`,
+            name: `${fullName}'s Company`,
+            legal_name: `${fullName}'s Company`,
             website: '', phone: '', email: email, address: '', city: '', state: '', country: '', pincode: '',
             gst_number: '', pan_number: '', vat_number: '', registration_number: '',
             currency: 'USD', timezone: 'UTC',
@@ -355,13 +360,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await fetchWorkspace(newUser.uid, resolvedCompanyId);
       }
 
-      if (hasInvites) {
-        setPendingInvites(invitesForEmail);
-      }
-
-      return { error: null, hasInvites };
+      return { error: null, hasInvites: false };
     } catch (error) {
       return { error: error as Error };
+    }
+  };
+
+  const createInitialWorkspace = async () => {
+    if (!user) return;
+    
+    try {
+      const wsName = `${user.full_name}'s Workspace`;
+      const newWorkspace = await createWorkspace(wsName, user.id);
+      
+      if (newWorkspace) {
+        const { createCompany } = await import('@/lib/db/companies/api');
+        const newCompany = await createCompany(newWorkspace.id, {
+          name: `${user.full_name}'s Company`,
+          legal_name: `${user.full_name}'s Company`,
+          website: '', phone: '', email: user.email, address: '', city: '', state: '', country: '', pincode: '',
+          gst_number: '', pan_number: '', vat_number: '', registration_number: '',
+          currency: 'USD', timezone: 'UTC',
+          bank_name: '', account_number: '', ifsc: '', swift: '', upi: '',
+          logo_url: '', footer_text: ''
+        });
+        
+        // Update user record
+        const userRef = ref(database, `users/${user.id}`);
+        await import('firebase/database').then(({ update }) => {
+          update(userRef, { company_id: newCompany.company_id, role: 'admin' });
+        });
+        
+        await refreshUser();
+        await fetchWorkspace(user.id, newCompany.company_id);
+      }
+    } catch (error) {
+      console.error('Failed to create initial workspace', error);
+      throw error;
     }
   };
 
@@ -400,6 +435,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         workspaceLoading,
         signIn,
         signUp,
+        createInitialWorkspace,
         signOut,
         resetPassword,
         refreshUser,

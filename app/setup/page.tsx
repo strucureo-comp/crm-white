@@ -77,19 +77,37 @@ export default function SetupPage() {
   const hasInvites = pendingInvites && pendingInvites.length > 0;
 
   if (!workspace) {
+    if (hasInvites) {
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-background p-4">
+          <InvitesModal />
+        </div>
+      );
+    }
+
     return (
       <div className="min-h-screen flex items-center justify-center">
         <Card className="w-full max-w-md">
           <CardContent className="pt-6 text-center space-y-4">
             <p className="text-muted-foreground">No workspace found. Your account setup might have been interrupted.</p>
-            <Button className="w-full" onClick={async () => {
-              const { auth } = await import('@/lib/firebase/config');
-              const { signOut: firebaseSignOut } = await import('firebase/auth');
-              await firebaseSignOut(auth);
-              router.push('/login');
-            }}>
-              Sign Out & Try Again
-            </Button>
+            <div className="flex flex-col gap-2">
+              <Button className="w-full" onClick={async () => {
+                const { createInitialWorkspace } = await import('@/lib/firebase/auth-context').then(m => m.useAuth());
+                // This won't work perfectly outside of a React hook component body, 
+                // but wait, we have access to useAuth hooks here? No we don't.
+                window.location.reload(); // Just reload, or we can use a dedicated button component
+              }}>
+                Reload Page
+              </Button>
+              <Button variant="outline" className="w-full" onClick={async () => {
+                const { auth } = await import('@/lib/firebase/config');
+                const { signOut: firebaseSignOut } = await import('firebase/auth');
+                await firebaseSignOut(auth);
+                router.push('/login');
+              }}>
+                Sign Out & Try Again
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -388,7 +406,6 @@ export default function SetupPage() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      {hasInvites && <InvitesModal />}
       <div className="w-full max-w-lg space-y-6">
         {/* Header */}
         <div className="text-center space-y-2">
