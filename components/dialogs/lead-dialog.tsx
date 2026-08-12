@@ -21,11 +21,12 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { createLead, updateLead } from '@/lib/firebase/database';
+import { getLeads, createLead, updateLead } from '@/lib/firebase/database';
 import { Badge } from '@/components/ui/badge';
 import type { Lead, LeadStatus, LeadSource, LeadTag, LeadPriority } from '@/lib/db/types';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useRouter } from 'next/navigation';
 
 interface LeadDialogProps {
   open: boolean;
@@ -105,9 +106,11 @@ function formToPayload(f: LeadForm) {
 }
 
 export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProps) {
+  const router = useRouter();
   const { workspace, user } = useAuth();
   const [form, setForm] = useState<LeadForm>({ ...defaultForm });
   const [saving, setSaving] = useState(false);
+  const [duplicateMatch, setDuplicateMatch] = useState<Lead | null>(null);
 
   useEffect(() => {
     if (lead) {
@@ -118,13 +121,14 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
         owner_id: user?.id || '',
       });
     }
-  }, [lead, user]);
+    setDuplicateMatch(null);
+  }, [lead, user, open]);
 
   function set<K extends keyof LeadForm>(key: K, value: LeadForm[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent, force: boolean = false) {
     e.preventDefault();
     if (!form.name.trim() || !form.email.trim()) {
       toast.error('Name and email are required');
@@ -132,6 +136,20 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
     }
     setSaving(true);
     try {
+      if (!lead && !force) {
+        // Check for duplicates
+        const allLeads = await getLeads(workspace?.id);
+        const match = allLeads.find((l) => 
+          l.email.toLowerCase() === form.email.toLowerCase() ||
+          (form.phone && l.phone && l.phone.replace(/\D/g, '') === form.phone.replace(/\D/g, ''))
+        );
+        if (match) {
+          setDuplicateMatch(match);
+          setSaving(false);
+          return;
+        }
+      }
+
       const payload = formToPayload(form);
       if (lead) {
         await updateLead(lead.id, payload);
@@ -154,19 +172,53 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
 
   function handleCancel() {
     setForm(lead ? leadToForm(lead) : { ...defaultForm, owner_id: user?.id || '' });
+    setDuplicateMatch(null);
     onOpenChange(false);
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleCancel}>
       <DialogContent className="sm:max-w-[500px]">
-        <DialogHeader>
-          <DialogTitle>{lead ? 'Edit Lead' : 'New Lead'}</DialogTitle>
-          <DialogDescription>
-            {lead ? 'Update the lead details.' : 'Enter the lead details.'}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        {duplicateMatch ? (
+          <>
+            <DialogHeader>
+              <DialogTitle>Duplicate Lead Detected</DialogTitle>
+              <DialogDescription>
+                A lead with this email or phone already exists in the system.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="py-4 space-y-3">
+              <div className="p-3 bg-muted rounded-md text-sm">
+                <p><strong>Name:</strong> {duplicateMatch.name}</p>
+                <p><strong>Email:</strong> {duplicateMatch.email}</p>
+                <p><strong>Phone:</strong> {duplicateMatch.phone || 'N/A'}</p>
+                <p><strong>Status:</strong> <Badge variant="outline" className="ml-2">{duplicateMatch.status}</Badge></p>
+              </div>
+              <p className="text-sm text-muted-foreground mt-2">
+                What would you like to do?
+              </p>
+            </div>
+            <DialogFooter className="flex flex-col sm:flex-row gap-2 sm:justify-between sm:space-x-0">
+              <Button variant="outline" onClick={() => setDuplicateMatch(null)}>Back to Edit</Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => {
+                  onOpenChange(false);
+                  // Not perfect, ideally we open a deal dialog, but navigation is easiest
+                  router.push('/pipeline'); 
+                }}>Create Deal</Button>
+                <Button variant="destructive" onClick={(e) => handleSubmit(e, true)}>Proceed Anyway</Button>
+              </div>
+            </DialogFooter>
+          </>
+        ) : (
+          <>
+            <DialogHeader>
+              <DialogTitle>{lead ? 'Edit Lead' : 'New Lead'}</DialogTitle>
+              <DialogDescription>
+                {lead ? 'Update the lead details.' : 'Enter the lead details.'}
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={(e) => handleSubmit(e, false)} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <div className="col-span-2">
               <Label htmlFor="name">Name *</Label>
@@ -270,6 +322,8 @@ export function LeadDialog({ open, onOpenChange, onSaved, lead }: LeadDialogProp
             <Button type="submit" disabled={saving}>{saving ? 'Saving...' : lead ? 'Update' : 'Create'}</Button>
           </DialogFooter>
         </form>
+          </>
+        )}
       </DialogContent>
     </Dialog>
   );

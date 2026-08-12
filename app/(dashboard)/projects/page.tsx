@@ -243,9 +243,9 @@ export default function ProjectsPage() {
               const colProjects = filteredProjects.filter(p => p.status === col);
 
               return (
-                <div key={col} className="flex-shrink-0 w-[300px] flex flex-col max-h-full">
-                  <div className="flex items-center gap-2 mb-4 px-1 shrink-0">
-                    <h3 className="font-semibold text-sm uppercase tracking-wider">{col}</h3>
+                <div key={col} className="flex-shrink-0 w-[300px] flex flex-col max-h-full rounded-xl border bg-muted/20 pb-2">
+                  <div className="flex items-center justify-between gap-2 mb-3 px-3 py-2.5 shrink-0 border-b bg-card rounded-t-xl">
+                    <h3 className="font-semibold text-sm tracking-wide text-foreground">{col}</h3>
                     <Badge variant="secondary" className="bg-muted text-muted-foreground px-1.5 py-0 text-xs">
                       {colProjects.length}
                     </Badge>
@@ -256,7 +256,7 @@ export default function ProjectsPage() {
                       <div
                         ref={provided.innerRef}
                         {...provided.droppableProps}
-                        className={`flex-1 overflow-y-auto space-y-3 min-h-[150px] transition-colors rounded-xl p-2 -mx-2 ${snapshot.isDraggingOver ? 'bg-muted/40' : ''}`}
+                        className={`flex-1 overflow-y-auto space-y-3 min-h-[150px] transition-colors rounded-lg px-2 ${snapshot.isDraggingOver ? 'bg-muted/50 ring-1 ring-border' : ''}`}
                       >
                         {colProjects.map((project, index) => (
                           <Draggable key={project.id} draggableId={project.id} index={index}>

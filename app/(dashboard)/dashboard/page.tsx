@@ -9,9 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { getLeads, getInvoices, getActivityLogs, getAutomationRules, getEmailCampaigns } from '@/lib/firebase/database';
+import { getLeads, getInvoices, getActivityLogs, getAutomationRules, getEmailCampaigns, getTasks } from '@/lib/firebase/database';
 import { useAuth } from '@/lib/firebase/auth-context';
-import type { Lead, Invoice, ActivityLog, AutomationRule, EmailCampaign } from '@/lib/db/types';
+import { useWorkspace } from '@/lib/settings/workspace-context';
+import type { Lead, Invoice, ActivityLog, AutomationRule, EmailCampaign, TaskItem } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';
 
 const statusColors: Record<string, string> = {
@@ -33,9 +34,11 @@ const priorityColors: Record<string, string> = {
 export default function DashboardPage() {
   const router = useRouter();
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [activityLogs, setActivityLogs] = useState<ActivityLog[]>([]);
+  const [tasks, setTasks] = useState<TaskItem[]>([]);
   const [automationRules, setAutomationRules] = useState<AutomationRule[]>([]);
   const [emailCampaigns, setEmailCampaigns] = useState<EmailCampaign[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +50,18 @@ export default function DashboardPage() {
         return;
       }
       try {
-        const [leadData, invoiceData, activityData, ruleData, emailData] = await Promise.all([
+        const [leadData, invoiceData, activityData, ruleData, emailData, tasksData] = await Promise.all([
           getLeads(workspace?.id),
           getInvoices(workspace?.id),
           getActivityLogs(workspace?.id, 10),
           getAutomationRules(workspace?.id),
           getEmailCampaigns(workspace?.id),
+          getTasks(workspace?.id),
         ]);
         setLeads(leadData);
         setInvoices(invoiceData);
         setActivityLogs(activityData);
+        setTasks(tasksData);
         setAutomationRules(ruleData);
         setEmailCampaigns(emailData);
       } catch (err) {
@@ -105,9 +110,9 @@ export default function DashboardPage() {
 
   const recentLeads = leads.slice(0, 5);
 
-  const urgentTasks = leads
-    .filter((l) => l.next_follow_up && l.status !== 'won' && l.status !== 'lost')
-    .sort((a, b) => new Date(a.next_follow_up!).getTime() - new Date(b.next_follow_up!).getTime())
+  const urgentTasks = tasks
+    .filter((t) => t.due_date && t.status !== 'done')
+    .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
     .slice(0, 5);
 
   if (loading) {
@@ -128,7 +133,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
         <KpiCard title="Total Leads" value={String(totalLeads)} change={`${totalLeads} total`} trend="up" icon={Users} description="all time" />
         <KpiCard title="Active Deals" value={String(activeDeals)} change={`${activeDeals} in pipeline`} trend="up" icon={DollarSign} description="in progress" />
-        <KpiCard title="Monthly Revenue" value={formatCurrency(monthlyRevenue)} change={`${invoices.filter((i) => i.status === 'paid' && i.created_at >= monthStart).length} paid`} trend={monthlyRevenue > 0 ? 'up' : 'neutral'} icon={TrendingUp} description="this month" />
+        <KpiCard title="Monthly Revenue" value={formatCurrency(monthlyRevenue, currency)} change={`${invoices.filter((i) => i.status === 'paid' && i.created_at >= monthStart).length} paid`} trend={monthlyRevenue > 0 ? 'up' : 'neutral'} icon={TrendingUp} description="this month" />
         <KpiCard title="Invoices Overdue" value={String(invoicesOverdue)} change={`${invoicesOverdue} unpaid`} trend={invoicesOverdue > 0 ? 'down' : 'neutral'} icon={Receipt} description="need attention" />
         <KpiCard title="Email Clicked" value={`${emailClicked}%`} change="engagement" trend="up" icon={Mail} description="click rate" />
       </div>
@@ -151,7 +156,7 @@ export default function DashboardPage() {
                       <div key={lead.id} className="p-2 rounded-lg border bg-card hover:shadow-sm transition-shadow cursor-pointer" onClick={() => router.push('/pipeline')}>
                         <p className="text-xs font-medium truncate">{lead.name}</p>
                         <p className="text-[10px] text-muted-foreground truncate">{lead.company || '—'}</p>
-                        <p className="text-[10px] font-medium mt-1">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</p>
+                        <p className="text-[10px] font-medium mt-1">{lead.estimated_value ? formatCurrency(lead.estimated_value, currency) : '—'}</p>
                       </div>
                     ))}
                     {stage.leads.length > 3 && (
@@ -271,7 +276,9 @@ export default function DashboardPage() {
                       case 'project': return '/projects';
                       case 'invoice': return '/invoices';
                       case 'contact': return '/contacts';
-                      case 'quote': return '/quotations';
+                      case 'quote': return '/quotes';
+                      case 'task': return '/tasks';
+                      case 'activity': return '/activity';
                       default: return '#';
                     }
                   };
@@ -308,15 +315,15 @@ export default function DashboardPage() {
         <CardContent>
           {urgentTasks.length > 0 ? (
             <div className="space-y-3">
-              {urgentTasks.map((lead) => {
-                const dueDate = lead.next_follow_up ? new Date(lead.next_follow_up) : null;
+              {urgentTasks.map((task) => {
+                const dueDate = task.due_date ? new Date(task.due_date) : null;
                 const isOverdue = dueDate && dueDate < new Date();
-                const priority = isOverdue ? 'high' : lead.status === 'negotiation' ? 'medium' : 'low';
+                const priority = task.priority || (isOverdue ? 'high' : 'medium');
                 return (
-                  <div key={lead.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => router.push('/leads')}>
+                  <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => router.push('/tasks')}>
                     <div className="flex items-center gap-3">
                       <div className={`flex items-center justify-center w-5 h-5 rounded-full border-2 ${isOverdue ? 'border-red-400' : 'border-muted-foreground/30'}`} />
-                      <span className="text-sm">{"" || `Follow up with ${lead.name}`}</span>
+                      <span className="text-sm">{task.title}</span>
                     </div>
                     <div className="flex items-center gap-2">
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${priorityColors[priority]}`}>

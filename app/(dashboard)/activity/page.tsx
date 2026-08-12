@@ -24,6 +24,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Select,
   SelectContent,
@@ -126,8 +127,10 @@ export default function ActivityPage() {
   const [activeTab, setActiveTab] = useState<TabFilter>('All');
   const [dialogOpen, setDialogOpen] = useState(false);
   const [completedOpen, setCompletedOpen] = useState(true);
+  const [viewActivity, setViewActivity] = useState<EnrichedActivity | null>(null);
   const [formState, setFormState] = useState({
     title: '',
+    description: '',
     type: 'meeting',
     priority: 'medium',
     date: format(new Date(), 'yyyy-MM-dd'),
@@ -141,7 +144,7 @@ export default function ActivityPage() {
     try {
       await createActivityLog({
         action: 'task_created',
-        description: formState.title,
+        description: formState.description || formState.title,
         entity_type: formState.type,
         user_id: user?.id || 'demo-user',
         user_name: user?.full_name || 'Demo User',
@@ -154,7 +157,7 @@ export default function ActivityPage() {
       toast.success('Activity added');
       setDialogOpen(false);
       load();
-      setFormState({ ...formState, title: '' });
+      setFormState({ ...formState, title: '', description: '' });
     } catch (error) {
       toast.error('Failed to save activity');
     } finally {
@@ -445,7 +448,7 @@ export default function ActivityPage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" title="View" onClick={() => setViewActivity(activity)}>
                             <Eye size={14} />
                           </Button>
                           <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-600" title="Delete" onClick={() => handleDelete(activity.id)}>
@@ -617,6 +620,15 @@ export default function ActivityPage() {
                 </Select>
               </div>
             </div>
+            <div>
+              <label className="text-sm font-medium mb-1 block">Description (Optional)</label>
+              <Textarea 
+                placeholder="Details about this activity..." 
+                value={formState.description}
+                onChange={(e) => setFormState(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+              />
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="text-sm font-medium mb-1 block">Date</label>
@@ -642,6 +654,74 @@ export default function ActivityPage() {
               {isSubmitting ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!viewActivity} onOpenChange={(open) => !open && setViewActivity(null)}>
+        <DialogContent>
+          {viewActivity && (
+            <>
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <div className={cn('w-8 h-8 rounded-full flex items-center justify-center shrink-0', typeConfig[viewActivity.type].color)}>
+                    {(() => {
+                      const Icon = typeConfig[viewActivity.type].icon;
+                      return <Icon size={14} />;
+                    })()}
+                  </div>
+                  {viewActivity.title}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <div className="flex flex-wrap items-center gap-2 text-sm">
+                  <Badge variant="outline" className={priorityConfig[viewActivity.priority].className}>
+                    {priorityConfig[viewActivity.priority].label} Priority
+                  </Badge>
+                  <Badge variant="secondary">
+                    {typeConfig[viewActivity.type].label}
+                  </Badge>
+                  {viewActivity.status && (
+                    <Badge variant={viewActivity.status === 'completed' ? 'default' : 'outline'}>
+                      {viewActivity.status.charAt(0).toUpperCase() + viewActivity.status.slice(1)}
+                    </Badge>
+                  )}
+                </div>
+                
+                <div className="bg-muted rounded-md p-4 space-y-3">
+                  <div className="grid grid-cols-2 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground mb-1">Date</p>
+                      <p className="font-medium flex items-center gap-1.5"><CalendarIcon size={14}/> {viewActivity.date}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground mb-1">Time</p>
+                      <p className="font-medium flex items-center gap-1.5"><Clock size={14}/> {viewActivity.time}</p>
+                    </div>
+                    {viewActivity.company && (
+                      <div className="col-span-2">
+                        <p className="text-muted-foreground mb-1">Related To</p>
+                        <p className="font-medium flex items-center gap-1.5"><Building2 size={14}/> {viewActivity.company}</p>
+                      </div>
+                    )}
+                    <div>
+                      <p className="text-muted-foreground mb-1">Owner</p>
+                      <p className="font-medium">{viewActivity.owner}</p>
+                    </div>
+                  </div>
+                </div>
+
+                {viewActivity.description && (
+                  <div>
+                    <h4 className="text-sm font-semibold mb-2">Description</h4>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{viewActivity.description}</p>
+                  </div>
+                )}
+              </div>
+              <DialogFooter>
+                <Button variant="outline" onClick={() => setViewActivity(null)}>Close</Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </div>

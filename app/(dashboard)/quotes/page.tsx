@@ -242,11 +242,9 @@ export default function QuotesPage() {
                         }}>
                           <Eye size={14} className="mr-2" /> Preview
                         </DropdownMenuItem>
-                        {q.status === 'accepted' && (
-                          <DropdownMenuItem onClick={() => handleConvertToInvoice(q)}>
-                            <FileText size={14} className="mr-2" /> Convert to Invoice
-                          </DropdownMenuItem>
-                        )}
+                        <DropdownMenuItem onClick={() => handleConvertToInvoice(q)}>
+                          <FileText size={14} className="mr-2" /> Convert to Invoice
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem className="text-red-600" onClick={() => handleDelete(q)}>
                           <Trash2 size={14} className="mr-2" /> Delete

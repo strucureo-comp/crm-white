@@ -2610,8 +2610,8 @@ export async function getActivityLogs(workspaceId: string, limitCount: number = 
   }
 }
 
-export async function createActivityLog(data: Omit<ActivityLog, 'id' | 'created_at'>): Promise<string | null> {
-  return logActivity(data);
+export async function createActivityLog(data: Omit<ActivityLog, 'id' | 'created_at'> & { created_at?: string }): Promise<string | null> {
+  return logActivity(data as any);
 }
 
 export async function deleteActivityLog(workspaceId: string, id: string): Promise<boolean> {
@@ -2625,7 +2625,7 @@ export async function deleteActivityLog(workspaceId: string, id: string): Promis
   }
 }
 
-export async function logActivity(log: Omit<ActivityLog, 'id' | 'created_at' | 'user_id' | 'user_name'> & { user_id?: string; user_name?: string }): Promise<string | null> {
+export async function logActivity(log: Omit<ActivityLog, 'id' | 'user_id' | 'user_name'> & { user_id?: string; user_name?: string }): Promise<string | null> {
   try {
     if (!log.workspace_id) return null;
     const logsRef = wsRef(log.workspace_id, 'activity_logs');
@@ -2646,13 +2646,23 @@ export async function logActivity(log: Omit<ActivityLog, 'id' | 'created_at' | '
     }
     
     const now = new Date();
+    let createdAt = log.created_at;
+    if (!createdAt) {
+       // if date and time are provided, construct created_at
+       if (log.date && log.time) {
+          createdAt = new Date(`${log.date}T${log.time}`).toISOString();
+       } else {
+          createdAt = now.toISOString();
+       }
+    }
+    
     const logData = cleanData({
       ...log,
       user_id: userId,
       user_name: userName,
-      date: now.toISOString().split('T')[0],
-      time: now.toLocaleTimeString(),
-      created_at: now.toISOString(),
+      date: log.date || now.toISOString().split('T')[0],
+      time: log.time || now.toLocaleTimeString(),
+      created_at: createdAt,
     });
 
     await set(newLogRef, logData);

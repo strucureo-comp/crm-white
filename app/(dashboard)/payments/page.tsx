@@ -23,10 +23,13 @@ import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataPagination } from '@/components/ui/data-pagination';
+import { useWorkspace } from '@/lib/settings/workspace-context';
+import { formatCurrency } from '@/lib/utils';
 
 export default function PaymentsPage() {
   const PAGE_SIZE = 25;
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const workspaceId = workspace?.id || '';
   const [payments, setPayments] = useState<NormalizedPayment[]>([]);
   const [entityMap, setEntityMap] = useState<Record<string, string>>({});
@@ -125,9 +128,9 @@ export default function PaymentsPage() {
       if (statusFilter !== 'All' && p.status !== statusFilter) return false;
       if (search) {
         const query = search.toLowerCase();
-        return (p.workspace_id || '').toLowerCase().includes(query) || 
-               (p.invoice_id || '').toLowerCase().includes(query) || 
-               (p.payment_id || '').toLowerCase().includes(query);
+        return (p.company_id || '').toLowerCase().includes(query) || 
+               (p.contact_id || '').toLowerCase().includes(query) || 
+               (p.invoice_id || '').toLowerCase().includes(query);
       }
       return true;
     });
@@ -138,8 +141,8 @@ export default function PaymentsPage() {
     return filteredPayments.slice(start, start + PAGE_SIZE);
   }, [filteredPayments, page]);
 
-  const formatCurrency = (val: number) => {
-    return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR' }).format(val);
+  const formatAmount = (val: number) => {
+    return formatCurrency(val, currency);
   };
 
   const handleRecordPayment = async (e: React.FormEvent) => {
@@ -149,13 +152,13 @@ export default function PaymentsPage() {
     try {
       if (!workspaceId) throw new Error("No workspace found");
       const paymentData = {
-        workspace_id: form.client,
+        company_id: form.client,
         invoice_id: form.invoiceId,
         amount: parseFloat(form.amount),
         method: form.method,
         status: form.status,
         date: new Date().toISOString(),
-        currency: 'INR',
+        currency: currency,
         payment_type: form.payment_type,
         contact_id: '',
         quote_id: '',
@@ -229,7 +232,7 @@ export default function PaymentsPage() {
               <TrendingUp className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">{formatCurrency(totalIncome)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-2">{formatAmount(totalIncome)}</p>
           <p className="text-xs text-muted-foreground mt-1">All time</p>
         </div>
         
@@ -240,7 +243,7 @@ export default function PaymentsPage() {
               <AlertCircle className="w-4 h-4 text-rose-600 dark:text-rose-400" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-rose-700 dark:text-rose-400 mt-2">{formatCurrency(totalExpense)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-rose-700 dark:text-rose-400 mt-2">{formatAmount(totalExpense)}</p>
           <p className="text-xs text-muted-foreground mt-1">Operation Bills</p>
         </div>
 
@@ -251,7 +254,7 @@ export default function PaymentsPage() {
               <Wallet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
             </div>
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{formatCurrency(netCollection)}</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-700 dark:text-blue-400 mt-2">{formatAmount(netCollection)}</p>
           <p className="text-xs text-muted-foreground mt-1">Income - Expenses</p>
         </div>
 
@@ -286,13 +289,13 @@ export default function PaymentsPage() {
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
-                    <p className="font-medium text-sm text-foreground truncate">{entityMap[txn.workspace_id] || txn.workspace_id}</p>
+                    <p className="font-medium text-sm text-foreground truncate">{entityMap[txn.company_id || txn.contact_id] || txn.company_id || txn.contact_id}</p>
                     <span className={`text-sm font-bold ${
                       txn.status === 'completed' ? 'text-emerald-600 dark:text-emerald-400' :
                       txn.status === 'failed' ? 'text-rose-600 dark:text-rose-400' :
                       'text-amber-600 dark:text-amber-400'
                     }`}>
-                      {formatCurrency(txn.amount)}
+                      {formatAmount(txn.amount)}
                     </span>
                   </div>
                   <div className="flex items-center justify-between mt-0.5 text-xs text-muted-foreground">
@@ -316,7 +319,7 @@ export default function PaymentsPage() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="flex items-center gap-1.5"><Smartphone className="w-3.5 h-3.5" /> UPI</span>
-                  <span className="font-medium">{formatCurrency(upiCollected)}</span>
+                  <span className="font-medium">{formatAmount(upiCollected)}</span>
                 </div>
                 <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                   <div className="bg-blue-500 h-full rounded-full transition-all duration-500" style={{ width: `${(upiCollected / maxCollected) * 100}%` }}></div>
@@ -325,7 +328,7 @@ export default function PaymentsPage() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="flex items-center gap-1.5"><ArrowUpRight className="w-3.5 h-3.5" /> NEFT</span>
-                  <span className="font-medium">{formatCurrency(neftCollected)}</span>
+                  <span className="font-medium">{formatAmount(neftCollected)}</span>
                 </div>
                 <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                   <div className="bg-purple-500 h-full rounded-full transition-all duration-500" style={{ width: `${(neftCollected / maxCollected) * 100}%` }}></div>
@@ -334,7 +337,7 @@ export default function PaymentsPage() {
               <div>
                 <div className="flex justify-between text-sm mb-1">
                   <span className="flex items-center gap-1.5"><Banknote className="w-3.5 h-3.5" /> Cheque</span>
-                  <span className="font-medium">{formatCurrency(chequeCollected)}</span>
+                  <span className="font-medium">{formatAmount(chequeCollected)}</span>
                 </div>
                 <div className="w-full bg-secondary h-2 rounded-full overflow-hidden">
                   <div className="bg-orange-500 h-full rounded-full transition-all duration-500" style={{ width: `${(chequeCollected / maxCollected) * 100}%` }}></div>
@@ -352,7 +355,7 @@ export default function PaymentsPage() {
                 <tbody>
                   {pendingFollowUps.map((p, i) => (
                     <tr key={i} className="border-b last:border-0 hover:bg-muted/50 transition-colors">
-                      <td className="p-3 py-2 font-medium">{entityMap[p.workspace_id] || p.workspace_id}</td>
+                      <td className="p-3 py-2 font-medium">{entityMap[p.company_id || p.contact_id] || p.company_id || p.contact_id}</td>
                       <td className="p-3 py-2 text-right">
                         <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
                           p.status === 'failed' 
@@ -435,8 +438,12 @@ export default function PaymentsPage() {
             <tbody className="divide-y divide-border">
               {paginatedPayments.map(txn => (
                 <tr key={txn.payment_id} className="hover:bg-muted/30 transition-colors">
-                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">{txn.payment_id}</td>
-                  <td className="px-4 py-3 font-medium">{entityMap[txn.workspace_id] || txn.workspace_id}</td>
+                  <td className="px-4 py-3 font-mono text-xs text-muted-foreground hidden md:table-cell">PAY-{txn.payment_id.slice(-6).toUpperCase()}</td>
+                  <td className="px-4 py-3 font-medium">
+                    {txn.company_id ? (entityMap[txn.company_id] || txn.company_id) : 
+                     txn.contact_id ? (entityMap[txn.contact_id] || txn.contact_id) : 
+                     '—'}
+                  </td>
                   <td className="px-4 py-3 font-mono text-xs text-blue-600 dark:text-blue-400 hidden lg:table-cell">{txn.invoice_id}</td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center px-2 py-1 rounded text-xs font-medium ${
@@ -445,7 +452,7 @@ export default function PaymentsPage() {
                       {(!txn.payment_type || txn.payment_type === 'income') ? 'Income' : 'Operation Bill'}
                     </span>
                   </td>
-                  <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(txn.amount)}</td>
+                  <td className="px-4 py-3 font-bold text-emerald-600 dark:text-emerald-400">{formatAmount(txn.amount)}</td>
                   <td className="px-4 py-3 text-muted-foreground whitespace-nowrap hidden sm:table-cell">{new Date(txn.date).toLocaleDateString()}</td>
                   <td className="px-4 py-3 hidden md:table-cell">
                     <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-secondary text-secondary-foreground border">
@@ -475,7 +482,7 @@ export default function PaymentsPage() {
                           <DropdownMenuItem onClick={() => {
                             setEditingPaymentId(txn.payment_id);
                             setForm({
-                              client: txn.workspace_id,
+                              client: txn.company_id || txn.contact_id || '',
                               invoiceId: txn.invoice_id,
                               amount: txn.amount.toString(),
                               method: txn.method,
@@ -651,18 +658,22 @@ export default function PaymentsPage() {
               </button>
             </div>
             <div className="p-5 space-y-4 text-sm">
+              <div className="flex items-center justify-between pb-3 border-b">
+                <span className="text-muted-foreground">ID</span>
+                <span className="font-mono text-sm">PAY-{viewingPayment.payment_id.slice(-6).toUpperCase()}</span>
+              </div>
+              <div className="flex items-center justify-between pb-3 border-b">
+                <span className="text-muted-foreground">Client / Vendor</span>
+                <span className="font-medium">
+                  {viewingPayment.company_id ? (entityMap[viewingPayment.company_id] || viewingPayment.company_id) : 
+                   viewingPayment.contact_id ? (entityMap[viewingPayment.contact_id] || viewingPayment.contact_id) : 
+                   '—'}
+                </span>
+              </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
-                  <p className="font-medium font-mono">{viewingPayment.payment_id}</p>
-                </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Date</p>
                   <p className="font-medium">{new Date(viewingPayment.date).toLocaleDateString()}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-muted-foreground mb-1">Client</p>
-                  <p className="font-medium">{viewingPayment.workspace_id}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Invoice ID</p>
@@ -670,7 +681,7 @@ export default function PaymentsPage() {
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Amount</p>
-                  <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatCurrency(viewingPayment.amount)}</p>
+                  <p className="font-bold text-emerald-600 dark:text-emerald-400">{formatAmount(viewingPayment.amount)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-muted-foreground mb-1">Method</p>

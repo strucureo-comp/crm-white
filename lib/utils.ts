@@ -7,13 +7,21 @@ export function cn(...inputs: ClassValue[]) {
 
 /**
  * Format a number as currency.
- * If symbol is not provided, defaults to USD.
+ * Uses Intl.NumberFormat for accurate locale-based currency symbols and formatting.
+ * Defaults to USD if no currency code is provided.
  */
-export function formatCurrency(value: number, symbol?: string): string {
-  if (symbol) {
-    return `${symbol}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+export function formatCurrency(value: number, currencyCode: string = 'USD'): string {
+  try {
+    return new Intl.NumberFormat('en-US', { 
+      style: 'currency', 
+      currency: currencyCode,
+      minimumFractionDigits: 2, 
+      maximumFractionDigits: 2 
+    }).format(value);
+  } catch (e) {
+    // Fallback if currency code is invalid (e.g. if someone passes a symbol like '$' instead of 'USD')
+    return `${currencyCode}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 }
 
 /**
