@@ -359,7 +359,7 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
     await logActivity({
       workspace_id: invoice.workspace_id,
       action: 'create_invoice',
-      description: `Invoice ${invoice.invoice_number} created for ${invoice.client_name}`,
+      description: `Invoice ${invoice.invoice_number} created${invoice.client_name ? ` for ${invoice.client_name}` : invoice.client_company ? ` for ${invoice.client_company}` : ''}`,
       title: 'Invoice Created',
       entity_id: newInvoiceRef.key || '',
       entity_type: 'invoice',
@@ -1104,36 +1104,50 @@ export async function convertQuotationToInvoice(quotation: Quotation): Promise<s
   try {
     const invoiceId = await createInvoice({
       project_id: quotation.project_id || '',
-      client_id: quotation.client_id,
+      client_id: quotation.client_id || '',
       workspace_id: quotation.workspace_id,
-      contact_id: quotation.client_id,
+      contact_id: quotation.client_id || '',
       deal_id: '',
       quote_id: quotation.id,
       invoice_number: `INV-${Date.now()}`,
+      client_name: quotation.client_name || '',
+      client_company: quotation.client_company || '',
+      client_email: quotation.client_email || '',
+      client_address: quotation.client_address || '',
+      client_gstin: quotation.client_gstin || '',
       items: (quotation.items || []).map((item, idx) => ({
-        item_id: `item-${idx}`,
-        description: item.description,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total: item.total,
+        item_id: item.item_id || `item-${idx}`,
+        name: item.name || '',
+        description: item.description || '',
+        quantity: item.quantity || 1,
+        unit_price: item.unit_price || 0,
+        total: item.total || 0,
         tax_rate: 0,
       })),
-      subtotal: quotation.amount,
-      discount: 0,
+      subtotal: quotation.subtotal ?? quotation.amount,
+      discount: quotation.discount_amount || 0,
+      discount_percent: quotation.discount_percent || 0,
+      discount_amount: quotation.discount_amount || 0,
       discount_type: 'percentage',
-      tax: 0,
-      tax_rate: 0,
+      cgst_percent: quotation.cgst_percent || 0,
+      sgst_percent: quotation.sgst_percent || 0,
+      igst_percent: quotation.igst_percent || 0,
+      tax: quotation.tax_amount || 0,
+      tax_amount: quotation.tax_amount || 0,
+      tax_rate: (quotation.cgst_percent || 0) + (quotation.sgst_percent || 0) + (quotation.igst_percent || 0),
       total: quotation.amount,
       amount: quotation.amount,
-      currency: 'USD',
+      currency: quotation.currency || 'INR',
       status: 'pending',
       issue_date: new Date().toISOString(),
       due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
       paid_date: '',
       amount_paid: 0,
       amount_due: quotation.amount,
-      notes: '',
-      terms_and_conditions: '',
+      notes: quotation.notes || '',
+      terms: quotation.terms || '',
+      terms_and_conditions: quotation.terms || '',
+      internal_notes: quotation.internal_notes || '',
       description: quotation.description || `Invoice for ${quotation.quotation_number}`,
     });
 
@@ -1314,20 +1328,53 @@ export async function updateEnquiry(id: string, updates: Partial<Enquiry>): Prom
 export async function getTasks(workspaceId?: string): Promise<TaskItem[]> {
   try {
     if (workspaceId) {
-      const refPath = wsRef(workspaceId, 'tasks');
-      const snapshot = await get(refPath);
-
-      if (!snapshot.exists()) return [];
-
-      const tasks: TaskItem[] = [];
-      const data = snapshot.val();
-      for (const [key, val] of Object.entries(data)) {
-        if (val && typeof val === 'object') {
-          tasks.push({ id: key, ...val } as TaskItem);
+      const tasksMap = new Map<string, TaskItem>();
+      
+      // 1. Fetch from company_tasks
+      const companyTasksRef = ref(database, `company_tasks/${workspaceId}`);
+      const companyTasksSnap = await get(companyTasksRef);
+      if (companyTasksSnap.exists()) {
+        const cData = companyTasksSnap.val();
+        for (const [key, val] of Object.entries(cData)) {
+          if (val && typeof val === 'object') {
+            const t = val as any;
+            tasksMap.set(key, {
+              id: key,
+              workspace_id: workspaceId,
+              title: t.title || t.name || 'Untitled Task',
+              description: t.description || '',
+              status: (t.status || 'To Do').toLowerCase(),
+              priority: (t.priority || 'medium').toLowerCase() as any,
+              due_date: t.dueDate || t.due_date || '',
+              dueDate: t.dueDate || t.due_date || '',
+              assignee_id: t.assignee?.id || (t.assignees && t.assignees[0]?.id) || '',
+              assignee_name: t.assignee?.name || (t.assignees && t.assignees[0]?.name) || '',
+              created_at: t.created_at || new Date().toISOString(),
+              updated_at: t.updated_at || new Date().toISOString(),
+            } as TaskItem);
+          }
         }
       }
 
-      return tasks.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      // 2. Fetch from workspaces/tasks
+      const refPath = wsRef(workspaceId, 'tasks');
+      const snapshot = await get(refPath);
+      if (snapshot.exists()) {
+        const data = snapshot.val();
+        for (const [key, val] of Object.entries(data)) {
+          if (val && typeof val === 'object' && !tasksMap.has(key)) {
+            const t = val as any;
+            tasksMap.set(key, {
+              id: key,
+              ...t,
+              dueDate: t.dueDate || t.due_date || '',
+              due_date: t.due_date || t.dueDate || '',
+            } as TaskItem);
+          }
+        }
+      }
+
+      return Array.from(tasksMap.values()).sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
     }
 
     const workspacesSnap = await get(ref(database, 'workspaces'));

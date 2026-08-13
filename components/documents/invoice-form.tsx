@@ -39,18 +39,20 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
   const [meta, setMeta] = useState<DocumentMeta>({
     document_number: existingInvoice?.invoice_number || `INV-${Date.now().toString().slice(-6)}`,
     status: existingInvoice?.status || 'draft',
-    issue_date: existingInvoice?.created_at
+    issue_date: existingInvoice?.issue_date
+      ? new Date(existingInvoice.issue_date).toISOString().split('T')[0]
+      : existingInvoice?.created_at
       ? new Date(existingInvoice.created_at).toISOString().split('T')[0]
       : new Date().toISOString().split('T')[0],
     due_date: existingInvoice?.due_date || '',
-    currency: settings.general.default_currency || 'INR',
+    currency: existingInvoice?.currency || settings.general.default_currency || 'INR',
   });
 
   const [client, setClient] = useState<DocumentClient>({
     company: existingInvoice?.client_company || '',
     contact_person: existingInvoice?.client_name || '',
     email: existingInvoice?.client_email || '',
-    phone: '',
+    phone: (existingInvoice as any)?.client_phone || (existingInvoice as any)?.phone || '',
     address: existingInvoice?.client_address || '',
     gstin: existingInvoice?.client_gstin || '',
   });
@@ -146,6 +148,8 @@ export function InvoiceForm({ existingInvoice }: InvoiceFormProps) {
           client_company: client.company,
           client_address: client.address,
           client_gstin: client.gstin,
+          client_phone: client.phone,
+          currency: meta.currency || 'INR',
           amount: pricing.grand_total,
           subtotal: pricing.subtotal,
           discount_percent: pricing.discount_percent,

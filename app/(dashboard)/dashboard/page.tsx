@@ -111,8 +111,17 @@ export default function DashboardPage() {
   const recentLeads = leads.slice(0, 5);
 
   const urgentTasks = tasks
-    .filter((t) => t.due_date && t.status !== 'done')
-    .sort((a, b) => new Date(a.due_date!).getTime() - new Date(b.due_date!).getTime())
+    .filter((t) => {
+      const status = (t.status || '').toLowerCase();
+      const isNotDone = status !== 'done' && status !== 'completed';
+      const hasDueDate = Boolean(t.due_date || (t as any).dueDate);
+      return hasDueDate && isNotDone;
+    })
+    .sort((a, b) => {
+      const dateA = new Date(a.due_date || (a as any).dueDate || '').getTime() || 0;
+      const dateB = new Date(b.due_date || (b as any).dueDate || '').getTime() || 0;
+      return dateA - dateB;
+    })
     .slice(0, 5);
 
   if (loading) {
@@ -268,38 +277,48 @@ export default function DashboardPage() {
           <CardContent>
             {activityLogs.length > 0 ? (
               <div className="space-y-4">
-                {activityLogs.slice(0, 8).map((log) => {
-                  const getLink = (type: string) => {
-                    switch (type) {
-                      case 'lead': return '/leads';
-                      case 'deal': return '/pipeline';
-                      case 'project': return '/projects';
-                      case 'invoice': return '/invoices';
-                      case 'contact': return '/contacts';
-                      case 'quote': return '/quotes';
-                      case 'task': return '/tasks';
-                      case 'activity': return '/activity';
-                      default: return '#';
-                    }
-                  };
-                  const linkHref = getLink(log.entity_type);
-                  return (
-                  <div key={log.id} className="pb-3 border-b last:border-0 last:pb-0">
-                    <Link href={linkHref} className="flex items-start gap-3 hover:opacity-80 transition-opacity">
-                      <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm">{log.description}</p>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="text-xs text-muted-foreground">{log.user_name}</span>
-                          <span className="text-xs text-muted-foreground">·</span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(log.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
+                {activityLogs
+                  .filter((log) => log.description && !log.description.includes('undefined'))
+                  .slice(0, 8)
+                  .map((log) => {
+                    const getLink = (type?: string) => {
+                      switch ((type || '').toLowerCase()) {
+                        case 'lead': return '/leads';
+                        case 'deal':
+                        case 'pipeline': return '/pipeline';
+                        case 'project': return '/projects';
+                        case 'invoice': return '/invoices';
+                        case 'contact': return '/contacts';
+                        case 'quote':
+                        case 'quotation': return '/quotes';
+                        case 'task': return '/tasks';
+                        case 'meeting':
+                        case 'call':
+                        case 'deadline':
+                        case 'followup':
+                        case 'activity': return '/activity';
+                        default: return '/activity';
+                      }
+                    };
+                    const linkHref = getLink(log.entity_type);
+                    return (
+                      <div key={log.id} className="pb-3 border-b last:border-0 last:pb-0">
+                        <Link href={linkHref} className="flex items-start gap-3 hover:opacity-80 transition-opacity">
+                          <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm">{log.description}</p>
+                            <div className="flex items-center gap-2 mt-0.5">
+                              <span className="text-xs text-muted-foreground">{log.user_name}</span>
+                              <span className="text-xs text-muted-foreground">·</span>
+                              <span className="text-xs text-muted-foreground">
+                                {new Date(log.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                          </div>
+                        </Link>
                       </div>
-                    </Link>
-                  </div>
-                )})}
+                    );
+                  })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-8">No recent activity</p>
@@ -316,9 +335,15 @@ export default function DashboardPage() {
           {urgentTasks.length > 0 ? (
             <div className="space-y-3">
               {urgentTasks.map((task) => {
-                const dueDate = task.due_date ? new Date(task.due_date) : null;
+                const dueDateStr = task.due_date || (task as any).dueDate;
+                const dueDate = dueDateStr ? new Date(dueDateStr) : null;
                 const isOverdue = dueDate && dueDate < new Date();
-                const priority = task.priority || (isOverdue ? 'high' : 'medium');
+                const rawPriority = (task.priority || '').toLowerCase();
+                const priority = ['high', 'urgent'].includes(rawPriority)
+                  ? 'high'
+                  : rawPriority === 'low'
+                  ? 'low'
+                  : 'medium';
                 return (
                   <div key={task.id} className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors cursor-pointer" onClick={() => router.push('/tasks')}>
                     <div className="flex items-center gap-3">
@@ -326,7 +351,7 @@ export default function DashboardPage() {
                       <span className="text-sm">{task.title}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${priorityColors[priority]}`}>
+                      <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${priorityColors[priority] || priorityColors.medium}`}>
                         {priority.charAt(0).toUpperCase() + priority.slice(1)}
                       </Badge>
                       <span className="text-xs text-muted-foreground">{dueDate?.toLocaleDateString() || '—'}</span>

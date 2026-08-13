@@ -98,7 +98,7 @@ export default function QuotesPage() {
       const invoiceId = await convertQuotationToInvoice(q);
       if (invoiceId) {
         toast.success('Quote converted to invoice successfully', { id: toastId });
-        load();
+        router.push(`/invoices/${invoiceId}`);
       } else {
         toast.error('Failed to convert quote to invoice', { id: toastId });
       }

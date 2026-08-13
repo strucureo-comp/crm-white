@@ -33,7 +33,9 @@ export interface Task {
   id: string;
   title: string;
   projectId: string;
-  owner: string; // Member ID
+  owner?: string; // Legacy single Member ID fallback
+  assigneeIds?: string[]; // Multiple Member IDs
+  owners?: string[];
   status: TaskStatus;
   priority: TaskPriority;
   due: string;

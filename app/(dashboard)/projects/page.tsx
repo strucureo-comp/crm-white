@@ -5,7 +5,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import {
   Search, Plus, X, UploadCloud, FileText, Mail, FileIcon, MessageSquare,
   CheckCircle2, AlertCircle, Cloud, MoreHorizontal, Calendar, FolderOpen,
-  Check
+  Check, Pencil, Trash2, ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,8 +16,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import {
@@ -61,6 +62,18 @@ export default function ProjectsPage() {
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedProject, setSelectedProject] = useState<Project | null>(null);
 
+  // Edit Project Modal State
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editColor, setEditColor] = useState('#6366f1');
+  const [editBudget, setEditBudget] = useState('10000');
+  const [editEndDate, setEditEndDate] = useState('');
+  const [editMembers, setEditMembers] = useState<string[]>([]);
+
+  // Delete Confirmation State
+  const [deleteConfirmState, setDeleteConfirmState] = useState<{ open: boolean; project?: Project | null }>({ open: false });
+
   useEffect(() => {
     if (!workspace?.id) return;
     const unsubscribe = subscribeToProjectsData(workspace?.id, (data: ProjectsData) => {
@@ -86,10 +99,10 @@ export default function ProjectsPage() {
   const [formMembers, setFormMembers] = useState<string[]>([]);
   const [newMemberName, setNewMemberName] = useState('');
 
-  // Inline Task Form State
+  // Inline Task Form State (Multi-Assignee Support)
   const [addingTaskPhase, setAddingTaskPhase] = useState<ProjectStatus | null>(null);
   const [taskFormTitle, setTaskFormTitle] = useState('');
-  const [taskFormOwner, setTaskFormOwner] = useState('');
+  const [taskFormOwners, setTaskFormOwners] = useState<string[]>([]);
   const [taskFormDue, setTaskFormDue] = useState('');
   const [taskFormPriority, setTaskFormPriority] = useState<TaskPriority>('Normal');
 
@@ -143,6 +156,54 @@ export default function ProjectsPage() {
     }
   };
 
+  const handleOpenEditProject = (project: Project, e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    setEditingProject(project);
+    setEditName(project.name);
+    setEditColor(project.color || '#6366f1');
+    setEditBudget(String(project.budget?.est || 10000));
+    setEditEndDate(project.endDate || '');
+    setEditMembers(project.members || []);
+    setIsEditOpen(true);
+  };
+
+  const handleSaveEditedProject = async () => {
+    if (!workspace?.id || !editingProject) return;
+    if (!editName.trim()) return toast.error('Project name is required');
+
+    try {
+      await updateProject(workspace.id, editingProject.id, {
+        name: editName,
+        color: editColor,
+        budget: { ...editingProject.budget, est: Number(editBudget) || 0 },
+        endDate: editEndDate,
+        members: editMembers,
+      });
+      setIsEditOpen(false);
+      toast.success('Project updated successfully');
+    } catch (e) {
+      toast.error('Failed to update project');
+    }
+  };
+
+  const handleConfirmDeleteProject = async () => {
+    if (!workspace?.id || !deleteConfirmState.project) return;
+    try {
+      await deleteProject(workspace.id, deleteConfirmState.project.id);
+      if (selectedProject?.id === deleteConfirmState.project.id) {
+        setSelectedProject(null);
+      }
+      toast.success('Project deleted successfully');
+    } catch (e) {
+      toast.error('Failed to delete project');
+    } finally {
+      setDeleteConfirmState({ open: false, project: null });
+    }
+  };
+
   const handleAddNewMember = async (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -166,12 +227,14 @@ export default function ProjectsPage() {
   const handleCreateTask = async (phase: ProjectStatus) => {
     if (!workspace?.id) return;
     if (!taskFormTitle.trim()) return toast.error('Task title is required');
-    if (!taskFormOwner) return toast.error('Assignee is required');
+    if (taskFormOwners.length === 0) return toast.error('At least one assignee is required');
 
     const newTask = {
       title: taskFormTitle,
       projectId: selectedProject!.id,
-      owner: taskFormOwner,
+      owner: taskFormOwners[0] || '',
+      assigneeIds: taskFormOwners,
+      owners: taskFormOwners,
       status: 'To Do' as TaskStatus,
       priority: taskFormPriority,
       due: taskFormDue || 'No due date',
@@ -182,7 +245,7 @@ export default function ProjectsPage() {
       await createTask(workspace?.id, newTask);
       setAddingTaskPhase(null);
       setTaskFormTitle('');
-      setTaskFormOwner('');
+      setTaskFormOwners([]);
       setTaskFormDue('');
       setTaskFormPriority('Normal');
       toast.success('Task created successfully');
@@ -205,6 +268,12 @@ export default function ProjectsPage() {
     e.preventDefault();
     e.stopPropagation();
     setFormMembers(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
+  };
+
+  const toggleEditMember = (id: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setEditMembers(prev => prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]);
   };
 
   if (!isMounted) return null;
@@ -273,11 +342,39 @@ export default function ProjectsPage() {
                               >
                                 <CardContent className="p-4 space-y-4">
                                   <div className="flex items-start justify-between gap-2">
-                                    <div className="flex gap-2.5">
+                                    <div className="flex gap-2.5 items-center min-w-0">
                                       <span className="text-2xl leading-none">{project.emoji}</span>
                                       <h4 className="font-medium text-sm leading-tight text-foreground line-clamp-2">{project.name}</h4>
                                     </div>
-                                    <CircularProgress progress={project.progress} color={project.color} />
+                                    <div className="flex items-center gap-1 shrink-0">
+                                      <CircularProgress progress={project.progress} color={project.color} />
+                                      <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                          <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-muted-foreground hover:text-foreground opacity-70 group-hover:opacity-100 transition-opacity"
+                                            onClick={(e) => { e.stopPropagation(); }}
+                                          >
+                                            <MoreHorizontal className="w-4 h-4" />
+                                          </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                          <DropdownMenuItem onClick={(e) => handleOpenEditProject(project, e)}>
+                                            <Pencil className="w-3.5 h-3.5 mr-2" /> Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem
+                                            className="text-destructive focus:text-destructive"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setDeleteConfirmState({ open: true, project });
+                                            }}
+                                          >
+                                            <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete
+                                          </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                      </DropdownMenu>
+                                    </div>
                                   </div>
 
                                   <div className="flex items-center justify-between text-xs text-muted-foreground pt-1 border-t border-border/50">
@@ -361,9 +458,15 @@ export default function ProjectsPage() {
                       </div>
                     ))}
                   </div>
-                  <div className="p-2 border-t bg-muted/30 flex items-center gap-2" onClick={e => e.stopPropagation()}>
-                    <Input placeholder="Add new member name..." value={newMemberName} onChange={e => setNewMemberName(e.target.value)} className="h-8 text-xs" />
-                    <Button size="sm" onClick={handleAddNewMember} className="h-8">Add</Button>
+                  <div className="p-2 border-t flex gap-2">
+                    <Input
+                      placeholder="New member name..."
+                      value={newMemberName}
+                      onChange={e => setNewMemberName(e.target.value)}
+                      className="h-8 text-xs"
+                      onClick={e => e.stopPropagation()}
+                    />
+                    <Button size="sm" onClick={handleAddNewMember} className="h-8 text-xs">Add</Button>
                   </div>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -376,7 +479,82 @@ export default function ProjectsPage() {
         </DialogContent>
       </Dialog>
 
-      {/* 5. Project Detail Overlay (Full-Screen Modal) */}
+      {/* 5. Edit Project Modal */}
+      <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
+        <DialogContent className="sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>Edit Project</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-5 py-4">
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Project Name</Label>
+              <Input placeholder="E.g. Q4 Website Redesign" value={editName} onChange={e => setEditName(e.target.value)} />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Color Theme</Label>
+                <div className="flex items-center gap-3">
+                  <Input type="color" value={editColor} onChange={e => setEditColor(e.target.value)} className="w-12 h-10 p-1 cursor-pointer" />
+                  <span className="text-sm font-mono text-muted-foreground uppercase">{editColor}</span>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Est Budget ($)</Label>
+                <Input type="number" value={editBudget} onChange={e => setEditBudget(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Due Date</Label>
+              <Input type="date" value={editEndDate} onChange={e => setEditEndDate(e.target.value)} />
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Assign Members</Label>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" className="w-full justify-start text-muted-foreground font-normal">
+                    {editMembers.length > 0 ? `${editMembers.length} member(s) selected` : 'Select members...'}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="start" className="w-[450px] p-0" onClick={e => e.stopPropagation()}>
+                  <div className="max-h-[200px] overflow-y-auto p-1">
+                    {members.map(m => (
+                      <div
+                        key={m.id}
+                        onClick={(e) => toggleEditMember(m.id, e)}
+                        className="flex items-center justify-between px-3 py-2 hover:bg-muted rounded-md cursor-pointer transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px] bg-muted-foreground/10">{m.avatar}</AvatarFallback></Avatar>
+                          <span className="text-sm">{m.name}</span>
+                        </div>
+                        {editMembers.includes(m.id) && <Check className="w-4 h-4 text-primary" />}
+                      </div>
+                    ))}
+                  </div>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button onClick={handleSaveEditedProject}>Save Changes</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 6. Delete Confirmation Dialog */}
+      <ConfirmDialog
+        open={deleteConfirmState.open}
+        onOpenChange={(open) => setDeleteConfirmState({ open, project: open ? deleteConfirmState.project : null })}
+        title="Delete Project"
+        description="Are you sure you want to delete this project? This action cannot be undone."
+        onConfirm={handleConfirmDeleteProject}
+      />
+
+      {/* 7. Detailed Project Overlay Modal */}
       <Dialog open={!!selectedProject} onOpenChange={(open) => { if (!open) setSelectedProject(null); }}>
         <DialogContent className="max-w-[90vw] h-[90vh] p-0 overflow-hidden flex">
           {selectedProject && (
@@ -394,7 +572,16 @@ export default function ProjectsPage() {
                   </Button>
                 </div>
 
-                <div className="p-6 space-y-8 overflow-y-auto">
+                <div className="p-6 space-y-8 overflow-y-auto flex-1">
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={(e) => handleOpenEditProject(selectedProject, e)}>
+                      <Pencil className="w-3.5 h-3.5 mr-1.5" /> Edit
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 text-xs text-destructive hover:bg-destructive/10" onClick={() => setDeleteConfirmState({ open: true, project: selectedProject })}>
+                      <Trash2 className="w-3.5 h-3.5 mr-1.5" /> Delete
+                    </Button>
+                  </div>
+
                   <div className="space-y-3">
                     <div className="flex items-center justify-between text-sm font-medium">
                       <span>Progress</span>
@@ -415,10 +602,6 @@ export default function ProjectsPage() {
                       <span className="text-muted-foreground">Due Date</span>
                       <span className="font-semibold">{selectedProject.endDate || 'Not set'}</span>
                     </div>
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="text-muted-foreground">Time Tracked</span>
-                      <span className="font-semibold">0h 0m</span>
-                    </div>
                   </div>
 
                   <div className="space-y-3">
@@ -435,15 +618,6 @@ export default function ProjectsPage() {
                         );
                       })}
                     </div>
-                  </div>
-
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-medium text-muted-foreground border-b pb-2">Linked Entities</h4>
-                    {selectedProject.linkedDeal ? (
-                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{selectedProject.linkedDeal}</Badge>
-                    ) : (
-                      <p className="text-sm text-muted-foreground italic">No links attached</p>
-                    )}
                   </div>
                 </div>
               </div>
@@ -480,7 +654,12 @@ export default function ProjectsPage() {
                               <table className="w-full text-sm text-left">
                                 <tbody className="divide-y divide-border">
                                   {phaseTasks.map(task => {
-                                    const owner = members.find(m => m.id === task.owner);
+                                    const taskAssigneeIds = task.assigneeIds && task.assigneeIds.length > 0
+                                      ? task.assigneeIds
+                                      : task.owner
+                                      ? [task.owner]
+                                      : [];
+                                    const taskAssignees = taskAssigneeIds.map(id => members.find(m => m.id === id)).filter(Boolean) as Member[];
                                     return (
                                       <tr key={task.id} className="hover:bg-muted/30 transition-colors">
                                         <td className="w-12 px-4 py-3 text-center">
@@ -489,12 +668,22 @@ export default function ProjectsPage() {
                                         <td className={`px-4 py-3 font-medium ${task.status === 'Done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
                                           {task.title}
                                         </td>
-                                        <td className="px-4 py-3 w-40">
-                                          {owner && (
+                                        <td className="px-4 py-3 w-48">
+                                          {taskAssignees.length > 0 ? (
                                             <div className="flex items-center gap-2">
-                                              <Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-muted-foreground/10">{owner.avatar}</AvatarFallback></Avatar>
-                                              <span className="text-xs text-muted-foreground">{owner.name}</span>
+                                              <div className="flex -space-x-1.5 overflow-hidden">
+                                                {taskAssignees.slice(0, 3).map((a, i) => (
+                                                  <Avatar key={a.id || i} className="h-5 w-5 border border-background shadow-xs" title={a.name}>
+                                                    <AvatarFallback className="text-[7px] bg-muted-foreground/10">{a.avatar}</AvatarFallback>
+                                                  </Avatar>
+                                                ))}
+                                              </div>
+                                              <span className="text-xs text-muted-foreground truncate max-w-[120px]">
+                                                {taskAssignees.map(a => a.name).join(', ')}
+                                              </span>
                                             </div>
+                                          ) : (
+                                            <span className="text-xs text-muted-foreground">—</span>
                                           )}
                                         </td>
                                         <td className="px-4 py-3 w-32 text-xs text-muted-foreground">{task.due}</td>
@@ -512,15 +701,44 @@ export default function ProjectsPage() {
                                 {addingTaskPhase === phase ? (
                                   <div className="flex items-center gap-2 bg-background p-2 rounded border flex-wrap sm:flex-nowrap">
                                     <Input placeholder="Task subject" value={taskFormTitle} onChange={e => setTaskFormTitle(e.target.value)} className="h-8 text-xs flex-1 min-w-[150px]" autoFocus />
-                                    <Select value={taskFormOwner} onValueChange={setTaskFormOwner}>
-                                      <SelectTrigger className="h-8 text-xs w-[120px]"><SelectValue placeholder="Assignee" /></SelectTrigger>
-                                      <SelectContent>
+                                    <DropdownMenu>
+                                      <DropdownMenuTrigger asChild>
+                                        <Button variant="outline" size="sm" className="h-8 text-xs min-w-[130px] justify-between">
+                                          <span className="truncate">
+                                            {taskFormOwners.length === 0
+                                              ? 'Assignees'
+                                              : taskFormOwners.length === 1
+                                              ? members.find(m => m.id === taskFormOwners[0])?.name || '1 assigned'
+                                              : `${taskFormOwners.length} assignees`}
+                                          </span>
+                                          <ChevronDown className="w-3 h-3 ml-1 opacity-50 shrink-0" />
+                                        </Button>
+                                      </DropdownMenuTrigger>
+                                      <DropdownMenuContent className="w-56 p-2 space-y-1" align="start">
                                         {selectedProject.members.map(mid => {
-                                          const m = members.find(m => m.id === mid);
-                                          return m ? <SelectItem key={m.id} value={m.id}>{m.name}</SelectItem> : null;
+                                          const m = members.find(mem => mem.id === mid);
+                                          if (!m) return null;
+                                          const isSelected = taskFormOwners.includes(m.id);
+                                          return (
+                                            <div
+                                              key={m.id}
+                                              className="flex items-center justify-between p-1.5 rounded hover:bg-muted/50 cursor-pointer text-xs"
+                                              onClick={() => {
+                                                setTaskFormOwners(prev =>
+                                                  prev.includes(m.id) ? prev.filter(id => id !== m.id) : [...prev, m.id]
+                                                );
+                                              }}
+                                            >
+                                              <div className="flex items-center gap-2">
+                                                <Avatar className="h-5 w-5"><AvatarFallback className="text-[8px] bg-muted-foreground/10">{m.avatar}</AvatarFallback></Avatar>
+                                                <span>{m.name}</span>
+                                              </div>
+                                              {isSelected && <Check className="w-3.5 h-3.5 text-primary" />}
+                                            </div>
+                                          );
                                         })}
-                                      </SelectContent>
-                                    </Select>
+                                      </DropdownMenuContent>
+                                    </DropdownMenu>
                                     <Input type="date" value={taskFormDue} onChange={e => setTaskFormDue(e.target.value)} className="h-8 text-xs w-[130px]" />
                                     <Select value={taskFormPriority} onValueChange={(v: TaskPriority) => setTaskFormPriority(v)}>
                                       <SelectTrigger className="h-8 text-xs w-[100px]"><SelectValue placeholder="Priority" /></SelectTrigger>
@@ -549,27 +767,25 @@ export default function ProjectsPage() {
                   {/* FILES TAB */}
                   {activeTab === 'Files' && (
                     <div className="space-y-6 h-full flex flex-col">
-                      <div className="flex items-center justify-between border-b pb-4 shrink-0">
-                        <div className="flex gap-2">
-                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All</Badge>
-                          <Badge variant="outline" className="cursor-pointer">Deal files</Badge>
-                          <Badge variant="outline" className="cursor-pointer">Project files</Badge>
+                      <div className="border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 bg-muted/5 hover:bg-muted/10 transition-colors cursor-pointer shrink-0">
+                        <div className="w-12 h-12 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                          <UploadCloud className="w-6 h-6" />
                         </div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                          Expand all items <Switch />
+                        <div className="text-center">
+                          <p className="text-sm font-medium">Click to upload or drag & drop files</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">PDF, DOCX, PNG, JPG up to 50MB</p>
                         </div>
                       </div>
-                      <div className="border-2 border-dashed border-emerald-500/30 rounded-xl bg-emerald-500/5 p-8 flex flex-col items-center justify-center text-center shrink-0">
-                        <UploadCloud className="w-10 h-10 text-emerald-600 mb-3" />
-                        <p className="font-medium mb-4">Drag and drop files here</p>
-                        <div className="flex gap-3">
-                          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">Upload files</Button>
-                          <Button variant="outline" className="bg-background">Connect to Google Drive</Button>
+                      <div className="flex items-center justify-between border-b pb-4 shrink-0">
+                        <div className="flex gap-2">
+                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All Files</Badge>
+                          <Badge variant="outline" className="cursor-pointer">Images</Badge>
+                          <Badge variant="outline" className="cursor-pointer">Documents</Badge>
                         </div>
                       </div>
                       <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                        <FileIcon className="w-16 h-16 mb-4" />
-                        <p className="font-medium">No files added yet</p>
+                        <FolderOpen className="w-16 h-16 mb-4" />
+                        <p className="font-medium">No files uploaded yet</p>
                       </div>
                     </div>
                   )}
@@ -577,25 +793,14 @@ export default function ProjectsPage() {
                   {/* NOTES TAB */}
                   {activeTab === 'Notes' && (
                     <div className="space-y-6 h-full flex flex-col">
-                      <div className="bg-card border rounded-lg p-4 shrink-0 space-y-4">
-                        <div className="flex items-center justify-between">
-                          <div className="flex items-center gap-2">
-                            <Avatar className="h-6 w-6"><AvatarFallback className="text-[10px] bg-muted-foreground/10">ME</AvatarFallback></Avatar>
-                            <span className="text-sm font-medium">Current User</span>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 font-medium">✅ Complete</Button>
-                            <Button variant="ghost" size="sm" className="h-7 text-xs text-muted-foreground hover:text-foreground font-medium">✖ Cancel</Button>
-                            <Button variant="ghost" size="icon" className="h-7 w-7"><MoreHorizontal className="w-4 h-4" /></Button>
-                          </div>
-                        </div>
-                        <textarea className="w-full bg-transparent border-0 focus:ring-0 resize-none h-16 text-sm placeholder:text-muted-foreground/60 p-0" placeholder="Take a note, @name..."></textarea>
+                      <div className="bg-background border rounded-md p-3 text-sm text-muted-foreground cursor-text hover:border-primary/50 transition-colors shrink-0">
+                        Click here to add a note...
                       </div>
                       <div className="flex items-center justify-between border-b pb-4 shrink-0">
                         <div className="flex gap-2">
-                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All</Badge>
-                          <Badge variant="outline" className="cursor-pointer">Deal notes</Badge>
-                          <Badge variant="outline" className="cursor-pointer">Project notes</Badge>
+                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All Notes</Badge>
+                          <Badge variant="outline" className="cursor-pointer">Client Notes</Badge>
+                          <Badge variant="outline" className="cursor-pointer">Internal</Badge>
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
                           Expand all items <Switch />

@@ -413,7 +413,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setFirebaseUser(null);
       setWorkspace(null);
       setWorkspaceRole(null);
-      window.location.href = '/auth/login';
+      window.location.href = '/login';
     }
   };
 

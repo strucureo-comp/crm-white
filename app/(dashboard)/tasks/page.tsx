@@ -5,7 +5,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import { 
   Search, Plus, LayoutGrid, LayoutList, Kanban, Table as TableIcon, Calendar as CalendarIcon,
   CheckCircle2, AlertCircle, X, ChevronDown, MoreHorizontal, MessageSquare, Paperclip,
-  Trash2, Filter, Settings, Flag, Check
+  Trash2, Filter, Settings, Flag, Check, Pencil
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,10 +14,11 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
+import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { 
   Task, Assignee, SubTask, Comment, DealReference, Attachment, 
@@ -77,6 +78,7 @@ export default function TaskManagerPage() {
   // Modals
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
+  const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
   // Sync viewingTask with live updates
   useEffect(() => {
@@ -568,8 +570,33 @@ export default function TaskManagerPage() {
                                   >
                                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${pColor} opacity-80 group-hover:opacity-100 transition-opacity`} />
                                     <CardContent className="p-4 pl-5 space-y-3 relative">
-                                      <div className="flex gap-1 flex-wrap">
-                                        {task.labels?.map(l => <Badge key={l} variant="outline" className="text-[9px] px-2 py-0 border-primary/20 text-primary bg-primary/5">{l}</Badge>)}
+                                      <div className="flex items-start justify-between gap-2">
+                                        <div className="flex gap-1 flex-wrap items-center">
+                                          {task.labels?.map(l => <Badge key={l} variant="outline" className="text-[9px] px-2 py-0 border-primary/20 text-primary bg-primary/5">{l}</Badge>)}
+                                        </div>
+                                        <DropdownMenu>
+                                          <DropdownMenuTrigger asChild>
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              className="h-6 w-6 -mr-1 -mt-1 text-muted-foreground hover:text-foreground opacity-60 group-hover:opacity-100 transition-opacity"
+                                              onClick={(e) => e.stopPropagation()}
+                                            >
+                                              <MoreHorizontal className="w-4 h-4" />
+                                            </Button>
+                                          </DropdownMenuTrigger>
+                                          <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
+                                            <DropdownMenuItem onClick={() => setViewingTask(task)}>
+                                              <Pencil className="w-3.5 h-3.5 mr-2" /> Edit Task
+                                            </DropdownMenuItem>
+                                            <DropdownMenuItem
+                                              className="text-destructive focus:text-destructive"
+                                              onClick={() => setTaskToDelete(task)}
+                                            >
+                                              <Trash2 className="w-3.5 h-3.5 mr-2" /> Delete Task
+                                            </DropdownMenuItem>
+                                          </DropdownMenuContent>
+                                        </DropdownMenu>
                                       </div>
                                       <h4 className="font-bold text-[15px] leading-snug text-foreground group-hover:text-primary transition-colors">{task.title}</h4>
                                       {task.description && (
@@ -1244,6 +1271,29 @@ export default function TaskManagerPage() {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Delete Task Confirmation Dialog */}
+      <ConfirmDialog
+        open={!!taskToDelete}
+        onOpenChange={(open) => { if (!open) setTaskToDelete(null); }}
+        title="Delete Task"
+        description="Are you sure you want to delete this task? This action cannot be undone."
+        onConfirm={async () => {
+          if (taskToDelete && workspace?.id) {
+            try {
+              await deleteTask(workspace.id, taskToDelete.id);
+              if (viewingTask?.id === taskToDelete.id) {
+                setViewingTask(null);
+              }
+              toast.success('Task deleted successfully');
+            } catch (e) {
+              toast.error('Failed to delete task');
+            } finally {
+              setTaskToDelete(null);
+            }
+          }
+        }}
+      />
     </div>
   );
 }
