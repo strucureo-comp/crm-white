@@ -26,6 +26,7 @@ import {
 } from '@/lib/firebase/database';
 import { getCampaigns, Campaign } from '@/lib/db/campaigns/api';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import type { Lead, Invoice, Project, User, ActivityLog, ContentItem } from '@/lib/db/types';
 import { formatCurrency } from '@/lib/utils';
 
@@ -46,6 +47,7 @@ const stageColors: Record<string, string> = {
 export default function OverviewPage() {
   const router = useRouter();
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [invoices, setInvoices] = useState<Invoice[]>([]);
@@ -114,6 +116,7 @@ export default function OverviewPage() {
 
   const funnelStages = [
     { name: 'Lead', count: leads.filter((l) => l.status === 'new').length, value: leads.filter((l) => l.status === 'new').reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Contacted', count: leads.filter((l) => l.status === 'contacted').length, value: leads.filter((l) => l.status === 'contacted').reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Qualified', count: leads.filter((l) => l.status === 'qualified').length, value: leads.filter((l) => l.status === 'qualified').reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Proposal', count: leads.filter((l) => l.status === "proposal").length, value: leads.filter((l) => l.status === "proposal").reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length, value: leads.filter((l) => l.status === 'negotiation').reduce((s, l) => s + (l.estimated_value || 0), 0) },
@@ -159,7 +162,7 @@ export default function OverviewPage() {
         />
         <KpiCard
           title="Pipeline Value"
-          value={formatCurrency(pipelineValue)}
+          value={formatCurrency(pipelineValue, currency)}
           change={`${activeDeals} deals`}
           trend={pipelineValue > 0 ? 'up' : 'neutral'}
           icon={DollarSign}
@@ -206,7 +209,7 @@ export default function OverviewPage() {
                     <span className="text-sm">{stage.count} companies</span>
                   </div>
                   <div className="w-24 text-right shrink-0">
-                    <span className="text-sm font-medium">{formatCurrency(stage.value)}</span>
+                    <span className="text-sm font-medium">{formatCurrency(stage.value, currency)}</span>
                   </div>
                 </div>
               ))}
@@ -231,7 +234,7 @@ export default function OverviewPage() {
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${stageColors[deal.status] || ''}`}>
                         {deal.status.charAt(0).toUpperCase() + deal.status.slice(1)}
                       </Badge>
-                      <span className="text-sm font-medium">{formatCurrency(deal.estimated_value || 0)}</span>
+                      <span className="text-sm font-medium">{formatCurrency(deal.estimated_value || 0, currency)}</span>
                       <span className="text-xs text-muted-foreground">{deal.next_follow_up ? new Date(deal.next_follow_up).toLocaleDateString() : '—'}</span>
                     </div>
                   </div>
@@ -260,7 +263,7 @@ export default function OverviewPage() {
                     </div>
                     <div className="flex items-center gap-3 shrink-0 ml-3">
                       <span className="text-xs text-muted-foreground">{campaign.startDate ? new Date(campaign.startDate).toLocaleDateString() : '—'}</span>
-                      <span className="text-sm font-medium">{formatCurrency(campaign.budget || 0)}</span>
+                      <span className="text-sm font-medium">{formatCurrency(campaign.budget || 0, currency)}</span>
                       <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${statusColors[campaign.status] || ''}`}>
                         {campaign.status.charAt(0).toUpperCase() + campaign.status.slice(1)}
                       </Badge>
@@ -322,7 +325,7 @@ export default function OverviewPage() {
                             <p className="text-xs text-muted-foreground">{invoice.description || '—'}</p>
                           </div>
                           <div className="flex items-center gap-2 shrink-0 ml-2">
-                            <span className="text-sm font-medium">{formatCurrency(invoice.amount)}</span>
+                            <span className="text-sm font-medium">{formatCurrency(invoice.amount, currency)}</span>
                             <Badge variant="secondary" className={`text-[10px] px-1.5 py-0 ${isOverdue ? 'bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400' : 'bg-amber-50 text-amber-600 dark:bg-amber-950 dark:text-amber-400'}`}>
                               {isOverdue ? 'Overdue' : 'Pending'}
                             </Badge>
@@ -366,7 +369,18 @@ export default function OverviewPage() {
           <CardContent>
             {activityLogs.length > 0 ? (
               <div className="space-y-4">
-                {activityLogs.slice(0, 8).map((log) => (
+                {activityLogs
+                  .filter((log) => {
+                    if (!log.description || log.description.includes('undefined')) return false;
+                    const entityType = (log.entity_type || '').toLowerCase();
+                    const action = (log.action || '').toLowerCase();
+                    if (entityType === 'invoice' || entityType === 'payment' || action.includes('invoice') || action.includes('payment')) {
+                      return false;
+                    }
+                    return true;
+                  })
+                  .slice(0, 8)
+                  .map((log) => (
                   <div key={log.id} className="flex items-start gap-3 pb-3 border-b last:border-0 last:pb-0">
                     <div className="w-2 h-2 rounded-full bg-primary mt-2 shrink-0" />
                     <div className="flex-1 min-w-0">

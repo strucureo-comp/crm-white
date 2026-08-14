@@ -278,7 +278,15 @@ export default function DashboardPage() {
             {activityLogs.length > 0 ? (
               <div className="space-y-4">
                 {activityLogs
-                  .filter((log) => log.description && !log.description.includes('undefined'))
+                  .filter((log) => {
+                    if (!log.description || log.description.includes('undefined')) return false;
+                    const entityType = (log.entity_type || '').toLowerCase();
+                    const action = (log.action || '').toLowerCase();
+                    if (entityType === 'invoice' || entityType === 'payment' || action.includes('invoice') || action.includes('payment')) {
+                      return false;
+                    }
+                    return true;
+                  })
                   .slice(0, 8)
                   .map((log) => {
                     const getLink = (type?: string) => {
@@ -287,7 +295,6 @@ export default function DashboardPage() {
                         case 'deal':
                         case 'pipeline': return '/pipeline';
                         case 'project': return '/projects';
-                        case 'invoice': return '/invoices';
                         case 'contact': return '/contacts';
                         case 'quote':
                         case 'quotation': return '/quotes';

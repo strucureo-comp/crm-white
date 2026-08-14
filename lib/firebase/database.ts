@@ -261,16 +261,6 @@ export async function updateInvoice(invoiceId: string, updates: Partial<Invoice>
       updated_at: new Date().toISOString(),
     }));
 
-    await logActivity({
-      workspace_id: invoice.workspace_id,
-      action: 'update_invoice',
-      description: `Invoice ${updates.invoice_number || invoiceId} updated`,
-      title: 'Invoice Updated',
-      entity_id: invoiceId,
-      entity_type: 'invoice',
-      metadata: updates
-    }).catch(console.error);
-
     let diffAmount = 0;
     if (updates.amount_paid !== undefined) {
       diffAmount = updates.amount_paid - (invoice.amount_paid || 0);
@@ -355,16 +345,6 @@ export async function createInvoice(invoice: Omit<Invoice, 'id' | 'invoice_id' |
     });
 
     await set(newInvoiceRef, invoiceData);
-
-    await logActivity({
-      workspace_id: invoice.workspace_id,
-      action: 'create_invoice',
-      description: `Invoice ${invoice.invoice_number} created${invoice.client_name ? ` for ${invoice.client_name}` : invoice.client_company ? ` for ${invoice.client_company}` : ''}`,
-      title: 'Invoice Created',
-      entity_id: newInvoiceRef.key || '',
-      entity_type: 'invoice',
-      metadata: invoice
-    }).catch(console.error);
 
     await createNotification({
       user_id: invoice.contact_id || '',

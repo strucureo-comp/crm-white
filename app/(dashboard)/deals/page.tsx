@@ -50,6 +50,7 @@ import { getCurrentUserId } from '@/lib/firebase/auth';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import { formatCurrency } from '@/lib/utils';
 import { Switch } from '@/components/ui/switch';
 import { DataPagination } from '@/components/ui/data-pagination';
@@ -69,9 +70,8 @@ const stageLabels: Record<string, string> = {
   contacted: 'Contacted',
   proposal: 'Proposal',
   negotiation: 'Negotiation',
-  won: 'Closed Won',
-  lost: 'Closed Lost',
-  new: 'New',
+  won: 'Won',
+  lost: 'Lost',
 };
 
 const stageColors: Record<string, string> = {
@@ -86,7 +86,7 @@ const stageColors: Record<string, string> = {
 
 const PAGE_SIZE = 25;
 
-function getInitials(name: string) {
+function getInitials(name: string): string {
   return name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase();
 }
 
@@ -99,6 +99,7 @@ const mockWhatsAppMessages = [
 
 export default function PipelinePage() {
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [activePipelineId, setActivePipelineId] = useState<string | null>(null);
@@ -522,10 +523,10 @@ export default function PipelinePage() {
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <KpiCard title="Total Pipeline Value" value={formatCurrency(totalPipelineValue)} change="open deals" trend="up" icon={DollarSign} description="all pipelines" />
-        <KpiCard title="Confirmed Orders" value={formatCurrency(confirmedOrders)} change="closed won" trend="up" icon={DollarSign} description="this month" />
+        <KpiCard title="Total Pipeline Value" value={formatCurrency(totalPipelineValue, currency)} change="open deals" trend="up" icon={DollarSign} description="all pipelines" />
+        <KpiCard title="Confirmed Orders" value={formatCurrency(confirmedOrders, currency)} change="closed won" trend="up" icon={DollarSign} description="this month" />
         <KpiCard title="Active Deals" value={String(activeDeals)} change={`${activeDeals} in progress`} trend="up" icon={Clock} description="current pipeline" />
-        <KpiCard title="Avg. Deal Size" value={formatCurrency(avgDealSize)} change="per deal avg" trend="neutral" icon={Building2} description="estimated" />
+        <KpiCard title="Avg. Deal Size" value={formatCurrency(avgDealSize, currency)} change="per deal avg" trend="neutral" icon={Building2} description="estimated" />
       </div>
 
       {viewMode === 'kanban' ? (
@@ -614,7 +615,7 @@ export default function PipelinePage() {
                                     </div>
                                     <div className="flex items-center gap-1">
                                       <DollarSign size={12} />
-                                      {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
+                                      {lead.estimated_value ? formatCurrency(lead.estimated_value, currency) : '—'}
                                     </div>
                                     <div className="flex items-center justify-between">
                                       <span className="flex items-center gap-1">
@@ -701,7 +702,7 @@ export default function PipelinePage() {
                             ))}
                           </div>
                         </td>
-                        <td className="p-3 font-medium">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</td>
+                        <td className="p-3 font-medium">{lead.estimated_value ? formatCurrency(lead.estimated_value, currency) : '—'}</td>
                         <td className="p-3 hidden sm:table-cell">
                           <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
                             {stageLabels[lead.status] || lead.status}
@@ -964,7 +965,7 @@ export default function PipelinePage() {
             <div className="space-y-4">
               <div className="flex items-center justify-between p-4 rounded-lg bg-muted/50">
                 <div>
-                  <p className="text-base sm:text-lg font-semibold">{viewDeal.estimated_value ? formatCurrency(viewDeal.estimated_value) : '—'}</p>
+                  <p className="text-base sm:text-lg font-semibold">{viewDeal.estimated_value ? formatCurrency(viewDeal.estimated_value, currency) : '—'}</p>
                   <p className="text-xs text-muted-foreground">Deal Value</p>
                 </div>
                 <div className="text-right">

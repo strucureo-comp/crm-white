@@ -29,6 +29,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import { getLeads, getPipelines } from '@/lib/firebase/database';
 import type { Lead, Pipeline } from '@/lib/db/types';
 
@@ -58,6 +59,7 @@ const STAGE_LABELS: Record<string, string> = {
 
 export default function FunnelPage() {
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [loading, setLoading] = useState(true);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
@@ -190,14 +192,14 @@ export default function FunnelPage() {
         />
         <KpiCard
           title="Avg. Deal Value"
-          value={formatCurrency(avgDealValue)}
+          value={formatCurrency(avgDealValue, currency)}
           change="Per deal"
           trend={avgDealValue > 0 ? 'up' : 'neutral'}
           icon={DollarSign}
         />
         <KpiCard
           title="Lost Value"
-          value={formatCurrency(lostValue)}
+          value={formatCurrency(lostValue, currency)}
           change={`${lostCount} lost deals`}
           trend={lostValue > 0 ? 'down' : 'neutral'}
           icon={TrendingDown}
@@ -271,7 +273,7 @@ export default function FunnelPage() {
                           </div>
                         </div>
                         <span className="text-sm font-medium tabular-nums w-24 text-right shrink-0">
-                          {formatCurrency(stage.value)}
+                          {formatCurrency(stage.value, currency)}
                         </span>
                       </div>
                     );
@@ -315,7 +317,7 @@ export default function FunnelPage() {
                       </TableCell>
                       <TableCell className="text-right tabular-nums">{stage.count}</TableCell>
                       <TableCell className="text-right tabular-nums font-medium">
-                        {formatCurrency(stage.value)}
+                        {formatCurrency(stage.value, currency)}
                       </TableCell>
                     </TableRow>
                   ))}

@@ -26,6 +26,7 @@ export interface Member {
   avatar: string; // 2-letter initials
   email?: string;
   role?: string;
+  status?: 'Active' | 'Pending' | 'Invited' | 'Inactive' | 'Accepted' | 'Expired';
   projectIds?: string[];
 }
 

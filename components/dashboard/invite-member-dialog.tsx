@@ -21,11 +21,20 @@ export function InviteMemberDialog() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!workspace || !user || !email) return;
+    if (!workspace || !user || !email.trim()) return;
 
     setLoading(true);
     try {
-      await sendInvite(workspace.id, workspace.name, email, role, user.id);
+      const { getWorkspaceInvites } = await import('@/lib/workspace/invites');
+      const existingInvites = await getWorkspaceInvites(workspace.id);
+      const emailLower = email.trim().toLowerCase();
+      if (existingInvites.some(i => i.email.toLowerCase() === emailLower && i.status === 'pending')) {
+        toast.error(`An invitation has already been sent to "${email.trim()}".`);
+        setLoading(false);
+        return;
+      }
+
+      await sendInvite(workspace.id, workspace.name, emailLower, role, user.id);
       toast.success('Invitation sent successfully!');
       setOpen(false);
       setEmail('');

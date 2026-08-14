@@ -19,11 +19,13 @@ import { Dialog, DialogContent, DialogTitle, DialogHeader } from '@/components/u
 import { KpiCard } from '@/components/dashboard/kpi-card';
 
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import { subscribeToLeads } from '@/lib/firebase/database';
 import { subscribeToCampaigns, Campaign } from '@/lib/db/campaigns/api';
 import { subscribeToProjectsData } from '@/lib/db/projects/api';
 import { subscribeToDashboardSettings, saveDashboardSettings, DashboardSettings, WidgetLayout } from '@/lib/db/dashboard/api';
 import { Lead } from '@/lib/db/types';
+import { formatCurrency } from '@/lib/utils';
 
 type WidgetType = 'kpi' | 'bar' | 'donut' | 'line' | 'funnel' | 'area';
 
@@ -387,46 +389,42 @@ export default function AnalyticsDashboard() {
     const campaignRoi = campaigns.map(c => ({
       name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
       budget: c.budget || 0,
-      spent: c.spent || 0
-    }));
+      spent: c.spent || 0,
+      value: c.roi || (c.revenue && c.spent ? Math.round((c.revenue / c.spent) * 100) / 100 : (c.budget ? Math.round(((c.revenue || 0) / c.budget) * 10) / 10 : 0))
+    })).filter(c => c.value > 0);
 
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-    const last6Months = Array.from({ length: 6 }).map((_, i) => {
-      const d = new Date();
-      d.setMonth(currentMonth - (5 - i));
-      return { monthIndex: d.getMonth(), year: d.getFullYear(), name: months[d.getMonth()] };
-    });
-
-    const revenueGrowth = last6Months.map(m => {
-      const revInMonth = wonDeals.filter(d => {
-        const closedAt = d.updated_at;
-        if (!closedAt) return false;
-        const closedDate = new Date(closedAt);
-        return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
-      }).reduce((acc, d) => acc + (d.estimated_value || 0), 0);
-      return { name: m.name, value: revInMonth };
-    });
+    const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const last6Months = [];
+    for (let i = 5; i >= 0; i--) {
+      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      last6Months.push({ monthIndex: d.getMonth(), year: d.getFullYear(), name: monthNames[d.getMonth()] });
+    }
 
     let runningTotal = 0;
-    const cumulativeRevenueGrowth = revenueGrowth.map(item => {
-      runningTotal += item.value;
-      return { name: item.name, value: runningTotal };
+    const cumulativeRevenueGrowth = last6Months.map(m => {
+      const monthWon = filteredDeals.filter(d => {
+        if (d.status !== 'won') return false;
+        const closedDate = new Date(d.updated_at || d.created_at || Date.now());
+        return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
+      });
+      const monthRev = monthWon.reduce((sum, d) => sum + (d.estimated_value || 0), 0);
+      runningTotal += monthRev;
+      return { name: m.name, value: runningTotal };
     });
 
     const activePipelineVolume = last6Months.map(m => {
-      const vol = filteredDeals.filter(d => {
-        if (!d.created_at || d.status === 'won' || d.status === 'lost') return false;
-        const createdDate = new Date(d.created_at);
-        return (createdDate.getFullYear() < m.year) || (createdDate.getFullYear() === m.year && createdDate.getMonth() <= m.monthIndex);
-      }).reduce((acc, d) => acc + (d.estimated_value || 0), 0);
-      return { name: m.name, value: vol };
+      const activeInMonth = filteredDeals.filter(d => {
+        const createdDate = new Date(d.created_at || Date.now());
+        return createdDate.getMonth() === m.monthIndex && createdDate.getFullYear() === m.year && d.status !== 'won' && d.status !== 'lost';
+      });
+      const val = activeInMonth.reduce((sum, d) => sum + (d.estimated_value || 0), 0);
+      return { name: m.name, value: val };
     });
 
     const winRateTrend = last6Months.map(m => {
       const resolvedInMonth = filteredDeals.filter(d => {
-        const closedAt = d.updated_at;
-        if (!closedAt || (d.status !== 'won' && d.status !== 'lost')) return false;
-        const closedDate = new Date(closedAt);
+        if (d.status !== 'won' && d.status !== 'lost') return false;
+        const closedDate = new Date(d.updated_at || d.created_at || Date.now());
         return closedDate.getMonth() === m.monthIndex && closedDate.getFullYear() === m.year;
       });
       const wonInMonth = resolvedInMonth.filter(d => d.status === 'won');
@@ -435,10 +433,10 @@ export default function AnalyticsDashboard() {
     });
 
     return {
-      total_pipeline_value: { value: `$${totalPipeline.toLocaleString()}`, change: pipelineChange, trend: 'up' as const },
-      total_revenue: { value: `$${totalRevenue.toLocaleString()}`, change: revenueChange, trend: 'up' as const },
+      total_pipeline_value: { value: formatCurrency(totalPipeline, currency), change: pipelineChange, trend: 'up' as const },
+      total_revenue: { value: formatCurrency(totalRevenue, currency), change: revenueChange, trend: 'up' as const },
       win_rate: { value: `${winRate}%`, change: winRateChange, trend: 'up' as const },
-      avg_deal_size: { value: `$${avgDealSize.toLocaleString()}`, change: avgDealChange, trend: 'up' as const },
+      avg_deal_size: { value: formatCurrency(avgDealSize, currency), change: avgDealChange, trend: 'up' as const },
       pipeline_by_stage: pipelineByStage,
       revenue_by_owner: revenueByOwner,
       sales_funnel: salesFunnel,
@@ -448,7 +446,7 @@ export default function AnalyticsDashboard() {
       active_pipeline_volume: activePipelineVolume,
       win_rate_trend: winRateTrend
     };
-  }, [filteredDeals, members, campaigns]);
+  }, [filteredDeals, members, campaigns, currency]);
 
   useEffect(() => setIsClient(true), []);
 

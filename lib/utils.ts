@@ -11,16 +11,31 @@ export function cn(...inputs: ClassValue[]) {
  * Defaults to USD if no currency code is provided.
  */
 export function formatCurrency(value: number, currencyCode: string = 'USD'): string {
+  if (value === undefined || value === null || isNaN(value)) {
+    return '0.00';
+  }
+  const cleanCode = (currencyCode || 'USD').trim();
+  const symbolToIso: Record<string, string> = {
+    '₹': 'INR',
+    '$': 'USD',
+    '€': 'EUR',
+    '£': 'GBP',
+    '¥': 'JPY',
+    'C$': 'CAD',
+    'A$': 'AUD',
+  };
+  const isoCode = symbolToIso[cleanCode] || cleanCode;
+
   try {
-    return new Intl.NumberFormat('en-US', { 
+    const locale = isoCode === 'INR' ? 'en-IN' : 'en-US';
+    return new Intl.NumberFormat(locale, { 
       style: 'currency', 
-      currency: currencyCode,
+      currency: isoCode,
       minimumFractionDigits: 2, 
       maximumFractionDigits: 2 
     }).format(value);
   } catch (e) {
-    // Fallback if currency code is invalid (e.g. if someone passes a symbol like '$' instead of 'USD')
-    return `${currencyCode}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+    return `${cleanCode}${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   }
 }
 

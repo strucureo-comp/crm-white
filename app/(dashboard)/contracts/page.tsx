@@ -17,6 +17,7 @@ import {
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { getContracts, deleteContract } from '@/lib/firebase/database';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import type { Contract, ContractStatus } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { toast } from 'sonner';
@@ -38,6 +39,7 @@ const PAGE_SIZE = 25;
 export default function ContractsPage() {
   const router = useRouter();
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -212,7 +214,7 @@ export default function ContractsPage() {
           <CardContent className="p-3 sm:p-5 flex flex-col gap-1.5 sm:gap-2">
             <span className="text-[10px] sm:text-xs font-bold uppercase text-muted-foreground tracking-wider">Active ARR</span>
             <div className="flex items-end justify-between">
-              <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">{formatCurrency(totalARR, 'USD')}</span>
+              <span className="text-2xl sm:text-3xl font-black text-foreground tracking-tighter">{formatCurrency(totalARR, currency)}</span>
               <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center"><Briefcase size={14} className="sm:hidden" /><Briefcase size={16} className="hidden sm:block" /></div>
             </div>
           </CardContent>

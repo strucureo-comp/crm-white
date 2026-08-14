@@ -13,8 +13,9 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 import { useAuth } from '@/lib/firebase/auth-context';
-import { subscribeToCalendarEvents, createCalendarEvent, CalendarEvent as DBCalendarEvent } from '@/lib/db/calendar/api';
+import { subscribeToCalendarEvents, createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, CalendarEvent as DBCalendarEvent } from '@/lib/db/calendar/api';
 import { Member, Project, subscribeToProjectsData, createMember } from '@/lib/db/projects/api';
+import { toast } from 'sonner';
 
 export type CalendarEvent = DBCalendarEvent;
 
@@ -37,9 +38,21 @@ export default function CalendarAgendaPage() {
     return () => { unsubEvents(); unsubMembers(); };
   }, [user]);
 
-  const [currentMonth, setCurrentMonth] = useState(new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  }, []);
+
+  const [currentMonth, setCurrentMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  });
   const [viewingEvent, setViewingEvent] = useState<CalendarEvent | null>(null);
+  const [reschedulingEvent, setReschedulingEvent] = useState<CalendarEvent | null>(null);
+  const [rescheduleTitle, setRescheduleTitle] = useState('');
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleTime, setRescheduleTime] = useState('09:00');
   const [isScheduleOpen, setIsScheduleOpen] = useState(false);
 
   const [formTitle, setFormTitle] = useState('');
@@ -64,15 +77,52 @@ export default function CalendarAgendaPage() {
   const handleCreateEvent = async () => {
     if (!workspace?.id || !formTitle.trim()) return;
     const newEvent: Omit<CalendarEvent, 'id'> = {
-      title: formTitle, date: formDate || new Date().toISOString().split('T')[0], time: formTime, color: formColor,
+      title: formTitle, date: formDate || todayStr, time: formTime, color: formColor,
       attendees: formAttendees.length > 0 ? formAttendees : (members.length > 0 ? [members[0].id] : []),
       linkedRecord: formProject ? { type: 'project', id: formProject } : null
     };
     try {
       await createCalendarEvent(workspace?.id, newEvent);
+      toast.success('Event scheduled successfully');
       setIsScheduleOpen(false);
       setFormTitle(''); setFormDate(''); setFormTime('09:00'); setFormColor(EVENT_COLORS[0]); setFormAttendees([]); setFormProject('');
-    } catch (e) { console.error("Failed to create event", e); }
+    } catch (e) { console.error("Failed to create event", e); toast.error('Failed to create event'); }
+  };
+
+  const handleDeleteEvent = async (eventId: string) => {
+    if (!workspace?.id || !eventId) return;
+    try {
+      await deleteCalendarEvent(workspace.id, eventId);
+      toast.success('Event deleted');
+      setViewingEvent(null);
+    } catch (e) {
+      console.error('Failed to delete event', e);
+      toast.error('Failed to delete event');
+    }
+  };
+
+  const handleOpenReschedule = (event: CalendarEvent) => {
+    setRescheduleTitle(event.title);
+    setRescheduleDate(event.date);
+    setRescheduleTime(event.time || '09:00');
+    setReschedulingEvent(event);
+    setViewingEvent(null);
+  };
+
+  const handleSaveReschedule = async () => {
+    if (!workspace?.id || !reschedulingEvent || !rescheduleDate) return;
+    try {
+      await updateCalendarEvent(workspace.id, reschedulingEvent.id, {
+        title: rescheduleTitle.trim() || reschedulingEvent.title,
+        date: rescheduleDate,
+        time: rescheduleTime,
+      });
+      toast.success('Event rescheduled');
+      setReschedulingEvent(null);
+    } catch (e) {
+      console.error('Failed to reschedule event', e);
+      toast.error('Failed to reschedule event');
+    }
   };
 
   const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
@@ -106,7 +156,12 @@ export default function CalendarAgendaPage() {
 
   const handlePrevMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1, 1));
   const handleNextMonth = () => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1, 1));
-  const handleToday = () => { setCurrentMonth(new Date(2026, 6, 1)); setSelectedDate('2026-07-15'); };
+  const handleToday = () => {
+    const today = new Date();
+    setCurrentMonth(new Date(today.getFullYear(), today.getMonth(), 1));
+    const tStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    setSelectedDate(tStr);
+  };
   const getMonthName = (date: Date) => date.toLocaleString('default', { month: 'long', year: 'numeric' });
 
   return (
@@ -160,7 +215,7 @@ export default function CalendarAgendaPage() {
                       onClick={() => setSelectedDate(cell.dateStr)}>
                       <div className="text-right mb-1">
                         <span className={`text-[11px] font-medium w-6 h-6 inline-flex items-center justify-center rounded-full ${
-                          cell.dateStr === '2026-07-15' && !isSelected ? 'bg-foreground text-background' :
+                          cell.dateStr === todayStr && !isSelected ? 'bg-foreground text-background font-bold' :
                           isSelected ? 'bg-foreground text-background' :
                           cell.isWeekend ? 'text-muted-foreground' : 'text-muted-foreground'
                         }`}>
@@ -273,14 +328,43 @@ export default function CalendarAgendaPage() {
                 )}
               </div>
               <div className="flex items-center justify-between pt-3 border-t">
-                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive">Delete</Button>
+                <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={() => handleDeleteEvent(viewingEvent.id)}>Delete</Button>
                 <div className="flex items-center gap-2">
                   <Button variant="outline" size="sm" onClick={() => setViewingEvent(null)}>Close</Button>
-                  <Button size="sm">Reschedule</Button>
+                  <Button size="sm" onClick={() => handleOpenReschedule(viewingEvent)}>Reschedule</Button>
                 </div>
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Reschedule Event Modal */}
+      <Dialog open={!!reschedulingEvent} onOpenChange={(open) => { if (!open) setReschedulingEvent(null); }}>
+        <DialogContent className="sm:max-w-[425px]" hideCloseIcon>
+          <DialogHeader>
+            <DialogTitle>Reschedule Event</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <label className="text-xs font-medium text-muted-foreground">Event Title</label>
+              <Input value={rescheduleTitle} onChange={(e) => setRescheduleTitle(e.target.value)} />
+            </div>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Date</label>
+                <Input type="date" value={rescheduleDate} onChange={(e) => setRescheduleDate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-muted-foreground">Time</label>
+                <Input type="time" value={rescheduleTime} onChange={(e) => setRescheduleTime(e.target.value)} />
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2 pt-3 border-t">
+            <Button variant="ghost" size="sm" onClick={() => setReschedulingEvent(null)}>Cancel</Button>
+            <Button size="sm" onClick={handleSaveReschedule}>Save Changes</Button>
+          </div>
         </DialogContent>
       </Dialog>
 

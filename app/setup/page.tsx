@@ -14,6 +14,10 @@ import { updateWorkspace } from '@/lib/workspace/api';
 import { updateGeneralSettings, updateBrandingSettings } from '@/lib/settings/api';
 import { InvitesModal } from '@/components/dashboard/invites-modal';
 
+import { ref, update } from 'firebase/database';
+import { updateProfile } from 'firebase/auth';
+import { auth, database } from '@/lib/firebase/config';
+
 const STEPS = [
   { id: 0, title: 'Company Info', icon: Building2, description: 'Tell us about your business' },
   { id: 1, title: 'Location', icon: MapPin, description: 'Where are you based?' },
@@ -23,7 +27,7 @@ const STEPS = [
 ];
 
 export default function SetupPage() {
-  const { user, loading: authLoading, workspace, workspaceLoading, refreshWorkspace, pendingInvites } = useAuth();
+  const { user, loading: authLoading, workspace, workspaceLoading, refreshWorkspace, refreshUser, pendingInvites } = useAuth();
   const router = useRouter();
   const [currentStep, setCurrentStep] = useState(0);
   const [submitting, setSubmitting] = useState(false);
@@ -37,7 +41,7 @@ export default function SetupPage() {
   const [address, setAddress] = useState('');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
-  const [country, setCountry] = useState('');
+  const [country, setCountry] = useState('India');
   const [phone, setPhone] = useState('');
   const [timezone, setTimezone] = useState('Asia/Kolkata');
 
@@ -91,12 +95,7 @@ export default function SetupPage() {
           <CardContent className="pt-6 text-center space-y-4">
             <p className="text-muted-foreground">No workspace found. Your account setup might have been interrupted.</p>
             <div className="flex flex-col gap-2">
-              <Button className="w-full" onClick={async () => {
-                const { createInitialWorkspace } = await import('@/lib/firebase/auth-context').then(m => m.useAuth());
-                // This won't work perfectly outside of a React hook component body, 
-                // but wait, we have access to useAuth hooks here? No we don't.
-                window.location.reload(); // Just reload, or we can use a dedicated button component
-              }}>
+              <Button className="w-full" onClick={() => window.location.reload()}>
                 Reload Page
               </Button>
               <Button variant="outline" className="w-full" onClick={async () => {
@@ -115,11 +114,11 @@ export default function SetupPage() {
   }
 
   const handleNext = async () => {
-    if (currentStep === 0 && !companyName) {
+    if (currentStep === 0 && !companyName.trim()) {
       toast.error('Company name is required');
       return;
     }
-    if (currentStep === 2 && !fullName) {
+    if (currentStep === 2 && !fullName.trim()) {
       toast.error('Your name is required');
       return;
     }
@@ -128,30 +127,71 @@ export default function SetupPage() {
     setSubmitting(true);
     try {
       if (currentStep === 0) {
-        // Update workspace name
-        await updateWorkspace(workspace.id, { name: companyName });
-        // Save general settings
+        // Update workspace name and company info
+        await updateWorkspace(workspace.id, { name: companyName.trim() });
         await updateGeneralSettings(workspace.id, {
-          company_name: companyName,
-          default_currency: currency,
-          currency_symbol: currencySymbol,
-          timezone,
-        });
-      } else if (currentStep === 1) {
-        await updateGeneralSettings(workspace.id, {
-          company_name: companyName,
-          timezone,
-        });
-      } else if (currentStep === 3) {
-        await updateGeneralSettings(workspace.id, {
-          company_name: companyName,
+          company_name: companyName.trim(),
+          workspace_name: companyName.trim(),
+          workspace_url: companyName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          legal_name: companyName.trim(),
+          tagline: industry.trim(),
           default_currency: currency,
           currency_symbol: currencySymbol,
           timezone,
         });
         await updateBrandingSettings(workspace.id, {
-          gst_number: gstNumber,
-          pan_number: panNumber,
+          website: website.trim(),
+        });
+      } else if (currentStep === 1) {
+        // Location info
+        await updateGeneralSettings(workspace.id, {
+          company_name: companyName.trim(),
+          country: country.trim(),
+          state: state.trim(),
+          timezone,
+        });
+        await updateBrandingSettings(workspace.id, {
+          address: [address, city, state, country].filter(Boolean).join(', ').trim() || address.trim(),
+          phone: phone.trim(),
+          website: website.trim(),
+        });
+      } else if (currentStep === 2) {
+        // Admin profile info
+        const userRef = ref(database, `users/${user.id}`);
+        await update(userRef, {
+          full_name: fullName.trim(),
+          role: role || 'Owner',
+          updated_at: new Date().toISOString(),
+        });
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: fullName.trim() }).catch(() => {});
+        }
+        await refreshUser();
+      } else if (currentStep === 3) {
+        // Documents & Currency
+        await updateGeneralSettings(workspace.id, {
+          company_name: companyName.trim(),
+          workspace_name: companyName.trim(),
+          workspace_url: companyName.trim().toLowerCase().replace(/[^a-z0-9]/g, '-'),
+          legal_name: companyName.trim(),
+          tagline: industry.trim(),
+          country: country.trim(),
+          state: state.trim(),
+          timezone,
+          default_currency: currency,
+          currency_symbol: currencySymbol,
+          number_format: currency === 'INR' ? '1,23,456.78' : '1,234,567.89',
+          first_day_of_week: 'Monday',
+          financial_year: currency === 'INR' ? 'April - March' : 'January - December',
+        });
+        await updateBrandingSettings(workspace.id, {
+          address: [address, city, state, country].filter(Boolean).join(', ').trim() || address.trim(),
+          phone: phone.trim(),
+          website: website.trim(),
+          email: user.email || '',
+          gst_number: gstNumber.trim(),
+          pan_number: panNumber.trim(),
+          tax_system: gstNumber.trim() ? 'gst' : 'none',
         });
       }
 
@@ -177,11 +217,62 @@ export default function SetupPage() {
   const handleComplete = async () => {
     setSubmitting(true);
     try {
-      await updateWorkspace(workspace.id, { setup_completed: true, setup_step: 5 });
+      const fullAddress = [address, city, state, country].filter(Boolean).join(', ').trim() || address.trim();
+      
+      // Save all general settings
+      await updateGeneralSettings(workspace.id, {
+        company_name: companyName.trim() || workspace.name,
+        workspace_name: companyName.trim() || workspace.name,
+        workspace_url: (companyName.trim() || workspace.name).toLowerCase().replace(/[^a-z0-9]/g, '-'),
+        legal_name: companyName.trim() || workspace.name,
+        tagline: industry.trim(),
+        country: country.trim(),
+        state: state.trim(),
+        timezone: timezone || 'Asia/Kolkata',
+        default_currency: currency || 'INR',
+        currency_symbol: currencySymbol || '₹',
+        number_format: currency === 'INR' ? '1,23,456.78' : '1,234,567.89',
+        first_day_of_week: 'Monday',
+        financial_year: currency === 'INR' ? 'April - March' : 'January - December',
+      });
+
+      // Save all branding settings
+      await updateBrandingSettings(workspace.id, {
+        address: fullAddress,
+        phone: phone.trim(),
+        website: website.trim(),
+        email: user.email || '',
+        gst_number: gstNumber.trim(),
+        pan_number: panNumber.trim(),
+        tax_system: gstNumber.trim() ? 'gst' : 'none',
+      });
+
+      // Update user admin name & role in users collection
+      if (fullName.trim()) {
+        const userRef = ref(database, `users/${user.id}`);
+        await update(userRef, {
+          full_name: fullName.trim(),
+          role: role || 'Owner',
+          updated_at: new Date().toISOString(),
+        });
+        if (auth.currentUser) {
+          await updateProfile(auth.currentUser, { displayName: fullName.trim() }).catch(() => {});
+        }
+        await refreshUser();
+      }
+
+      // Complete workspace setup
+      await updateWorkspace(workspace.id, {
+        name: companyName.trim() || workspace.name,
+        setup_completed: true,
+        setup_step: 5
+      });
       await refreshWorkspace();
+
       toast.success('Workspace setup complete!');
       router.push('/dashboard');
     } catch (error) {
+      console.error('Failed to complete setup:', error);
       toast.error('Failed to complete setup');
     } finally {
       setSubmitting(false);

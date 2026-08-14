@@ -77,6 +77,7 @@ export default function TaskManagerPage() {
 
   // Modals
   const [isNewTaskOpen, setIsNewTaskOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [viewingTask, setViewingTask] = useState<Task | null>(null);
   const [taskToDelete, setTaskToDelete] = useState<Task | null>(null);
 
@@ -96,7 +97,7 @@ export default function TaskManagerPage() {
   const [newSubtaskAssigneeIds, setNewSubtaskAssigneeIds] = useState<string[]>([]);
   const [expandedSubtasks, setExpandedSubtasks] = useState<Set<string>>(new Set());
 
-  // New Task Form State
+  // New/Edit Task Form State
   const [formTitle, setFormTitle] = useState('');
   const [formStatus, setFormStatus] = useState('To Do');
   const [formPriority, setFormPriority] = useState<TaskPriority>('Medium');
@@ -158,7 +159,32 @@ export default function TaskManagerPage() {
   }, [tasks]);
 
   // Handlers
-  const handleCreateTask = async () => {
+  const handleOpenEditTask = (task: Task) => {
+    setEditingTask(task);
+    setFormTitle(task.title);
+    setFormStatus(task.status);
+    setFormPriority(task.priority);
+    setFormDate(task.dueDate || '');
+    setFormAssigneeIds(getTaskAssignees(task).map(a => a.id));
+    setFormDescription(task.description || '');
+    setFormLabels(task.labels || []);
+    setViewingTask(null);
+    setIsNewTaskOpen(true);
+  };
+
+  const handleCloseTaskDialog = () => {
+    setIsNewTaskOpen(false);
+    setEditingTask(null);
+    setFormTitle('');
+    setFormStatus('To Do');
+    setFormPriority('Medium');
+    setFormDate('');
+    setFormAssigneeIds([]);
+    setFormDescription('');
+    setFormLabels([]);
+  };
+
+  const handleSaveTask = async () => {
     if (!workspace?.id) return;
     if (!formTitle.trim()) return toast.error('Task title is required');
     
@@ -170,35 +196,38 @@ export default function TaskManagerPage() {
       assignees.push({ ...members[0], email: '' });
     }
     
-    const newTask = {
-      title: formTitle,
-      description: formDescription,
-      status: formStatus,
-      assignees,
-      priority: formPriority,
-      dueDate: formDate || new Date().toISOString().split('T')[0],
-      subtasks: [],
-      comments: [],
-      labels: formLabels,
-      dealReference: null,
-      attachments: []
-    };
-    
     try {
-      await createTask(workspace?.id, newTask);
-      setIsNewTaskOpen(false);
-      toast.success('Task scheduled successfully');
-      
-      // Reset form
-      setFormTitle('');
-      setFormStatus('To Do');
-      setFormPriority('Medium');
-      setFormDate('');
-      setFormAssigneeIds([]);
-      setFormDescription('');
-      setFormLabels([]);
+      if (editingTask) {
+        await updateTask(workspace.id, editingTask.id, {
+          title: formTitle.trim(),
+          description: formDescription,
+          status: formStatus,
+          assignees,
+          priority: formPriority,
+          dueDate: formDate || new Date().toISOString().split('T')[0],
+          labels: formLabels,
+        });
+        toast.success('Task updated successfully');
+      } else {
+        const newTask = {
+          title: formTitle.trim(),
+          description: formDescription,
+          status: formStatus,
+          assignees,
+          priority: formPriority,
+          dueDate: formDate || new Date().toISOString().split('T')[0],
+          subtasks: [],
+          comments: [],
+          labels: formLabels,
+          dealReference: null,
+          attachments: []
+        };
+        await createTask(workspace.id, newTask);
+        toast.success('Task scheduled successfully');
+      }
+      handleCloseTaskDialog();
     } catch (e) {
-      toast.error('Failed to create task');
+      toast.error(editingTask ? 'Failed to update task' : 'Failed to create task');
     }
   };
 
@@ -586,7 +615,7 @@ export default function TaskManagerPage() {
                                             </Button>
                                           </DropdownMenuTrigger>
                                           <DropdownMenuContent align="end" onClick={(e) => e.stopPropagation()}>
-                                            <DropdownMenuItem onClick={() => setViewingTask(task)}>
+                                            <DropdownMenuItem onClick={() => handleOpenEditTask(task)}>
                                               <Pencil className="w-3.5 h-3.5 mr-2" /> Edit Task
                                             </DropdownMenuItem>
                                             <DropdownMenuItem
@@ -793,8 +822,9 @@ export default function TaskManagerPage() {
                     <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{primaryAssignee?.avatar || 'U'}</AvatarFallback></Avatar>
                     <span className="text-xs font-semibold truncate">{primaryAssignee?.name || 'Unassigned'}</span>
                   </div>
-                  <div className="w-12 text-center">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteSingleTask(task.id)}><Trash2 className="w-4 h-4" /></Button>
+                  <div className="w-16 flex items-center justify-center gap-1">
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-foreground" title="Edit Task" onClick={() => handleOpenEditTask(task)}><Pencil className="w-3.5 h-3.5" /></Button>
+                    <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-rose-600" title="Delete Task" onClick={() => handleDeleteSingleTask(task.id)}><Trash2 className="w-4 h-4" /></Button>
                   </div>
                 </div>
               );
@@ -816,7 +846,7 @@ export default function TaskManagerPage() {
                     <th className="px-4 py-3 font-bold w-36">Due Date</th>
                     <th className="px-4 py-3 font-bold w-40">Lead Owner</th>
                     <th className="px-4 py-3 font-bold w-40">Deal Context</th>
-                    <th className="px-4 py-3 font-bold w-16 text-center">Action</th>
+                    <th className="px-4 py-3 font-bold w-20 text-center">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -855,7 +885,10 @@ export default function TaskManagerPage() {
                           ) : <span className="text-xs text-muted-foreground italic">No context</span>}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600" onClick={() => handleDeleteSingleTask(task.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          <div className="flex items-center justify-center gap-1">
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" title="Edit Task" onClick={() => handleOpenEditTask(task)}><Pencil className="w-3.5 h-3.5" /></Button>
+                            <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-rose-600" title="Delete Task" onClick={() => handleDeleteSingleTask(task.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -915,12 +948,14 @@ export default function TaskManagerPage() {
 
       {/* 5. Modals */}
       
-      {/* New Task Modal */}
-      <Dialog open={isNewTaskOpen} onOpenChange={setIsNewTaskOpen}>
+      {/* New / Edit Task Modal */}
+      <Dialog open={isNewTaskOpen} onOpenChange={(open) => { if (!open) handleCloseTaskDialog(); }}>
         <DialogContent className="sm:max-w-[500px] p-8 bg-card border-0 shadow-2xl rounded-[1.5rem] gap-6" hideCloseIcon>
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-2xl font-bold text-foreground tracking-tight">Schedule New Task</DialogTitle>
-            <button className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors" onClick={() => setIsNewTaskOpen(false)}>
+            <DialogTitle className="text-2xl font-bold text-foreground tracking-tight">
+              {editingTask ? 'Edit Task' : 'Schedule New Task'}
+            </DialogTitle>
+            <button className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center text-primary hover:bg-primary/20 transition-colors" onClick={handleCloseTaskDialog}>
               <X className="w-4 h-4" />
             </button>
           </div>
@@ -1037,8 +1072,10 @@ export default function TaskManagerPage() {
           </div>
           
           <div className="flex items-center justify-end gap-3 pt-2">
-            <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-border text-foreground font-bold hover:bg-muted hover:text-foreground" onClick={() => setIsNewTaskOpen(false)}>Cancel</Button>
-            <Button className="h-11 px-6 rounded-[2rem] bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md" onClick={handleCreateTask}>Schedule Task</Button>
+            <Button variant="outline" className="h-11 px-6 rounded-[2rem] border-border text-foreground font-bold hover:bg-muted hover:text-foreground" onClick={handleCloseTaskDialog}>Cancel</Button>
+            <Button className="h-11 px-6 rounded-[2rem] bg-primary hover:bg-primary/90 text-primary-foreground font-bold shadow-md" onClick={handleSaveTask}>
+              {editingTask ? 'Save Changes' : 'Schedule Task'}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -1050,9 +1087,14 @@ export default function TaskManagerPage() {
             <>
               <DialogHeader className="p-6 border-b shrink-0 flex flex-col items-start justify-center">
                 <div className="space-y-2 w-full">
-                  <div className="flex gap-2">
-                    <Badge variant="secondary">{viewingTask.status}</Badge>
-                    <Badge variant="secondary">{viewingTask.priority} Priority</Badge>
+                  <div className="flex items-center justify-between">
+                    <div className="flex gap-2">
+                      <Badge variant="secondary">{viewingTask.status}</Badge>
+                      <Badge variant="secondary">{viewingTask.priority} Priority</Badge>
+                    </div>
+                    <Button variant="outline" size="sm" className="h-8 gap-1.5 text-xs font-semibold" onClick={() => handleOpenEditTask(viewingTask)}>
+                      <Pencil className="w-3.5 h-3.5" /> Edit Task
+                    </Button>
                   </div>
                   <DialogTitle className="text-lg font-semibold">{viewingTask.title}</DialogTitle>
                 </div>

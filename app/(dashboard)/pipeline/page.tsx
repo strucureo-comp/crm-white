@@ -48,6 +48,7 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { KpiCard } from '@/components/dashboard/kpi-card';
 import { toast } from 'sonner';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import { formatCurrency } from '@/lib/utils';
 import { DataPagination } from '@/components/ui/data-pagination';
 
@@ -82,6 +83,7 @@ function daysBetween(dateStr: string): number {
 
 export default function DealsPage() {
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [pipelines, setPipelines] = useState<Pipeline[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string>('all');
@@ -280,14 +282,14 @@ export default function DealsPage() {
   const kpiCards = [
     {
       title: 'Total Pipeline Value',
-      value: formatCurrency(totalPipelineValue),
+      value: formatCurrency(totalPipelineValue, currency),
       change: 'Open deals total',
       trend: 'up' as const,
       icon: DollarSign,
     },
     {
       title: 'Won This Month',
-      value: formatCurrency(wonThisMonth),
+      value: formatCurrency(wonThisMonth, currency),
       change: `${wonThisMonthCount} deals`,
       trend: 'up' as const,
       icon: TrendingUp,
@@ -442,7 +444,7 @@ export default function DealsPage() {
                         {lead.company || '—'}
                       </div>
                     </TableCell>
-                    <TableCell className="font-mono">{lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}</TableCell>
+                    <TableCell className="font-mono">{lead.estimated_value ? formatCurrency(lead.estimated_value, currency) : '—'}</TableCell>
                     <TableCell>
                       <Badge className={stageColors[lead.status]} variant="outline">
                         {stageLabels[lead.status]}
@@ -579,7 +581,7 @@ export default function DealsPage() {
                                       </div>
                                       <div className="flex items-center gap-1">
                                         <DollarSign size={12} />
-                                        {lead.estimated_value ? formatCurrency(lead.estimated_value) : '—'}
+                                        {lead.estimated_value ? formatCurrency(lead.estimated_value, currency) : '—'}
                                       </div>
                                       {lead.source && (
                                         <div className="flex items-center gap-1">
@@ -670,7 +672,7 @@ export default function DealsPage() {
               <div className="rounded-xl border bg-card p-5">
                 <p className="text-sm text-muted-foreground mb-1">Deal Value</p>
                 <p className="text-2xl sm:text-3xl font-semibold">
-                  {selectedLead.estimated_value ? formatCurrency(selectedLead.estimated_value) : 'Not set'}
+                  {selectedLead.estimated_value ? formatCurrency(selectedLead.estimated_value, currency) : 'Not set'}
                 </p>
               </div>
 

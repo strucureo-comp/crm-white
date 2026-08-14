@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Users, Shield, Activity, Search, Plus, Edit2, X, Check, Clock, Filter, Save } from 'lucide-react';
+import { Users, Shield, Activity, Search, Plus, Edit2, X, Check, Clock, Filter, Save, Mail } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -20,14 +20,12 @@ import { sendInvite } from '@/lib/workspace/invites';
 
 type PermissionType = 'v' | 'e' | 'd';
 
-
-
 interface UIMember {
   id: string;
   name: string;
   email: string;
   role: string;
-  status: 'Active' | 'Invited' | 'Inactive';
+  status: 'Active' | 'Pending' | 'Invited' | 'Inactive' | 'Accepted' | 'Expired';
   lastActive: string;
   initials: string;
   color: string;
@@ -40,7 +38,6 @@ interface ActivityItem {
   target: string;
   time: string;
 }
-
 
 const MOCK_MEMBERS: UIMember[] = [];
 
@@ -99,8 +96,8 @@ export default function TeamPage() {
           name: m.name,
           email: m.email || '',
           role: m.role || 'Viewer',
-          status: 'Active' as const,
-          lastActive: 'Recently',
+          status: (m.status || 'Active') as UIMember['status'],
+          lastActive: m.status === 'Pending' || m.status === 'Invited' ? 'Invited' : 'Recently',
           initials,
           color: AVATAR_COLORS[i % AVATAR_COLORS.length]
         };
@@ -132,6 +129,7 @@ export default function TeamPage() {
     try {
       await updateMember(workspace?.id, editingMember.id, { name: editName.trim(), email: editEmail.trim() });
       setEditingMember(null);
+      toast.success('Member updated');
     } catch (err) { toast.error('Failed to update member'); }
   };
 
@@ -174,18 +172,43 @@ export default function TeamPage() {
 
   const handleInvite = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteName || !inviteEmail || !workspace?.id) return;
+    if (!inviteName.trim() || !inviteEmail.trim() || !workspace?.id) return;
+    
+    const emailLower = inviteEmail.trim().toLowerCase();
+    const existingMember = members.find(m => m.email.trim().toLowerCase() === emailLower);
+    if (existingMember) {
+      toast.error(`A member with email "${inviteEmail.trim()}" already exists in this workspace.`);
+      return;
+    }
+
     try {
       if (workspace?.id) {
-        await sendInvite(workspace.id, workspace.name || 'Workspace', inviteEmail.trim(), inviteRole, user?.id || '');
+        await sendInvite(workspace.id, workspace.name || 'Workspace', emailLower, inviteRole, user?.id || '');
       }
-      await createMember(workspace?.id, { name: inviteName, email: inviteEmail.trim(), role: inviteRole, avatar: '', projectIds: [] });
+      await createMember(workspace?.id, {
+        name: inviteName.trim(),
+        email: emailLower,
+        role: inviteRole,
+        status: 'Pending',
+        avatar: '',
+        projectIds: []
+      });
       toast.success('Invitation sent successfully!');
       setIsInviteModalOpen(false);
       setInviteName('');
       setInviteEmail('');
       setInviteRole('Viewer');
     } catch(err) { toast.error('Failed to send invite'); }
+  };
+
+  const handleResendInvite = async (member: UIMember) => {
+    if (!workspace?.id || !member.email) return;
+    try {
+      await sendInvite(workspace.id, workspace.name || 'Workspace', member.email.trim().toLowerCase(), member.role, user?.id || '');
+      toast.success(`Invitation email resent to ${member.email}`);
+    } catch (err) {
+      toast.error('Failed to resend invitation');
+    }
   };
 
   return (
@@ -234,6 +257,7 @@ export default function TeamPage() {
               <SelectContent>
                 <SelectItem value="All">All Statuses</SelectItem>
                 <SelectItem value="Active">Active</SelectItem>
+                <SelectItem value="Pending">Pending</SelectItem>
                 <SelectItem value="Invited">Invited</SelectItem>
                 <SelectItem value="Inactive">Inactive</SelectItem>
               </SelectContent>
@@ -282,8 +306,8 @@ export default function TeamPage() {
                         </td>
                         <td className="p-4">
                           <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${
-                            m.status === 'Active' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
-                            m.status === 'Invited' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'bg-muted text-muted-foreground'
+                            m.status === 'Active' || m.status === 'Accepted' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
+                            m.status === 'Pending' || m.status === 'Invited' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'bg-muted text-muted-foreground'
                           }`}>
                             {m.status}
                           </Badge>
@@ -291,11 +315,24 @@ export default function TeamPage() {
                         <td className="p-4 text-xs text-muted-foreground">{m.lastActive}</td>
                         <td className="p-4 text-right">
                           <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            {(m.status === 'Pending' || m.status === 'Invited') && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                title="Resend Invite"
+                                onClick={() => handleResendInvite(m)}
+                              >
+                                <Mail className="h-4 w-4" />
+                              </Button>
+                            )}
                             <Button variant="ghost" size="icon" className="h-8 w-8"
+                              title="Edit Member"
                               onClick={() => { setEditName(m.name); setEditEmail(m.email); setEditingMember(m); }}>
                               <Edit2 className="h-4 w-4" />
                             </Button>
                             <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                              title="Delete Member"
                               onClick={() => handleRemoveMember(m.id)}>
                               <X className="h-4 w-4" />
                             </Button>

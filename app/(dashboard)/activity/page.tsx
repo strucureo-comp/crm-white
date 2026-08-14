@@ -206,43 +206,55 @@ export default function ActivityPage() {
           owner: t.assignee || 'Unassigned',
         };
       });
-    const fromLogs = logs.map((l) => {
-      let normalizedDate = '';
-      if (l.date && l.date.length === 10) {
-        normalizedDate = l.date;
-      } else {
-        normalizedDate = format(parseISO(l.created_at), 'yyyy-MM-dd');
-      }
+    const fromLogs = logs
+      .filter((l) => {
+        const entityType = (l.entity_type || '').toLowerCase();
+        const action = (l.action || '').toLowerCase();
+        // Scope to CRM schedule & activity types (meetings, tasks, deadlines, followups, calls, notes)
+        // Explicitly exclude invoice/payment/billing items
+        if (entityType === 'invoice' || entityType === 'payment' || action.includes('invoice') || action.includes('payment')) {
+          return false;
+        }
+        return ['meeting', 'task', 'project', 'deadline', 'followup', 'call', 'note', 'status'].includes(entityType) ||
+               ['meeting', 'task', 'call', 'note', 'followup', 'deadline', 'status'].some(k => action.includes(k));
+      })
+      .map((l) => {
+        let normalizedDate = '';
+        if (l.date && l.date.length === 10) {
+          normalizedDate = l.date;
+        } else {
+          normalizedDate = format(parseISO(l.created_at), 'yyyy-MM-dd');
+        }
 
-      let sortTime = '';
-      let displayTime = '';
-      if (l.time && l.time.match(/^\d{1,2}:\d{2}$/)) {
-        sortTime = l.time.padStart(5, '0'); // pad 9:00 to 09:00
-        const [hh, mm] = l.time.split(':');
-        const h = parseInt(hh, 10);
-        displayTime = `${h % 12 || 12}:${mm} ${h >= 12 ? 'PM' : 'AM'}`;
-      } else {
-        sortTime = format(parseISO(l.created_at), 'HH:mm');
-        displayTime = format(parseISO(l.created_at), 'h:mm a');
-      }
+        let sortTime = '';
+        let displayTime = '';
+        if (l.time && l.time.match(/^\d{1,2}:\d{2}$/)) {
+          sortTime = l.time.padStart(5, '0'); // pad 9:00 to 09:00
+          const [hh, mm] = l.time.split(':');
+          const h = parseInt(hh, 10);
+          displayTime = `${h % 12 || 12}:${mm} ${h >= 12 ? 'PM' : 'AM'}`;
+        } else {
+          sortTime = format(parseISO(l.created_at), 'HH:mm');
+          displayTime = format(parseISO(l.created_at), 'h:mm a');
+        }
 
-      return {
-        id: `log-${l.id}`,
-        type: (l.entity_type === 'meeting' ? 'meeting' :
-              l.entity_type === 'task' ? 'task' :
-              l.entity_type === 'project' ? 'deadline' : 'followup') as ActivityType,
-        title: l.title || l.description,
-        description: l.action.replace(/_/g, ' '),
-        company: l.entity_type,
-        date: normalizedDate,
-        time: displayTime,
-        sortTime: sortTime,
-        duration: 0,
-        priority: (l.metadata?.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
-        status: 'pending' as 'pending',
-        owner: l.user_name,
-      };
-    });
+        return {
+          id: `log-${l.id}`,
+          type: (l.entity_type === 'meeting' ? 'meeting' :
+                l.entity_type === 'task' ? 'task' :
+                l.entity_type === 'project' ? 'deadline' : 'followup') as ActivityType,
+          title: l.title || l.description,
+          description: l.action.replace(/_/g, ' '),
+          company: l.entity_type,
+          date: normalizedDate,
+          time: displayTime,
+          sortTime: sortTime,
+          duration: 0,
+          priority: (l.metadata?.priority || 'medium') as 'low' | 'medium' | 'high' | 'critical',
+          status: 'pending' as 'pending',
+          owner: l.user_name,
+        };
+      });
     return [...fromTasks, ...fromLogs];
   }, [rawTasks, logs]);
 

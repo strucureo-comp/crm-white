@@ -24,6 +24,7 @@ import {
 import { ResponsiveTable } from '@/components/ui/responsive-table';
 import { getInvoices, deleteInvoice } from '@/lib/firebase/database';
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
 import type { Invoice } from '@/lib/db/types';
 import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 import { DataPagination } from '@/components/ui/data-pagination';
@@ -44,6 +45,7 @@ const PAGE_SIZE = 25;
 export default function InvoicesPage() {
   const router = useRouter();
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [invoices, setInvoices] = useState<Invoice[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -163,7 +165,7 @@ export default function InvoicesPage() {
                 {
                   key: 'amount',
                   header: 'Amount',
-                  render: (inv) => <span className="text-sm font-medium">{formatCurrency(inv.amount)}</span>,
+                  render: (inv) => <span className="text-sm font-medium">{formatCurrency(inv.amount, currency)}</span>,
                 },
                 {
                   key: 'status',

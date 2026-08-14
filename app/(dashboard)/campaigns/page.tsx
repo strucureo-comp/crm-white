@@ -18,6 +18,8 @@ import {
   DollarSign
 } from "lucide-react";
 import { useAuth } from '@/lib/firebase/auth-context';
+import { useWorkspace } from '@/lib/settings/workspace-context';
+import { formatCurrency } from '@/lib/utils';
 import { createCampaign, updateCampaign, deleteCampaign, subscribeToCampaigns, Campaign, SpendEntry } from '@/lib/db/campaigns/api';
 
 const MetaIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
@@ -37,6 +39,7 @@ const GoogleIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
 
 export default function CampaignsPage() {
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
   const [externalCampaigns, setExternalCampaigns] = useState<Campaign[]>([]);
 
@@ -253,7 +256,6 @@ export default function CampaignsPage() {
   const totalPortfolioSpend = allCampaigns.reduce((sum, c) => sum + c.spent, 0);
   const activeBudget = allCampaigns.filter((c) => c.status === "Active").reduce((sum, c) => sum + c.budget, 0);
 
-  const formatCurrency = (amount: number, currency: string = 'USD') => new Intl.NumberFormat('en-US', { style: 'currency', currency }).format(amount);
   const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
 
   return (
@@ -297,12 +299,12 @@ export default function CampaignsPage() {
           <div className="flex gap-6 items-center">
             <div className="flex flex-col items-end">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Portfolio Spend</span>
-              <span className="text-xl font-bold text-foreground">{formatCurrency(totalPortfolioSpend)}</span>
+              <span className="text-xl font-bold text-foreground">{formatCurrency(totalPortfolioSpend, currency)}</span>
             </div>
             <div className="h-10 w-px bg-muted"></div>
             <div className="flex flex-col items-end">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Budget</span>
-              <span className="text-xl font-bold text-emerald-500">{formatCurrency(activeBudget)}</span>
+              <span className="text-xl font-bold text-emerald-500">{formatCurrency(activeBudget, currency)}</span>
             </div>
           </div>
         </div>
@@ -479,8 +481,8 @@ export default function CampaignsPage() {
                         <td className="px-6 py-4">
                           <div className="flex flex-col gap-1.5 w-48">
                             <div className="flex justify-between text-xs font-medium">
-                              <span className="text-foreground">{formatCurrency(campaign.spent, campaign.currency || 'USD')}</span>
-                              <span className="text-muted-foreground">{formatCurrency(campaign.budget, campaign.currency || 'USD')}</span>
+                              <span className="text-foreground">{formatCurrency(campaign.spent, campaign.currency || currency)}</span>
+                              <span className="text-muted-foreground">{formatCurrency(campaign.budget, campaign.currency || currency)}</span>
                             </div>
                             <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                               <div 
@@ -626,7 +628,7 @@ export default function CampaignsPage() {
                   <div className="text-right">
                     <span className="block text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Total Spent</span>
                     <span className="text-lg font-bold text-foreground">
-                      {formatCurrency(formData.spent || 0, formData.currency || "USD")}
+                      {formatCurrency(formData.spent || 0, formData.currency || currency)}
                     </span>
                   </div>
                 </div>
@@ -682,7 +684,7 @@ export default function CampaignsPage() {
                                   {new Date(entry.date).toLocaleDateString()}
                                 </td>
                                 <td className="px-3 py-2 text-foreground font-medium text-right">
-                                  {formatCurrency(entry.amount, formData.currency || "USD")}
+                                  {formatCurrency(entry.amount, formData.currency || currency)}
                                 </td>
                                 <td className="px-3 py-2 text-right">
                                   <button
