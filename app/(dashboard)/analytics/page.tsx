@@ -386,12 +386,18 @@ export default function AnalyticsDashboard() {
       { name: 'Lost', value: lostDeals.length }
     ];
 
-    const campaignRoi = campaigns.map(c => ({
-      name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
-      budget: c.budget || 0,
-      spent: c.spent || 0,
-      value: c.roi || (c.revenue && c.spent ? Math.round((c.revenue / c.spent) * 100) / 100 : (c.budget ? Math.round(((c.revenue || 0) / c.budget) * 10) / 10 : 0))
-    })).filter(c => c.value > 0);
+    const currency = 'USD';
+
+    const campaignRoi = campaigns.map(c => {
+      const camp = c as any;
+      const val = camp.roi || (camp.revenue && camp.spent ? Math.round((camp.revenue / camp.spent) * 100) / 100 : (camp.budget ? Math.round(((camp.revenue || 0) / camp.budget) * 10) / 10 : 0));
+      return {
+        name: c.name.length > 15 ? c.name.substring(0, 15) + '...' : c.name,
+        budget: c.budget || 0,
+        spent: c.spent || 0,
+        value: val
+      };
+    }).filter(c => c.value > 0);
 
     const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     const last6Months = [];
@@ -446,7 +452,7 @@ export default function AnalyticsDashboard() {
       active_pipeline_volume: activePipelineVolume,
       win_rate_trend: winRateTrend
     };
-  }, [filteredDeals, members, campaigns, currency]);
+  }, [filteredDeals, members, campaigns]);
 
   useEffect(() => setIsClient(true), []);
 

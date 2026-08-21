@@ -89,6 +89,51 @@ export async function updateInviteStatus(inviteId: string, status: 'accepted' | 
   await update(inviteRef, { status });
 }
 
+export async function acceptWorkspaceInvite(
+  invite: Invite, 
+  user: { id: string; email?: string; full_name?: string }
+): Promise<void> {
+  await updateInviteStatus(invite.id, 'accepted');
+  
+  // 1. Create workspace member
+  const { createWorkspaceMember } = await import('@/lib/workspace/api');
+  await createWorkspaceMember(invite.workspace_id, user.id, invite.role as any, invite.invited_by);
+  
+  // 2. Sync / update status in project_members
+  try {
+    const projMembersRef = ref(database, `project_members/${invite.workspace_id}`);
+    const snap = await get(projMembersRef);
+    if (snap.exists()) {
+      const data = snap.val();
+      for (const [key, val] of Object.entries<any>(data)) {
+        if (val && val.email && val.email.trim().toLowerCase() === invite.email.trim().toLowerCase()) {
+          await update(ref(database, `project_members/${invite.workspace_id}/${key}`), {
+            status: 'Active',
+            name: user.full_name || val.name || invite.email.split('@')[0]
+          });
+          return;
+        }
+      }
+    }
+    
+    // If not found in project_members, insert active member
+    const mName = user.full_name || invite.email.split('@')[0];
+    const initials = mName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+    const roleCapitalized = invite.role ? invite.role.charAt(0).toUpperCase() + invite.role.slice(1) : 'Viewer';
+    const newRef = push(projMembersRef);
+    await set(newRef, {
+      name: mName,
+      email: invite.email,
+      role: roleCapitalized,
+      status: 'Active',
+      avatar: initials,
+      projectIds: []
+    });
+  } catch (err) {
+    console.warn('Could not sync project_members on invite accept:', err);
+  }
+}
+
 export async function deleteInvite(inviteId: string): Promise<void> {
   const inviteRef = ref(database, `invites/${inviteId}`);
   await remove(inviteRef);

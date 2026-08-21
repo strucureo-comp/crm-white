@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useAuth } from '@/lib/firebase/auth-context';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { updateInviteStatus } from '@/lib/workspace/invites';
+import { updateInviteStatus, acceptWorkspaceInvite } from '@/lib/workspace/invites';
 import { createWorkspaceMember } from '@/lib/workspace/api';
 import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
@@ -20,14 +20,17 @@ export function InvitesModal() {
     return null;
   }
 
-  const handleAccept = async (inviteId: string, workspaceId: string, role: string) => {
+  const handleAccept = async (invite: any) => {
     setProcessing(true);
     try {
-      await updateInviteStatus(inviteId, 'accepted');
-      await createWorkspaceMember(workspaceId, user.id, role as any, undefined);
+      await acceptWorkspaceInvite(invite, {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name
+      });
       toast.success('Invitation accepted! Switching workspace...');
       await refreshUser();
-      await switchWorkspace(workspaceId);
+      await switchWorkspace(invite.workspace_id);
       // Redirect to dashboard since the user now has a workspace
       router.push('/dashboard');
     } catch (e) {
@@ -91,7 +94,7 @@ export function InvitesModal() {
                 <Button size="sm" variant="outline" disabled={processing} onClick={() => handleDecline(invite.id)}>
                   Decline
                 </Button>
-                <Button size="sm" disabled={processing} onClick={() => handleAccept(invite.id, invite.workspace_id, invite.role)}>
+                <Button size="sm" disabled={processing} onClick={() => handleAccept(invite)}>
                   {processing && <Loader2 size={14} className="mr-1 animate-spin" />}
                   Accept
                 </Button>

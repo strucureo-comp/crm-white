@@ -4,6 +4,19 @@ import { Role, ModulePermissions } from '../types';
 
 const DEFAULT_ROLES: Omit<Role, 'id' | 'workspace_id' | 'created_at' | 'updated_at'>[] = [
   {
+    name: 'Owner',
+    description: 'Full ownership and administrative control over the workspace.',
+    is_system: true,
+    permissions: {
+      contracts: { view: true, edit: true, delete: true },
+      payments: { view: true, edit: true, delete: true },
+      marketing: { view: true, edit: true, delete: true },
+      workspace: { view: true, edit: true, delete: true },
+      analytics: { view: true, edit: true, delete: true },
+      leads: { view: true, edit: true, delete: true },
+    }
+  },
+  {
     name: 'Admin',
     description: 'Full access to all modules and settings.',
     is_system: true,
@@ -123,6 +136,15 @@ export async function ensureDefaultRoles(workspaceId: string): Promise<void> {
   if (roles.length === 0) {
     for (const defaultRole of DEFAULT_ROLES) {
       await createRole(workspaceId, defaultRole);
+    }
+  } else {
+    // Check if Owner role exists, if not, create it
+    const hasOwner = roles.some(r => r.name.toLowerCase() === 'owner');
+    if (!hasOwner) {
+      const ownerRole = DEFAULT_ROLES.find(r => r.name.toLowerCase() === 'owner');
+      if (ownerRole) {
+        await createRole(workspaceId, ownerRole);
+      }
     }
   }
 }

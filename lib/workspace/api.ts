@@ -38,6 +38,27 @@ export async function createWorkspace(
     // Add owner as workspace member
     await createWorkspaceMember(workspaceId, ownerId, 'owner');
 
+    // Add owner to project_members
+    try {
+      const userSnap = await get(ref(database, `users/${ownerId}`));
+      const userData = userSnap.exists() ? userSnap.val() : null;
+      const ownerName = userData?.full_name || 'Workspace Owner';
+      const ownerEmail = userData?.email || '';
+      const initials = ownerName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2) || 'OW';
+      
+      const memberRef = push(ref(database, `project_members/${workspaceId}`));
+      await set(memberRef, {
+        name: ownerName,
+        email: ownerEmail,
+        role: 'Owner',
+        status: 'Active',
+        avatar: initials,
+        projectIds: []
+      });
+    } catch (err) {
+      console.warn('Could not auto-create owner in project_members:', err);
+    }
+
     // Seed default RBAC roles
     await ensureDefaultRoles(workspaceId);
 
@@ -251,6 +272,107 @@ export async function getWorkspaceMembers(workspaceId: string): Promise<Workspac
   }
 }
 
+export async function ensureWorkspaceOwnerMember(
+  workspaceId: string,
+  ownerId?: string,
+  currentUser?: { id?: string; email?: string; full_name?: string; role?: string } | null
+): Promise<void> {
+  if (!workspaceId) return;
+  try {
+    // 1. Ensure default roles exist first
+    await ensureDefaultRoles(workspaceId);
+
+    // 2. Fetch project members
+    const projMembersRef = ref(database, `project_members/${workspaceId}`);
+    const projSnap = await get(projMembersRef);
+    const projData = projSnap.exists() ? projSnap.val() : {};
+    const existingMembers: Array<{ id: string; name?: string; email?: string; role?: string; status?: string }> = 
+      Object.keys(projData).map(k => ({ id: k, ...projData[k] }));
+
+    // 3. Resolve Owner information
+    let resolvedOwnerId = ownerId;
+    if (!resolvedOwnerId) {
+      const wsSnap = await get(ref(database, `workspaces/${workspaceId}`));
+      if (wsSnap.exists()) {
+        resolvedOwnerId = wsSnap.val()?.owner_id;
+      }
+    }
+
+    let ownerName = '';
+    let ownerEmail = '';
+
+    if (currentUser && resolvedOwnerId && currentUser.id === resolvedOwnerId) {
+      ownerName = currentUser.full_name || currentUser.email?.split('@')[0] || 'Workspace Owner';
+      ownerEmail = currentUser.email || '';
+    } else if (resolvedOwnerId) {
+      const userSnap = await get(ref(database, `users/${resolvedOwnerId}`));
+      if (userSnap.exists()) {
+        const u = userSnap.val();
+        ownerName = u.full_name || u.email?.split('@')[0] || 'Workspace Owner';
+        ownerEmail = u.email || '';
+      }
+    }
+
+    // 4. If owner is not in project_members, insert owner
+    if (ownerEmail || ownerName) {
+      const ownerExists = existingMembers.some(m =>
+        (ownerEmail && m.email?.trim().toLowerCase() === ownerEmail.trim().toLowerCase()) ||
+        (m.name?.trim().toLowerCase() === ownerName.trim().toLowerCase() && (m.role?.toLowerCase() === 'owner' || m.role?.toLowerCase() === 'admin'))
+      );
+
+      if (!ownerExists) {
+        const initials = (ownerName || 'OW').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        const newRef = push(projMembersRef);
+        await set(newRef, {
+          name: ownerName || 'Workspace Owner',
+          email: ownerEmail || '',
+          role: 'Owner',
+          status: 'Active',
+          avatar: initials,
+          projectIds: []
+        });
+      }
+    }
+
+    // 5. Sync any accepted workspace members to active project members
+    const wsMembersSnap = await get(ref(database, WORKSPACE_MEMBERS_PATH));
+    if (wsMembersSnap.exists()) {
+      const wsMembers = wsMembersSnap.val();
+      for (const [key, wm] of Object.entries<any>(wsMembers)) {
+        if (wm && wm.workspace_id === workspaceId && wm.user_id) {
+          const uSnap = await get(ref(database, `users/${wm.user_id}`));
+          if (uSnap.exists()) {
+            const u = uSnap.val();
+            if (u.email) {
+              const matchedMember = existingMembers.find(m => m.email?.trim().toLowerCase() === u.email.trim().toLowerCase());
+              if (matchedMember && matchedMember.status !== 'Active') {
+                await update(ref(database, `project_members/${workspaceId}/${matchedMember.id}`), {
+                  status: 'Active'
+                });
+              } else if (!matchedMember && (!ownerEmail || u.email.toLowerCase() !== ownerEmail.toLowerCase())) {
+                const mName = u.full_name || u.email.split('@')[0];
+                const initials = mName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2);
+                const roleCapitalized = wm.role ? wm.role.charAt(0).toUpperCase() + wm.role.slice(1) : 'Admin';
+                const newRef = push(projMembersRef);
+                await set(newRef, {
+                  name: mName,
+                  email: u.email,
+                  role: roleCapitalized,
+                  status: 'Active',
+                  avatar: initials,
+                  projectIds: []
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.error('Error in ensureWorkspaceOwnerMember:', error);
+  }
+}
+
 export async function getWorkspaceMembersWithDetails(workspaceId: string): Promise<Array<{id: string, name: string, email: string, role: string}>> {
   try {
     const members = await getWorkspaceMembers(workspaceId);
@@ -267,7 +389,7 @@ export async function getWorkspaceMembersWithDetails(workspaceId: string): Promi
             id: m.id,
             name: user.full_name || 'Unknown User',
             email: user.email || '',
-            role: m.role,
+            role: m.role ? m.role.charAt(0).toUpperCase() + m.role.slice(1) : 'Member',
           });
         }
       } catch (e) {

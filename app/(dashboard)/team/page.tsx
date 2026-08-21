@@ -15,7 +15,8 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { getActivityLogs } from '@/lib/firebase/database';
 import { ActivityLog, Role, ModulePermissions } from '@/lib/db/types';
 import { subscribeToProjectsData, createMember, updateMember, deleteMember } from '@/lib/db/projects/api';
-import { subscribeToRoles, updateRole, createRole, deleteRole } from '@/lib/db/roles/api';
+import { subscribeToRoles, updateRole, createRole, deleteRole, ensureDefaultRoles } from '@/lib/db/roles/api';
+import { ensureWorkspaceOwnerMember } from '@/lib/workspace/api';
 import { sendInvite } from '@/lib/workspace/invites';
 
 type PermissionType = 'v' | 'e' | 'd';
@@ -72,8 +73,14 @@ export default function TeamPage() {
 
   useEffect(() => {
     if (!workspace?.id) return;
+    ensureWorkspaceOwnerMember(workspace.id, workspace.owner_id, user).catch(console.error);
+    ensureDefaultRoles(workspace.id).catch(console.error);
+  }, [workspace?.id, user]);
+
+  useEffect(() => {
+    if (!workspace?.id) return;
     getActivityLogs(workspace?.id).then(setActivityLogs).catch(console.error);
-  }, [user]);
+  }, [workspace?.id, user]);
 
   useEffect(() => {
     if (!workspace?.id) return;
@@ -88,9 +95,9 @@ export default function TeamPage() {
 
   useEffect(() => {
     if (!workspace?.id) return;
-    const unsub = subscribeToProjectsData(workspace?.id, (data) => {
+    const unsub = subscribeToProjectsData(workspace.id, (data) => {
       const mapped: UIMember[] = (data.members || []).map((m, i) => {
-        const initials = m.name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+        const initials = (m.name || 'U').split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
         return {
           id: m.id,
           name: m.name,
@@ -102,10 +109,37 @@ export default function TeamPage() {
           color: AVATAR_COLORS[i % AVATAR_COLORS.length]
         };
       });
+
+      // If workspace owner is known and not present in data.members, proactively synthesize at top
+      if (workspace?.owner_id) {
+        const ownerEmail = (user?.id === workspace.owner_id ? user?.email : '') || '';
+        const ownerName = (user?.id === workspace.owner_id ? (user?.full_name || user?.email?.split('@')[0]) : '') || 'Workspace Owner';
+        
+        const hasOwner = mapped.some(m => 
+          (ownerEmail && m.email.toLowerCase() === ownerEmail.toLowerCase()) ||
+          (m.role.toLowerCase() === 'owner') ||
+          (m.id === workspace.owner_id)
+        );
+
+        if (!hasOwner && (ownerEmail || ownerName)) {
+          const initials = (ownerName || 'OW').split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+          mapped.unshift({
+            id: workspace.owner_id,
+            name: ownerName,
+            email: ownerEmail,
+            role: 'Owner',
+            status: 'Active',
+            lastActive: 'Recently',
+            initials,
+            color: AVATAR_COLORS[0]
+          });
+        }
+      }
+
       setMembers(mapped);
     });
     return () => unsub();
-  }, [user]);
+  }, [workspace?.id, user]);
 
   useEffect(() => {
     const role = roles.find(r => r.id === selectedRoleId);
@@ -115,19 +149,30 @@ export default function TeamPage() {
 
   const handleRoleChange = async (memberId: string, newRole: string) => {
     if (!workspace?.id) return;
-    try { await updateMember(workspace?.id, memberId, { role: newRole }); } catch(err) { toast.error('Failed to update member role'); }
+    try { await updateMember(workspace.id, memberId, { role: newRole }); } catch(err) { toast.error('Failed to update member role'); }
   };
 
-  const handleRemoveMember = async (memberId: string) => {
+  const handleRemoveMember = async (member: UIMember) => {
     if (!workspace?.id) return;
-    try { await deleteMember(workspace?.id, memberId); } catch(err) { toast.error('Failed to remove member'); }
+    const isOwner = member.role?.toLowerCase() === 'owner' || 
+      (workspace.owner_id && (member.id === workspace.owner_id || (user?.id === workspace.owner_id && member.email?.toLowerCase() === user.email?.toLowerCase())));
+    if (isOwner) {
+      toast.error('The workspace owner cannot be removed');
+      return;
+    }
+    try { 
+      await deleteMember(workspace.id, member.id); 
+      toast.success('Member removed');
+    } catch(err) { 
+      toast.error('Failed to remove member'); 
+    }
   };
 
   const handleEditSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingMember || !workspace?.id || !editName.trim()) return;
     try {
-      await updateMember(workspace?.id, editingMember.id, { name: editName.trim(), email: editEmail.trim() });
+      await updateMember(workspace.id, editingMember.id, { name: editName.trim(), email: editEmail.trim() });
       setEditingMember(null);
       toast.success('Member updated');
     } catch (err) { toast.error('Failed to update member'); }
@@ -281,65 +326,88 @@ export default function TeamPage() {
                     {filteredMembers.length === 0 && (
                       <tr><td colSpan={5} className="p-8 text-center text-sm text-muted-foreground">No members found.</td></tr>
                     )}
-                    {filteredMembers.map(m => (
-                      <tr key={m.id} className="hover:bg-muted/50 transition-colors group">
-                        <td className="p-4">
-                          <div className="flex items-center gap-3">
-                            <Avatar className="h-8 w-8 shrink-0">
-                              <AvatarFallback className="text-xs text-white" style={{ backgroundColor: m.color }}>{m.initials}</AvatarFallback>
-                            </Avatar>
-                            <div className="min-w-0">
-                              <p className="text-sm font-medium truncate">{m.name}</p>
-                              <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                    {filteredMembers.map(m => {
+                      const isCurrentUser = Boolean(
+                        (user?.email && m.email && m.email.trim().toLowerCase() === user.email.trim().toLowerCase()) ||
+                        (user?.id && (m.id === user.id || (user.id === workspace?.owner_id && (m.role?.toLowerCase() === 'owner' || m.id === workspace?.owner_id))))
+                      );
+                      const isOwner = m.role?.toLowerCase() === 'owner' || 
+                        Boolean(workspace?.owner_id && (m.id === workspace.owner_id || (user?.id === workspace.owner_id && isCurrentUser)));
+
+                      return (
+                        <tr key={m.id} className="hover:bg-muted/50 transition-colors group">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="h-8 w-8 shrink-0">
+                                <AvatarFallback className="text-xs text-white" style={{ backgroundColor: m.color }}>{m.initials}</AvatarFallback>
+                              </Avatar>
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 flex-wrap">
+                                  <p className="text-sm font-medium truncate">{m.name}</p>
+                                  {isCurrentUser && (
+                                    <span className="text-xs font-normal text-muted-foreground shrink-0">(You)</span>
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground truncate">{m.email}</p>
+                              </div>
                             </div>
-                          </div>
-                        </td>
-                        <td className="p-4">
-                          <Select value={m.role} onValueChange={(val) => handleRoleChange(m.id, val)}>
-                            <SelectTrigger className="h-8 text-xs border-none shadow-none bg-transparent hover:bg-muted w-[130px]">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              {roles.map(r => <SelectItem key={r.id} value={r.name} className="text-xs">{r.name}</SelectItem>)}
-                            </SelectContent>
-                          </Select>
-                        </td>
-                        <td className="p-4">
-                          <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${
-                            m.status === 'Active' || m.status === 'Accepted' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
-                            m.status === 'Pending' || m.status === 'Invited' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'bg-muted text-muted-foreground'
-                          }`}>
-                            {m.status}
-                          </Badge>
-                        </td>
-                        <td className="p-4 text-xs text-muted-foreground">{m.lastActive}</td>
-                        <td className="p-4 text-right">
-                          <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            {(m.status === 'Pending' || m.status === 'Invited') && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                title="Resend Invite"
-                                onClick={() => handleResendInvite(m)}
-                              >
-                                <Mail className="h-4 w-4" />
+                          </td>
+                          <td className="p-4">
+                            <Select 
+                              value={m.role} 
+                              onValueChange={(val) => handleRoleChange(m.id, val)}
+                              disabled={isOwner && user?.id !== workspace?.owner_id}
+                            >
+                              <SelectTrigger className="h-8 text-xs border-none shadow-none bg-transparent hover:bg-muted w-[130px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {roles.map(r => <SelectItem key={r.id} value={r.name} className="text-xs">{r.name}</SelectItem>)}
+                                {!roles.some(r => r.name.toLowerCase() === 'owner') && (
+                                  <SelectItem value="Owner" className="text-xs">Owner</SelectItem>
+                                )}
+                              </SelectContent>
+                            </Select>
+                          </td>
+                          <td className="p-4">
+                            <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${
+                              m.status === 'Active' || m.status === 'Accepted' ? 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400' :
+                              m.status === 'Pending' || m.status === 'Invited' ? 'bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400' : 'bg-muted text-muted-foreground'
+                            }`}>
+                              {m.status}
+                            </Badge>
+                          </td>
+                          <td className="p-4 text-xs text-muted-foreground">{m.lastActive}</td>
+                          <td className="p-4 text-right">
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {(m.status === 'Pending' || m.status === 'Invited') && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                  title="Resend Invite"
+                                  onClick={() => handleResendInvite(m)}
+                                >
+                                  <Mail className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button variant="ghost" size="icon" className="h-8 w-8"
+                                title="Edit Member"
+                                onClick={() => { setEditName(m.name); setEditEmail(m.email); setEditingMember(m); }}>
+                                <Edit2 className="h-4 w-4" />
                               </Button>
-                            )}
-                            <Button variant="ghost" size="icon" className="h-8 w-8"
-                              title="Edit Member"
-                              onClick={() => { setEditName(m.name); setEditEmail(m.email); setEditingMember(m); }}>
-                              <Edit2 className="h-4 w-4" />
-                            </Button>
-                            <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                              title="Delete Member"
-                              onClick={() => handleRemoveMember(m.id)}>
-                              <X className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </td>
-                      </tr>
-                    ))}
+                              {!isOwner && (
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                  title="Delete Member"
+                                  onClick={() => handleRemoveMember(m)}>
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

@@ -41,7 +41,7 @@ import { useAuth } from '@/lib/firebase/auth-context';
 import { getNotifications, markNotificationAsRead } from '@/lib/firebase/database';
 import type { Notification } from '@/lib/db/types';
 import { format } from 'date-fns';
-import { getPendingInvitesByEmail, updateInviteStatus, type Invite } from '@/lib/workspace/invites';
+import { getPendingInvitesByEmail, updateInviteStatus, acceptWorkspaceInvite, type Invite } from '@/lib/workspace/invites';
 import { createWorkspaceMember } from '@/lib/workspace/api';
 import { toast } from 'sonner';
 
@@ -94,8 +94,11 @@ export function AppHeader() {
   const handleAcceptInvite = async (invite: Invite) => {
     if (!user?.id) return;
     try {
-      await createWorkspaceMember(invite.workspace_id, user.id, invite.role as any);
-      await updateInviteStatus(invite.id, 'accepted');
+      await acceptWorkspaceInvite(invite, {
+        id: user.id,
+        email: user.email,
+        full_name: user.full_name
+      });
       toast.success(`Joined ${invite.workspace_name}!`);
       // Reload workspace list to include the new workspace
       // Actually switch workspace will be available on reload or through context refresh

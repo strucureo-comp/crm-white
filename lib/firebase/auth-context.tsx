@@ -13,7 +13,7 @@ import { ref, set, get, child } from 'firebase/database';
 import { auth, database } from './config';
 import { User, UserRole } from '@/lib/db/types';
 import { createUser } from './database';
-import { getUserWorkspace, getUserWorkspaces, createWorkspace, findWorkspaceByName, createWorkspaceMember } from '@/lib/workspace/api';
+import { getUserWorkspace, getUserWorkspaces, createWorkspace, findWorkspaceByName, createWorkspaceMember, ensureWorkspaceOwnerMember } from '@/lib/workspace/api';
 import { getPendingInvitesByEmail, Invite } from '@/lib/workspace/invites';
 import type { Workspace } from '@/lib/db/types';
 
@@ -173,6 +173,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       
       
       setWorkspace(ws);
+      
+      // Ensure owner and members are synced in background
+      if (ws) {
+        ensureWorkspaceOwnerMember(ws.id, ws.owner_id, user).catch(() => {});
+      }
       
       // Fetch workspace role
       if (ws) {
