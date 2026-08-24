@@ -121,6 +121,7 @@ export default function OverviewPage() {
     { name: 'Proposal', count: leads.filter((l) => l.status === "proposal").length, value: leads.filter((l) => l.status === "proposal").reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Negotiation', count: leads.filter((l) => l.status === 'negotiation').length, value: leads.filter((l) => l.status === 'negotiation').reduce((s, l) => s + (l.estimated_value || 0), 0) },
     { name: 'Closed Won', count: leads.filter((l) => l.status === 'won').length, value: leads.filter((l) => l.status === 'won').reduce((s, l) => s + (l.estimated_value || 0), 0) },
+    { name: 'Closed Lost', count: leads.filter((l) => l.status === 'lost').length, value: leads.filter((l) => l.status === 'lost').reduce((s, l) => s + (l.estimated_value || 0), 0) },
   ];
 
   const topDeals = leads
