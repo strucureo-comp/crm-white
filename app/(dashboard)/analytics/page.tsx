@@ -229,6 +229,7 @@ export default function AnalyticsDashboard() {
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const { workspace, user } = useAuth();
+  const { currency } = useWorkspace();
   const [deals, setDeals] = useState<Lead[]>([]);
   const [members, setMembers] = useState<any[]>([]);
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
@@ -386,8 +387,6 @@ export default function AnalyticsDashboard() {
       { name: 'Lost', value: lostDeals.length }
     ];
 
-    const currency = 'USD';
-
     const campaignRoi = campaigns.map(c => {
       const camp = c as any;
       const val = camp.roi || (camp.revenue && camp.spent ? Math.round((camp.revenue / camp.spent) * 100) / 100 : (camp.budget ? Math.round(((camp.revenue || 0) / camp.budget) * 10) / 10 : 0));
@@ -452,7 +451,7 @@ export default function AnalyticsDashboard() {
       active_pipeline_volume: activePipelineVolume,
       win_rate_trend: winRateTrend
     };
-  }, [filteredDeals, members, campaigns]);
+  }, [filteredDeals, members, campaigns, currency]);
 
   useEffect(() => setIsClient(true), []);
 
