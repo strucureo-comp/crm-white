@@ -357,10 +357,13 @@ export default function AnalyticsDashboard() {
     const avgDealChange = formatChange(avgDealSize, wonPrevMonth.length > 0 ? Math.round(wonPrevMonth.reduce((acc, d) => acc + (d.estimated_value || 0), 0) / wonPrevMonth.length) : 0);
 
     const pipelineByStage = [
-      { name: 'Lead', value: openDeals.filter(d => d.status === 'new' || d.status === 'contacted').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
-      { name: 'Qualified', value: openDeals.filter(d => d.status === 'qualified').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
-      { name: 'Proposal', value: openDeals.filter(d => d.status === 'proposal').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
-      { name: 'Negotiation', value: openDeals.filter(d => d.status === 'negotiation').reduce((acc, d) => acc + (d.estimated_value || 0), 0) }
+      { name: 'Lead', value: filteredDeals.filter(d => d.status === 'new').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Contacted', value: filteredDeals.filter(d => d.status === 'contacted').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Qualified', value: filteredDeals.filter(d => d.status === 'qualified').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Proposal', value: filteredDeals.filter(d => d.status === 'proposal').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Negotiation', value: filteredDeals.filter(d => d.status === 'negotiation').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Closed Won', value: filteredDeals.filter(d => d.status === 'won').reduce((acc, d) => acc + (d.estimated_value || 0), 0) },
+      { name: 'Closed Lost', value: filteredDeals.filter(d => d.status === 'lost').reduce((acc, d) => acc + (d.estimated_value || 0), 0) }
     ];
 
     const revenueByOwnerMap: Record<string, number> = {};
@@ -375,10 +378,13 @@ export default function AnalyticsDashboard() {
 
     const salesFunnel = [
       { name: 'Total Deals', value: filteredDeals.length },
-      { name: 'Qualified', value: filteredDeals.filter(d => d.status === 'qualified' || d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
-      { name: 'Proposals', value: filteredDeals.filter(d => d.status === 'proposal' || d.status === 'negotiation' || d.status === 'won').length },
-      { name: 'Negotiation', value: filteredDeals.filter(d => d.status === 'negotiation' || d.status === 'won').length },
-      { name: 'Closed Won', value: wonDeals.length }
+      { name: 'Lead', value: filteredDeals.filter(d => ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won'].includes(d.status)).length },
+      { name: 'Contacted', value: filteredDeals.filter(d => ['contacted', 'qualified', 'proposal', 'negotiation', 'won'].includes(d.status)).length },
+      { name: 'Qualified', value: filteredDeals.filter(d => ['qualified', 'proposal', 'negotiation', 'won'].includes(d.status)).length },
+      { name: 'Proposals', value: filteredDeals.filter(d => ['proposal', 'negotiation', 'won'].includes(d.status)).length },
+      { name: 'Negotiation', value: filteredDeals.filter(d => ['negotiation', 'won'].includes(d.status)).length },
+      { name: 'Closed Won', value: wonDeals.length },
+      { name: 'Closed Lost', value: lostDeals.length }
     ];
 
     const dealStatusDist = [
@@ -585,7 +591,7 @@ export default function AnalyticsDashboard() {
                             )}
                           </CardHeader>
                           <CardContent className="pt-0">
-                            <div className={w.type === 'funnel' ? 'h-[260px] overflow-hidden' : 'h-[200px]'}>
+                            <div className={w.type === 'funnel' ? 'h-auto min-h-[260px]' : 'h-[200px]'}>
                               <WidgetRenderer widget={w} data={(dashboardData as Record<string, any>)[w.config.metricId]} />
                             </div>
                           </CardContent>
