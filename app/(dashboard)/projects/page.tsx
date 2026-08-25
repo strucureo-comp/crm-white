@@ -5,7 +5,7 @@ import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea
 import {
   Search, Plus, X, UploadCloud, FileText, Mail, FileIcon, MessageSquare,
   CheckCircle2, AlertCircle, Cloud, MoreHorizontal, Calendar, FolderOpen,
-  Check, Pencil, Trash2, ChevronDown
+  Check, Pencil, Trash2, ChevronDown, Eye, Lock, Users
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -22,11 +22,12 @@ import { ConfirmDialog } from '@/components/ui/confirm-dialog';
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import {
-  ProjectStatus, TaskStatus, TaskPriority,
-  Project, Member, Task, ProjectsData,
+  ProjectStatus, TaskStatus, TaskPriority, NoteVisibility,
+  Project, Member, Task, Note, ProjectsData,
   subscribeToProjectsData, createProject, updateProject, deleteProject,
   createTask, updateTask, deleteTask,
-  createMember, updateMember, deleteMember
+  createMember, updateMember, deleteMember,
+  createNote, updateNote, deleteNote
 } from '@/lib/db/projects/api';
 
 const COLUMNS: ProjectStatus[] = ['Kick-off', 'Planning', 'Implementation', 'Review', 'Closing'];
@@ -55,6 +56,7 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<Member[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [notes, setNotes] = useState<Note[]>([]);
 
   const [search, setSearch] = useState('');
 
@@ -80,6 +82,7 @@ export default function ProjectsPage() {
       setProjects(data.projects);
       setMembers(data.members);
       setTasks(data.tasks);
+      setNotes(data.notes);
 
       // Update selected project if it exists so overlay stays current
       if (selectedProject) {
@@ -98,6 +101,8 @@ export default function ProjectsPage() {
   const [formBudget, setFormBudget] = useState('10000');
   const [formMembers, setFormMembers] = useState<string[]>([]);
   const [newMemberName, setNewMemberName] = useState('');
+  const [formStartDate, setFormStartDate] = useState(new Date().toISOString().split('T')[0]);
+  const [formEndDate, setFormEndDate] = useState('');
 
   // Inline Task Form State (Multi-Assignee Support)
   const [addingTaskPhase, setAddingTaskPhase] = useState<ProjectStatus | null>(null);
@@ -105,6 +110,18 @@ export default function ProjectsPage() {
   const [taskFormOwners, setTaskFormOwners] = useState<string[]>([]);
   const [taskFormDue, setTaskFormDue] = useState('');
   const [taskFormPriority, setTaskFormPriority] = useState<TaskPriority>('Normal');
+  const [taskFormDescription, setTaskFormDescription] = useState('');
+
+  // Notes Form State
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [noteFormTitle, setNoteFormTitle] = useState('');
+  const [noteFormDescription, setNoteFormDescription] = useState('');
+  const [noteFormVisibility, setNoteFormVisibility] = useState<NoteVisibility>('everyone');
+  const [noteFormVisibleTo, setNoteFormVisibleTo] = useState<string[]>([]);
+  const [notesFilter, setNotesFilter] = useState<'all' | 'only-me' | 'everyone' | 'specific'>('all');
+  const [expandAllNotes, setExpandAllNotes] = useState(false);
+  const [editingNote, setEditingNote] = useState<Note | null>(null);
+  const [viewingNote, setViewingNote] = useState<Note | null>(null);
 
   // Derived
   const filteredProjects = projects.filter(p => p.name.toLowerCase().includes(search.toLowerCase()));
@@ -135,8 +152,8 @@ export default function ProjectsPage() {
       members: formMembers,
       linkedDeal: null,
       emoji: '📁',
-      startDate: new Date().toISOString().split('T')[0],
-      endDate: '',
+      startDate: formStartDate,
+      endDate: formEndDate,
       budget: { est: Number(formBudget) || 0, actual: 0 },
       progress: 0
     };
@@ -151,6 +168,8 @@ export default function ProjectsPage() {
       setFormColor('#6366f1');
       setFormBudget('10000');
       setFormMembers([]);
+      setFormStartDate(new Date().toISOString().split('T')[0]);
+      setFormEndDate('');
     } catch (e) {
       toast.error('Failed to create project');
     }
@@ -238,7 +257,8 @@ export default function ProjectsPage() {
       status: 'To Do' as TaskStatus,
       priority: taskFormPriority,
       due: taskFormDue || 'No due date',
-      phase
+      phase,
+      description: taskFormDescription
     };
 
     try {
@@ -248,6 +268,7 @@ export default function ProjectsPage() {
       setTaskFormOwners([]);
       setTaskFormDue('');
       setTaskFormPriority('Normal');
+      setTaskFormDescription('');
       toast.success('Task created successfully');
     } catch (e) {
       toast.error('Failed to create task');
@@ -431,6 +452,17 @@ export default function ProjectsPage() {
               <div className="space-y-2">
                 <Label className="text-xs uppercase tracking-wider text-muted-foreground">Est Budget ($)</Label>
                 <Input type="number" value={formBudget} onChange={e => setFormBudget(e.target.value)} />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Start Date</Label>
+                <Input type="date" value={formStartDate} onChange={e => setFormStartDate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label className="text-xs uppercase tracking-wider text-muted-foreground">Due Date</Label>
+                <Input type="date" value={formEndDate} onChange={e => setFormEndDate(e.target.value)} />
               </div>
             </div>
 
@@ -665,8 +697,11 @@ export default function ProjectsPage() {
                                         <td className="w-12 px-4 py-3 text-center">
                                           <input type="checkbox" checked={task.status === 'Done'} onChange={() => handleToggleTaskStatus(task)} className="w-4 h-4 rounded border-muted-foreground text-primary focus:ring-primary cursor-pointer" />
                                         </td>
-                                        <td className={`px-4 py-3 font-medium ${task.status === 'Done' ? 'line-through text-muted-foreground' : 'text-foreground'}`}>
-                                          {task.title}
+                                        <td className={`px-4 py-3 ${task.status === 'Done' ? 'text-muted-foreground' : 'text-foreground'}`}>
+                                          <span className={`font-medium ${task.status === 'Done' ? 'line-through' : ''}`}>{task.title}</span>
+                                          {task.description && (
+                                            <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{task.description}</p>
+                                          )}
                                         </td>
                                         <td className="px-4 py-3 w-48">
                                           {taskAssignees.length > 0 ? (
@@ -699,7 +734,8 @@ export default function ProjectsPage() {
                               </table>
                               <div className="p-2 bg-muted/20 border-t">
                                 {addingTaskPhase === phase ? (
-                                  <div className="flex items-center gap-2 bg-background p-2 rounded border flex-wrap sm:flex-nowrap">
+                                  <div className="space-y-2 bg-background p-2 rounded border">
+                                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                                     <Input placeholder="Task subject" value={taskFormTitle} onChange={e => setTaskFormTitle(e.target.value)} className="h-8 text-xs flex-1 min-w-[150px]" autoFocus />
                                     <DropdownMenu>
                                       <DropdownMenuTrigger asChild>
@@ -751,6 +787,8 @@ export default function ProjectsPage() {
                                     <Button size="sm" onClick={() => handleCreateTask(phase)} className="h-8 text-xs">Add</Button>
                                     <Button size="sm" variant="ghost" onClick={() => setAddingTaskPhase(null)} className="h-8 text-xs">Cancel</Button>
                                   </div>
+                                    <Input placeholder="Description (optional)" value={taskFormDescription} onChange={e => setTaskFormDescription(e.target.value)} className="h-8 text-xs w-full" />
+                                  </div>
                                 ) : (
                                   <Button variant="ghost" size="sm" onClick={() => setAddingTaskPhase(phase)} className="w-full justify-start text-muted-foreground hover:text-foreground h-8 text-xs">
                                     <Plus className="w-3 h-3 mr-2" /> + Task / Activity / Milestone
@@ -791,27 +829,347 @@ export default function ProjectsPage() {
                   )}
 
                   {/* NOTES TAB */}
-                  {activeTab === 'Notes' && (
-                    <div className="space-y-6 h-full flex flex-col">
-                      <div className="bg-background border rounded-md p-3 text-sm text-muted-foreground cursor-text hover:border-primary/50 transition-colors shrink-0">
-                        Click here to add a note...
-                      </div>
-                      <div className="flex items-center justify-between border-b pb-4 shrink-0">
+                  {activeTab === 'Notes' && (() => {
+                    const currentUserId = user?.id || '';
+                    const projectNotes = notes
+                      .filter(n => n.projectId === selectedProject.id)
+                      .filter(n => {
+                        // Visibility filtering: show only notes the current user is allowed to see
+                        if (n.visibility === 'only-me' && n.createdBy !== currentUserId) return false;
+                        if (n.visibility === 'specific') {
+                          if (n.createdBy !== currentUserId && !(n.visibleTo || []).includes(currentUserId)) return false;
+                        }
+                        return true;
+                      })
+                      .filter(n => {
+                        if (notesFilter === 'all') return true;
+                        return n.visibility === notesFilter;
+                      })
+                      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+                    const handleCreateNote = async () => {
+                      if (!workspace?.id || !selectedProject) return;
+                      if (!noteFormTitle.trim()) return toast.error('Note title is required');
+                      const note = {
+                        projectId: selectedProject.id,
+                        title: noteFormTitle,
+                        description: noteFormDescription,
+                        visibility: noteFormVisibility,
+                        visibleTo: noteFormVisibility === 'specific' ? noteFormVisibleTo : [],
+                        createdBy: currentUserId,
+                        createdByName: user?.name || user?.email || 'Unknown',
+                        createdAt: new Date().toISOString(),
+                      };
+                      try {
+                        await createNote(workspace.id, note);
+                        setIsAddingNote(false);
+                        setNoteFormTitle('');
+                        setNoteFormDescription('');
+                        setNoteFormVisibility('everyone');
+                        setNoteFormVisibleTo([]);
+                        toast.success('Note added');
+                      } catch {
+                        toast.error('Failed to add note');
+                      }
+                    };
+
+                    const handleSaveEditNote = async () => {
+                      if (!workspace?.id || !editingNote) return;
+                      if (!noteFormTitle.trim()) return toast.error('Note title is required');
+                      try {
+                        await updateNote(workspace.id, editingNote.id, {
+                          title: noteFormTitle,
+                          description: noteFormDescription,
+                          visibility: noteFormVisibility,
+                          visibleTo: noteFormVisibility === 'specific' ? noteFormVisibleTo : [],
+                          updatedAt: new Date().toISOString(),
+                        });
+                        setEditingNote(null);
+                        setIsAddingNote(false);
+                        setNoteFormTitle('');
+                        setNoteFormDescription('');
+                        setNoteFormVisibility('everyone');
+                        setNoteFormVisibleTo([]);
+                        toast.success('Note updated');
+                      } catch {
+                        toast.error('Failed to update note');
+                      }
+                    };
+
+                    const handleDeleteNote = async (noteId: string) => {
+                      if (!workspace?.id) return;
+                      try {
+                        await deleteNote(workspace.id, noteId);
+                        toast.success('Note deleted');
+                      } catch {
+                        toast.error('Failed to delete note');
+                      }
+                    };
+
+                    const openEditNote = (note: Note) => {
+                      setEditingNote(note);
+                      setNoteFormTitle(note.title);
+                      setNoteFormDescription(note.description);
+                      setNoteFormVisibility(note.visibility);
+                      setNoteFormVisibleTo(note.visibleTo || []);
+                      setIsAddingNote(true);
+                    };
+
+                    const visibilityLabel = (v: NoteVisibility) => {
+                      if (v === 'only-me') return 'Only Me';
+                      if (v === 'everyone') return 'Everyone';
+                      return 'Specific Members';
+                    };
+                    const visibilityIcon = (v: NoteVisibility) => {
+                      if (v === 'only-me') return <Lock className="w-3 h-3" />;
+                      if (v === 'everyone') return <Eye className="w-3 h-3" />;
+                      return <Users className="w-3 h-3" />;
+                    };
+
+                    return (
+                    <div className="space-y-5 h-full flex flex-col">
+                      {/* Add / Edit Note Form */}
+                      {isAddingNote ? (
+                        <div className="bg-background border rounded-lg p-4 space-y-3 shrink-0">
+                          <Input
+                            placeholder="Note title"
+                            value={noteFormTitle}
+                            onChange={e => setNoteFormTitle(e.target.value)}
+                            className="text-sm font-medium"
+                            autoFocus
+                          />
+                          <textarea
+                            placeholder="Write your note description here..."
+                            value={noteFormDescription}
+                            onChange={e => setNoteFormDescription(e.target.value)}
+                            rows={3}
+                            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring resize-none"
+                          />
+                          <div className="space-y-2">
+                            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Visibility</Label>
+                            <div className="flex gap-2">
+                              {(['only-me', 'everyone', 'specific'] as NoteVisibility[]).map(v => (
+                                <Button
+                                  key={v}
+                                  type="button"
+                                  variant={noteFormVisibility === v ? 'default' : 'outline'}
+                                  size="sm"
+                                  className="text-xs gap-1.5"
+                                  onClick={() => setNoteFormVisibility(v)}
+                                >
+                                  {visibilityIcon(v)}
+                                  {visibilityLabel(v)}
+                                </Button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {noteFormVisibility === 'specific' && (
+                            <div className="space-y-2">
+                              <Label className="text-xs uppercase tracking-wider text-muted-foreground">Select Members</Label>
+                              <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/5 max-h-[140px] overflow-y-auto">
+                                {selectedProject.members.map(mid => {
+                                  const mem = members.find(m => m.id === mid);
+                                  if (!mem) return null;
+                                  const isSelected = noteFormVisibleTo.includes(mid);
+                                  return (
+                                    <Badge
+                                      key={mid}
+                                      variant={isSelected ? 'default' : 'outline'}
+                                      className="cursor-pointer gap-1.5 pl-1 pr-2 py-1 transition-colors"
+                                      onClick={() => setNoteFormVisibleTo(prev => isSelected ? prev.filter(id => id !== mid) : [...prev, mid])}
+                                    >
+                                      <Avatar className="h-4 w-4"><AvatarFallback className="text-[7px] bg-muted-foreground/10">{mem.avatar}</AvatarFallback></Avatar>
+                                      {mem.name}
+                                      {isSelected && <Check className="w-3 h-3 ml-0.5" />}
+                                    </Badge>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <Button size="sm" className="text-xs" onClick={editingNote ? handleSaveEditNote : handleCreateNote}>
+                              {editingNote ? 'Save Changes' : 'Add Note'}
+                            </Button>
+                            <Button size="sm" variant="ghost" className="text-xs" onClick={() => {
+                              setIsAddingNote(false);
+                              setEditingNote(null);
+                              setNoteFormTitle('');
+                              setNoteFormDescription('');
+                              setNoteFormVisibility('everyone');
+                              setNoteFormVisibleTo([]);
+                            }}>Cancel</Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div
+                          onClick={() => setIsAddingNote(true)}
+                          className="bg-background border rounded-md p-3 text-sm text-muted-foreground cursor-pointer hover:border-primary/50 transition-colors shrink-0 flex items-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" />
+                          Click here to add a note...
+                        </div>
+                      )}
+
+                      {/* Filter Tabs */}
+                      <div className="flex items-center justify-between border-b pb-3 shrink-0">
                         <div className="flex gap-2">
-                          <Badge variant="secondary" className="bg-muted text-foreground hover:bg-muted/80 cursor-pointer">All Notes</Badge>
-                          <Badge variant="outline" className="cursor-pointer">Client Notes</Badge>
-                          <Badge variant="outline" className="cursor-pointer">Internal</Badge>
+                          {([['all', 'All Notes'], ['everyone', 'Shared'], ['only-me', 'Private'], ['specific', 'Specific']] as const).map(([key, label]) => (
+                            <Badge
+                              key={key}
+                              variant={notesFilter === key ? 'secondary' : 'outline'}
+                              className={`cursor-pointer transition-colors ${notesFilter === key ? 'bg-muted text-foreground hover:bg-muted/80' : ''}`}
+                              onClick={() => setNotesFilter(key)}
+                            >
+                              {label}
+                            </Badge>
+                          ))}
                         </div>
                         <div className="flex items-center gap-2 text-sm text-muted-foreground font-medium">
-                          Expand all items <Switch />
+                          Expand all <Switch checked={expandAllNotes} onCheckedChange={setExpandAllNotes} />
                         </div>
                       </div>
-                      <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
-                        <MessageSquare className="w-16 h-16 mb-4" />
-                        <p className="font-medium">No notes added yet</p>
-                      </div>
+
+                      {/* Notes List */}
+                      {projectNotes.length === 0 ? (
+                        <div className="flex-1 flex flex-col items-center justify-center text-muted-foreground opacity-50">
+                          <MessageSquare className="w-16 h-16 mb-4" />
+                          <p className="font-medium">No notes added yet</p>
+                        </div>
+                      ) : (
+                        <div className="flex-1 overflow-y-auto space-y-3">
+                          {projectNotes.map(note => {
+                            const isOwner = note.createdBy === currentUserId;
+                            return (
+                              <div key={note.id} className="bg-background border rounded-lg overflow-hidden group cursor-pointer hover:border-primary/30 transition-colors" onClick={() => setViewingNote(note)}>
+                                <div className="p-4">
+                                  <div className="flex items-start justify-between gap-3">
+                                    <div className="min-w-0 flex-1">
+                                      <div className="flex items-center gap-2 mb-1">
+                                        <h4 className="font-medium text-sm truncate">{note.title}</h4>
+                                        <Badge variant="outline" className="text-[10px] gap-1 shrink-0 font-normal">
+                                          {visibilityIcon(note.visibility)}
+                                          {visibilityLabel(note.visibility)}
+                                        </Badge>
+                                      </div>
+                                      {(expandAllNotes || note.description) && (
+                                        <p className={`text-sm text-muted-foreground whitespace-pre-wrap ${expandAllNotes ? '' : 'line-clamp-2'}`}>
+                                          {note.description || <span className="italic">No description</span>}
+                                        </p>
+                                      )}
+                                    </div>
+                                    {isOwner && (
+                                      <div className="flex gap-1 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={(e) => { e.stopPropagation(); openEditNote(note); }}>
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={(e) => { e.stopPropagation(); handleDeleteNote(note.id); }}>
+                                          <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                      </div>
+                                    )}
+                                  </div>
+                                  <div className="flex items-center gap-3 mt-3 pt-2 border-t border-border/50 text-xs text-muted-foreground">
+                                    <span className="font-medium">{note.createdByName}</span>
+                                    <span>·</span>
+                                    <span>{new Date(note.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                    {note.updatedAt && <span className="italic">(edited)</span>}
+                                    {note.visibility === 'specific' && note.visibleTo && note.visibleTo.length > 0 && (
+                                      <>
+                                        <span>·</span>
+                                        <span className="flex items-center gap-1">
+                                          <Users className="w-3 h-3" />
+                                          {note.visibleTo.map(mid => members.find(m => m.id === mid)?.name).filter(Boolean).join(', ')}
+                                        </span>
+                                      </>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+
+                      {/* Note Detail Popup */}
+                      <Dialog open={!!viewingNote} onOpenChange={(open) => { if (!open) setViewingNote(null); }}>
+                        <DialogContent className="sm:max-w-[600px]">
+                          {viewingNote && (() => {
+                            const noteOwner = viewingNote.createdBy === currentUserId;
+                            return (
+                              <>
+                                <DialogHeader>
+                                  <div className="flex items-center gap-2">
+                                    <DialogTitle className="text-lg">{viewingNote.title}</DialogTitle>
+                                    <Badge variant="outline" className="text-[10px] gap-1 font-normal shrink-0">
+                                      {visibilityIcon(viewingNote.visibility)}
+                                      {visibilityLabel(viewingNote.visibility)}
+                                    </Badge>
+                                  </div>
+                                </DialogHeader>
+                                <div className="space-y-5 py-2">
+                                  {/* Description */}
+                                  <div className="space-y-1.5">
+                                    <Label className="text-xs uppercase tracking-wider text-muted-foreground">Description</Label>
+                                    <div className="bg-muted/20 border rounded-md p-3 text-sm whitespace-pre-wrap min-h-[60px]">
+                                      {viewingNote.description || <span className="text-muted-foreground italic">No description provided</span>}
+                                    </div>
+                                  </div>
+
+                                  {/* Visible To (for specific visibility) */}
+                                  {viewingNote.visibility === 'specific' && viewingNote.visibleTo && viewingNote.visibleTo.length > 0 && (
+                                    <div className="space-y-1.5">
+                                      <Label className="text-xs uppercase tracking-wider text-muted-foreground">Visible To</Label>
+                                      <div className="flex flex-wrap gap-2">
+                                        {viewingNote.visibleTo.map(mid => {
+                                          const mem = members.find(m => m.id === mid);
+                                          if (!mem) return null;
+                                          return (
+                                            <Badge key={mid} variant="secondary" className="pl-1 pr-2 py-1 gap-1.5">
+                                              <Avatar className="h-4 w-4"><AvatarFallback className="text-[7px] bg-muted-foreground/10">{mem.avatar}</AvatarFallback></Avatar>
+                                              <span className="text-xs font-medium">{mem.name}</span>
+                                            </Badge>
+                                          );
+                                        })}
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {/* Meta Info */}
+                                  <div className="border-t pt-4 space-y-2">
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">Created by</span>
+                                      <span className="font-medium">{viewingNote.createdByName}</span>
+                                    </div>
+                                    <div className="flex items-center justify-between text-sm">
+                                      <span className="text-muted-foreground">Created at</span>
+                                      <span className="font-medium">{new Date(viewingNote.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                    </div>
+                                    {viewingNote.updatedAt && (
+                                      <div className="flex items-center justify-between text-sm">
+                                        <span className="text-muted-foreground">Last edited</span>
+                                        <span className="font-medium">{new Date(viewingNote.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                                <DialogFooter>
+                                  {noteOwner && (
+                                    <Button variant="outline" size="sm" className="text-xs gap-1.5" onClick={() => { setViewingNote(null); openEditNote(viewingNote); }}>
+                                      <Pencil className="w-3.5 h-3.5" /> Edit Note
+                                    </Button>
+                                  )}
+                                  <Button variant="ghost" size="sm" className="text-xs" onClick={() => setViewingNote(null)}>Close</Button>
+                                </DialogFooter>
+                              </>
+                            );
+                          })()}
+                        </DialogContent>
+                      </Dialog>
                     </div>
-                  )}
+                  );})()}
 
                   {/* EMAILS TAB */}
                   {activeTab === 'Emails' && (

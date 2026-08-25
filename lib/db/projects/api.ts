@@ -41,12 +41,29 @@ export interface Task {
   priority: TaskPriority;
   due: string;
   phase: ProjectStatus;
+  description?: string;
+}
+
+export type NoteVisibility = 'only-me' | 'everyone' | 'specific';
+
+export interface Note {
+  id: string;
+  projectId: string;
+  title: string;
+  description: string;
+  visibility: NoteVisibility;
+  visibleTo?: string[]; // Member IDs when visibility is 'specific'
+  createdBy: string; // User ID
+  createdByName: string;
+  createdAt: string;
+  updatedAt?: string;
 }
 
 export type ProjectsData = {
   projects: Project[];
   tasks: Task[];
   members: Member[];
+  notes: Note[];
 };
 
 // --- Refs ---
@@ -58,6 +75,9 @@ const getTaskItemRef = (companyId: string, taskId: string) => ref(db, `project_t
 
 const getMembersRef = (companyId: string) => ref(db, `project_members/${companyId}`);
 const getMemberItemRef = (companyId: string, memberId: string) => ref(db, `project_members/${companyId}/${memberId}`);
+
+const getNotesRef = (companyId: string) => ref(db, `project_notes/${companyId}`);
+const getNoteItemRef = (companyId: string, noteId: string) => ref(db, `project_notes/${companyId}/${noteId}`);
 
 // --- Subscriptions ---
 export const subscribeToProjectsData = (
@@ -71,12 +91,14 @@ export const subscribeToProjectsData = (
   let currentProjects: Project[] = [];
   let currentTasks: Task[] = [];
   let currentMembers: Member[] = [];
+  let currentNotes: Note[] = [];
 
   const triggerCallback = () => {
     callback({
       projects: currentProjects,
       tasks: currentTasks,
-      members: currentMembers
+      members: currentMembers,
+      notes: currentNotes,
     });
   };
 
@@ -98,10 +120,18 @@ export const subscribeToProjectsData = (
     triggerCallback();
   });
 
+  const nRef = getNotesRef(companyId);
+  onValue(nRef, (snap) => {
+    const data = snap.val();
+    currentNotes = data ? Object.keys(data).map(key => ({ id: key, ...data[key] })) : [];
+    triggerCallback();
+  });
+
   return () => {
     off(pRef);
     off(tRef);
     off(mRef);
+    off(nRef);
   };
 };
 
@@ -146,4 +176,19 @@ export const updateMember = async (companyId: string, memberId: string, updates:
 
 export const deleteMember = async (companyId: string, memberId: string) => {
   await remove(getMemberItemRef(companyId, memberId));
+};
+
+// Notes
+export const createNote = async (companyId: string, note: Omit<Note, 'id'>) => {
+  const newRef = push(getNotesRef(companyId));
+  await set(newRef, note);
+  return newRef.key;
+};
+
+export const updateNote = async (companyId: string, noteId: string, updates: Partial<Note>) => {
+  await update(getNoteItemRef(companyId, noteId), updates);
+};
+
+export const deleteNote = async (companyId: string, noteId: string) => {
+  await remove(getNoteItemRef(companyId, noteId));
 };
