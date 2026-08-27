@@ -61,6 +61,10 @@ import {
   MessageSquare,
   TrendingUp,
   Globe,
+  PenTool,
+  Folder,
+  Rocket,
+  Smartphone
 } from 'lucide-react';
 
 interface NavItem {
@@ -122,6 +126,16 @@ function getNavConfig(leadCount: number, hasPermission: (module: string, action:
           { title: 'Tasks', href: '/tasks', icon: CheckSquare },
           { title: 'Calendar', href: '/calendar', icon: Calendar },
           { title: 'Team', href: '/team', icon: Users2 },
+        ], 'workspace')
+      },
+      {
+        title: 'Marketing',
+        items: filterByPermission([
+          { title: 'Content Hub', href: '/content-hub', icon: PenTool },
+          { title: 'Assets', href: '/assets', icon: Folder },
+          { title: 'Campaigns', href: '/campaigns', icon: Rocket },
+          { title: 'Scheduling Calendar', href: '/marketing-calendar', icon: Calendar },
+          { title: 'Social Media Manager', href: '/social', icon: Smartphone },
         ], 'workspace')
       },
       {
