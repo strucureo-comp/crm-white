@@ -857,7 +857,7 @@ export default function ProjectsPage() {
                         visibility: noteFormVisibility,
                         visibleTo: noteFormVisibility === 'specific' ? noteFormVisibleTo : [],
                         createdBy: currentUserId,
-                        createdByName: user?.name || user?.email || 'Unknown',
+                        createdByName: user?.full_name || user?.email || 'Unknown',
                         createdAt: new Date().toISOString(),
                       };
                       try {

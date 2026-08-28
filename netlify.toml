@@ -9,3 +9,8 @@ package = "@netlify/plugin-nextjs"
 # with header Authorization: Bearer ${CRON_SECRET}
 # Use cron-job.org, GitHub Actions, or any external scheduler.
 # (Netlify [[schedule]] works only with netlify/functions/ not Next.js API routes.)
+
+# Ad platform sync cron: trigger https://<site>.netlify.app/api/cron/ads-sync
+# every 15 minutes with header Authorization: Bearer ${CRON_SECRET}
+# Workspaces are processed in batches; if the response contains next_cursor,
+# call again with ?cursor=<next_cursor> to continue where it stopped.

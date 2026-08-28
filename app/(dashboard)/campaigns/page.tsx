@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Plus,
   RefreshCw,
@@ -13,14 +13,32 @@ import {
   X,
   Layers,
   AlertCircle,
+  AlertTriangle,
   Sparkles,
-  Calendar,
-  DollarSign
+  DollarSign,
+  ChevronLeft,
+  ChevronRight,
+  Unplug,
+  Building2,
 } from "lucide-react";
 import { useAuth } from '@/lib/firebase/auth-context';
 import { useWorkspace } from '@/lib/settings/workspace-context';
 import { formatCurrency } from '@/lib/utils';
-import { createCampaign, updateCampaign, deleteCampaign, subscribeToCampaigns, Campaign, SpendEntry } from '@/lib/db/campaigns/api';
+import { createCampaign, updateCampaign, deleteCampaign, subscribeToCampaigns, Campaign } from '@/lib/db/campaigns/api';
+import {
+  AdsApiError,
+  disconnectAdPlatform,
+  fetchAdAccounts,
+  fetchCampaignFeed,
+  selectAdAccount,
+  startAdOAuth,
+  triggerAdSync,
+  type AdAccountRef,
+  type AdPlatform,
+  type CampaignFeedResponse,
+  type PublicAdConnection,
+  type UnifiedCampaignRow,
+} from '@/lib/ads/client';
 
 const MetaIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   <svg className={className} viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg">
@@ -37,28 +55,69 @@ const GoogleIcon = ({ className = "w-6 h-6" }: { className?: string }) => (
   </svg>
 );
 
-export default function CampaignsPage() {
-  const { workspace, user } = useAuth();
-  const { currency } = useWorkspace();
-  const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
-  const [externalCampaigns, setExternalCampaigns] = useState<Campaign[]>([]);
+const PAGE_SIZE = 25;
 
-  useEffect(() => {
-    if (!workspace?.id) return;
-    const unsubscribe = subscribeToCampaigns(workspace?.id, (data) => {
-      setInternalCampaigns(data.filter(c => c.source === 'internal'));
-      setExternalCampaigns(data.filter(c => c.source !== 'internal'));
-    });
-    return () => unsubscribe();
-  }, [workspace?.id]);
-  
-  const metaConnected = externalCampaigns.some(c => c.source === 'meta');
-  const googleConnected = externalCampaigns.some(c => c.source === 'google');
-  
+const PLATFORM_LABEL: Record<AdPlatform, string> = { meta: "Meta Ads", google: "Google Ads" };
+
+/** The channel select keeps its existing labels; the API speaks in sources. */
+const CHANNEL_TO_SOURCE: Record<string, 'all' | 'crm' | 'meta' | 'google'> = {
+  All: 'all',
+  Internal: 'crm',
+  Meta: 'meta',
+  Google: 'google',
+};
+
+const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
+
+/** Renders a metric that a platform may simply not report. */
+const metric = (value?: number) => (value === undefined || value === null ? "—" : formatNumber(value));
+
+function relativeTime(iso?: string | null): string {
+  if (!iso) return "Never";
+  const then = Date.parse(iso);
+  if (!Number.isFinite(then)) return "Never";
+  const seconds = Math.floor((Date.now() - then) / 1000);
+  if (seconds < 60) return "Just now";
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ago`;
+  if (seconds < 86400) return `${Math.floor(seconds / 3600)}h ago`;
+  if (seconds < 604800) return `${Math.floor(seconds / 86400)}d ago`;
+  return new Date(then).toLocaleDateString();
+}
+
+function shortDate(value?: string | null): string | null {
+  if (!value) return null;
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed)) return null;
+  return new Date(parsed).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+}
+
+export default function CampaignsPage() {
+  const { workspace } = useAuth();
+  const { currency } = useWorkspace();
+
+  // CRM campaigns stay on the realtime subscription: it powers the create/edit
+  // modal and doubles as a fallback if the unified feed is unavailable.
+  const [internalCampaigns, setInternalCampaigns] = useState<Campaign[]>([]);
+
+  const [feed, setFeed] = useState<CampaignFeedResponse | null>(null);
+  const [loadingFeed, setLoadingFeed] = useState(true);
+  /** Integration failures render as a banner instead of breaking the page. */
+  const [feedError, setFeedError] = useState<string | null>(null);
+
   const [syncing, setSyncing] = useState(false);
+  const [busyPlatform, setBusyPlatform] = useState<AdPlatform | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [filterChannel, setFilterChannel] = useState("All");
   const [filterStatus, setFilterStatus] = useState("All");
+  const [page, setPage] = useState(1);
+
+  const [accountPicker, setAccountPicker] = useState<{
+    connection: PublicAdConnection;
+    accounts: AdAccountRef[];
+    loading: boolean;
+    saving: string | null;
+  } | null>(null);
 
   // Toast State
   const [toasts, setToasts] = useState<{ id: number; message: string; type: "success" | "error" }[]>([]);
@@ -67,88 +126,226 @@ export default function CampaignsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null);
   const [formData, setFormData] = useState<Partial<Campaign>>({});
-  
+
   // Spend Entry State
   const [newSpendAmount, setNewSpendAmount] = useState("");
   const [newSpendDate, setNewSpendDate] = useState(new Date().toISOString().split('T')[0]);
 
-  const addToast = (message: string, type: "success" | "error" = "success") => {
-    const id = Date.now();
+  const addToast = useCallback((message: string, type: "success" | "error" = "success") => {
+    const id = Date.now() + Math.random();
     setToasts((prev) => [...prev, { id, message, type }]);
     setTimeout(() => {
       setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 3000);
-  };
+    }, 4000);
+  }, []);
 
-  const handleConnectMeta = async () => {
+  // -------------------------------------------------------------------------
+  // Data loading
+  // -------------------------------------------------------------------------
+  const loadFeed = useCallback(
+    async (options: { silent?: boolean } = {}) => {
+      if (!workspace?.id) return;
+      if (!options.silent) setLoadingFeed(true);
+      try {
+        const data = await fetchCampaignFeed({
+          workspaceId: workspace.id,
+          search: debouncedSearch,
+          source: CHANNEL_TO_SOURCE[filterChannel] ?? 'all',
+          status: filterStatus === "All" ? 'all' : filterStatus,
+          page,
+          pageSize: PAGE_SIZE,
+        });
+        setFeed(data);
+        setFeedError(null);
+      } catch (error) {
+        setFeedError(
+          error instanceof Error ? error.message : "Could not load campaigns from the server.",
+        );
+      } finally {
+        setLoadingFeed(false);
+      }
+    },
+    [workspace?.id, debouncedSearch, filterChannel, filterStatus, page],
+  );
+
+  const loadFeedRef = useRef(loadFeed);
+  useEffect(() => {
+    loadFeedRef.current = loadFeed;
+  }, [loadFeed]);
+
+  useEffect(() => {
+    void loadFeed();
+  }, [loadFeed]);
+
+  // Debounce search so typing does not fire a request per keystroke.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearch(searchQuery.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  useEffect(() => {
+    setPage(1);
+  }, [filterChannel, filterStatus]);
+
+  // The realtime subscription keeps the modal's source data current and quietly
+  // refreshes the feed whenever a CRM campaign changes.
+  useEffect(() => {
     if (!workspace?.id) return;
+    let isFirstSnapshot = true;
+    const unsubscribe = subscribeToCampaigns(workspace.id, (data) => {
+      setInternalCampaigns(data.filter((c) => !c.source || c.source === 'internal'));
+      if (isFirstSnapshot) {
+        isFirstSnapshot = false;
+        return;
+      }
+      void loadFeedRef.current({ silent: true });
+    });
+    return () => unsubscribe();
+  }, [workspace?.id]);
+
+  const connections = feed?.connections ?? [];
+  const metaConnection = connections.find((c) => c.platform === 'meta') ?? null;
+  const googleConnection = connections.find((c) => c.platform === 'google') ?? null;
+  const canManage = ['owner', 'admin', 'manager'].includes((feed?.role || '').toLowerCase());
+
+  // -------------------------------------------------------------------------
+  // Connection actions
+  // -------------------------------------------------------------------------
+  const handleConnect = async (platform: AdPlatform) => {
+    if (!workspace?.id) return;
+    setBusyPlatform(platform);
     try {
-      await createCampaign(workspace?.id, {
-        name: "Retargeting - Product A",
-        source: "meta",
-        status: "Active",
-        budget: 3000,
-        spent: 1200,
-        impressions: 80000,
-        clicks: 3200,
-        lastSynced: new Date().toISOString(),
-        currency: "USD",
-      });
-      addToast("Meta Ads connected successfully!");
-    } catch {
-      addToast("Failed to connect Meta Ads", "error");
+      // The consent URL is built server-side so the app credentials and the
+      // signed state never exist in the browser bundle.
+      const url = await startAdOAuth(workspace.id, platform);
+      window.location.href = url;
+    } catch (error) {
+      addToast(
+        error instanceof Error ? error.message : `Could not start the ${PLATFORM_LABEL[platform]} connection.`,
+        "error",
+      );
+      setBusyPlatform(null);
     }
   };
 
-  const handleConnectGoogle = async () => {
-    if (!workspace?.id) return;
+  const openAccountPicker = useCallback(
+    async (connection: PublicAdConnection) => {
+      if (!workspace?.id) return;
+      setAccountPicker({ connection, accounts: connection.available_accounts, loading: true, saving: null });
+      try {
+        const { accounts, warning } = await fetchAdAccounts(workspace.id, connection.id);
+        if (warning) addToast(warning, "error");
+        setAccountPicker({ connection, accounts, loading: false, saving: null });
+      } catch (error) {
+        setAccountPicker((prev) => (prev ? { ...prev, loading: false } : prev));
+        addToast(error instanceof Error ? error.message : "Could not load ad accounts.", "error");
+      }
+    },
+    [workspace?.id, addToast],
+  );
+
+  const handleSelectAccount = async (accountId: string) => {
+    if (!workspace?.id || !accountPicker) return;
+    setAccountPicker({ ...accountPicker, saving: accountId });
     try {
-      await createCampaign(workspace?.id, {
-        name: "Search - Brand Keywords",
-        source: "google",
-        status: "Active",
-        budget: 8000,
-        spent: 4500,
-        impressions: 250000,
-        clicks: 12500,
-        lastSynced: new Date().toISOString(),
-        currency: "USD",
-      });
-      addToast("Google Ads connected successfully!");
-    } catch {
-      addToast("Failed to connect Google Ads", "error");
+      const result = await selectAdAccount(workspace.id, accountPicker.connection.id, accountId);
+      setAccountPicker(null);
+      if (result.sync?.error) addToast(result.sync.error, "error");
+      else addToast(`Imported ${result.sync?.campaignCount ?? 0} campaigns from ${result.selected_account.name}.`);
+      await loadFeed({ silent: true });
+    } catch (error) {
+      setAccountPicker((prev) => (prev ? { ...prev, saving: null } : prev));
+      addToast(error instanceof Error ? error.message : "Could not select that ad account.", "error");
     }
   };
 
-  const handleSyncData = async () => {
+  const handleDisconnect = async (connection: PublicAdConnection) => {
     if (!workspace?.id) return;
-    if (!metaConnected && !googleConnected) {
-      addToast("Connect an external provider to sync data.", "error");
+    const label = PLATFORM_LABEL[connection.platform];
+    if (!confirm(`Disconnect ${label}? Imported campaigns will be removed from the CRM. Nothing is changed inside ${label}.`)) {
       return;
     }
-    setSyncing(true);
-    
+    setBusyPlatform(connection.platform);
     try {
-      const updates = externalCampaigns.map(c => {
-        return updateCampaign(workspace?.id!, c.id!, {
-          spent: c.spent + Math.floor(Math.random() * 100),
-          clicks: c.clicks + Math.floor(Math.random() * 50),
-          impressions: c.impressions + Math.floor(Math.random() * 1000),
-          lastSynced: new Date().toISOString(),
-        });
-      });
-      await Promise.all(updates);
-      addToast("Data synced successfully!");
-    } catch (e) {
-      addToast("Failed to sync data", "error");
+      await disconnectAdPlatform(workspace.id, connection.id);
+      addToast(`${label} disconnected.`);
+      await loadFeed({ silent: true });
+    } catch (error) {
+      addToast(error instanceof Error ? error.message : `Could not disconnect ${label}.`, "error");
     } finally {
-      setSyncing(false);
+      setBusyPlatform(null);
     }
   };
 
+  const runSync = useCallback(
+    async (connectionId?: string) => {
+      if (!workspace?.id) return;
+      setSyncing(true);
+      try {
+        const { outcomes } = await triggerAdSync(workspace.id, connectionId);
+        const failures = outcomes.filter((o) => o.error);
+        const imported = outcomes.reduce((sum, o) => sum + (o.skipped ? 0 : o.campaignCount), 0);
+        if (failures.length > 0) addToast(failures[0].error as string, "error");
+        else if (outcomes.length === 0) addToast("Nothing to sync yet.", "error");
+        else addToast(`Synced ${imported} campaigns.`);
+        await loadFeed({ silent: true });
+      } catch (error) {
+        const message =
+          error instanceof AdsApiError && error.status === 429
+            ? error.message
+            : error instanceof Error
+              ? error.message
+              : "Sync failed.";
+        addToast(message, "error");
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [workspace?.id, addToast, loadFeed],
+  );
+
+  // -------------------------------------------------------------------------
+  // OAuth return handling — the callback route redirects here with a result.
+  // -------------------------------------------------------------------------
+  const [pendingCallback, setPendingCallback] = useState<{ select?: string; sync?: string } | null>(null);
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const failure = params.get('ads_error');
+    const connected = params.get('ads_connected');
+    const select = params.get('ads_select');
+    const sync = params.get('ads_sync');
+    if (!failure && !connected && !select && !sync) return;
+
+    if (failure) addToast(failure, "error");
+    else if (connected) addToast(`${PLATFORM_LABEL[connected as AdPlatform] || connected} connected.`);
+    if (select || sync) setPendingCallback({ select: select ?? undefined, sync: sync ?? undefined });
+
+    // Strip the parameters so a refresh does not replay the toast or the sync.
+    window.history.replaceState({}, '', window.location.pathname);
+  }, [addToast]);
+
+  useEffect(() => {
+    if (!pendingCallback || !feed) return;
+    const { select, sync } = pendingCallback;
+    setPendingCallback(null);
+    if (select) {
+      const connection = feed.connections.find((c) => c.id === select);
+      if (connection) void openAccountPicker(connection);
+    } else if (sync) {
+      void runSync(sync);
+    }
+  }, [pendingCallback, feed, openAccountPicker, runSync]);
+
+  // -------------------------------------------------------------------------
+  // CRM campaign CRUD (unchanged — only internal campaigns are editable)
+  // -------------------------------------------------------------------------
   const handleSaveCampaign = async () => {
     if (!workspace?.id || !formData.name || !formData.budget) return;
-    
+
     try {
       if (editingCampaign && editingCampaign.id) {
         await updateCampaign(workspace?.id, editingCampaign.id, formData);
@@ -192,7 +389,13 @@ export default function CampaignsPage() {
     }
   };
 
-  const openEditModal = (campaign: Campaign) => {
+  /** Imported rows have no editable record; only CRM rows open the modal. */
+  const openEditModal = (row: UnifiedCampaignRow) => {
+    const campaign = internalCampaigns.find((c) => c.id === row.id);
+    if (!campaign) {
+      addToast("This campaign is read-only.", "error");
+      return;
+    }
     setEditingCampaign(campaign);
     setFormData(campaign);
     setNewSpendAmount("");
@@ -207,7 +410,7 @@ export default function CampaignsPage() {
     setNewSpendDate(new Date().toISOString().split('T')[0]);
     setIsModalOpen(true);
   };
-  
+
   const handleAddSpendEntry = () => {
     if (!newSpendAmount || isNaN(Number(newSpendAmount)) || Number(newSpendAmount) <= 0) {
       addToast("Please enter a valid amount", "error");
@@ -221,7 +424,7 @@ export default function CampaignsPage() {
     };
     const currentHistory = formData.spendHistory || [];
     const currentSpent = formData.spent || 0;
-    
+
     setFormData({
       ...formData,
       spendHistory: [entry, ...currentHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()),
@@ -242,21 +445,155 @@ export default function CampaignsPage() {
     addToast("Spend entry removed");
   };
 
-  const allCampaigns = useMemo(() => [...internalCampaigns, ...externalCampaigns], [internalCampaigns, externalCampaigns]);
+  // -------------------------------------------------------------------------
+  // Derived view data
+  // -------------------------------------------------------------------------
+  /** Client-side view of CRM campaigns, used only if the feed request fails. */
+  const fallbackRows = useMemo<UnifiedCampaignRow[]>(() => {
+    const needle = debouncedSearch.toLowerCase();
+    return internalCampaigns
+      .filter((c) => {
+        const matchesSearch =
+          !needle || c.name.toLowerCase().includes(needle) || (c.id || "").toLowerCase().includes(needle);
+        const matchesChannel = filterChannel === "All" || filterChannel === "Internal";
+        const matchesStatus = filterStatus === "All" || (c.status || "").toLowerCase() === filterStatus.toLowerCase();
+        return matchesSearch && matchesChannel && matchesStatus;
+      })
+      .map((c) => ({
+        id: c.id || "",
+        source: 'crm' as const,
+        read_only: false,
+        name: c.name,
+        status: c.status || "Unknown",
+        currency: c.currency,
+        budget: c.budget,
+        spend: c.spent,
+        impressions: c.impressions,
+        clicks: c.clicks,
+        start_date: c.startDate ?? null,
+        end_date: c.endDate ?? null,
+        last_synced_at: c.lastSynced ?? null,
+      }));
+  }, [internalCampaigns, debouncedSearch, filterChannel, filterStatus]);
 
-  const filteredCampaigns = useMemo(() => {
-    return allCampaigns.filter((c) => {
-      const matchesSearch = c.name.toLowerCase().includes(searchQuery.toLowerCase()) || (c.id || "").toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesChannel = filterChannel === "All" || c.source.toLowerCase() === filterChannel.toLowerCase();
-      const matchesStatus = filterStatus === "All" || c.status.toLowerCase() === filterStatus.toLowerCase();
-      return matchesSearch && matchesChannel && matchesStatus;
-    });
-  }, [allCampaigns, searchQuery, filterChannel, filterStatus]);
+  const usingFallback = feedError !== null;
+  const rows = usingFallback ? fallbackRows : feed?.rows ?? [];
+  const totalCount = usingFallback ? fallbackRows.length : feed?.total ?? 0;
+  const pageCount = usingFallback ? 1 : feed?.pageCount ?? 1;
+  const currentPage = usingFallback ? 1 : feed?.page ?? 1;
 
-  const totalPortfolioSpend = allCampaigns.reduce((sum, c) => sum + c.spent, 0);
-  const activeBudget = allCampaigns.filter((c) => c.status === "Active").reduce((sum, c) => sum + c.budget, 0);
+  const totalPortfolioSpend = usingFallback
+    ? fallbackRows.reduce((sum, r) => sum + (r.spend ?? 0), 0)
+    : feed?.totals.spend ?? 0;
+  const activeBudget = usingFallback
+    ? fallbackRows.reduce((sum, r) => sum + (r.status === "Active" ? r.budget ?? 0 : 0), 0)
+    : feed?.totals.activeBudget ?? 0;
 
-  const formatNumber = (num: number) => new Intl.NumberFormat('en-US').format(num);
+  const statusOptions = useMemo(() => {
+    const base = ["Active", "Paused", "Draft"];
+    return Array.from(new Set([...base, ...(feed?.statuses ?? [])]));
+  }, [feed?.statuses]);
+
+  const hasSyncableConnection = connections.some((c) => c.selected_account);
+  const rangeStart = totalCount === 0 ? 0 : (currentPage - 1) * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(totalCount, currentPage * PAGE_SIZE);
+
+  // -------------------------------------------------------------------------
+  // Connection card — same shell as before, real state inside
+  // -------------------------------------------------------------------------
+  const renderConnectionCard = (platform: AdPlatform, connection: PublicAdConnection | null) => {
+    const configured = feed?.providers?.[platform]?.configured ?? true;
+    const label = PLATFORM_LABEL[platform];
+    const busy = busyPlatform === platform;
+    const needsReauth = connection?.status === 'needs_reauth';
+    const needsAccount = Boolean(connection) && !needsReauth && !connection?.selected_account;
+    const isLive = Boolean(connection?.selected_account) && !needsReauth;
+
+    const subtitle = !configured
+      ? `${label} is not configured on this server yet`
+      : !connection
+        ? `Connect your ${platform === 'meta' ? 'Meta' : 'Google'} account`
+        : needsReauth
+          ? 'Access expired — reconnect to resume syncing'
+          : needsAccount
+            ? 'Authorized — choose an ad account to sync'
+            : `${connection?.selected_account?.name ?? 'Account'} · Synced ${relativeTime(connection?.last_synced_at)}`;
+
+    return (
+      <div className="bg-card p-5 rounded-xl shadow-sm border border-border flex items-center justify-between gap-4 hover:shadow-md transition-shadow">
+        <div className="flex items-center gap-4 min-w-0">
+          {platform === 'meta' ? (
+            <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center shrink-0">
+              <MetaIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+            </div>
+          ) : (
+            <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center border border-border shrink-0">
+              <GoogleIcon className="w-6 h-6" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="font-semibold text-foreground">{label}</h3>
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase tracking-wider bg-muted text-muted-foreground border border-border">
+                <Lock className="w-2.5 h-2.5" /> Read only
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground font-medium truncate">{subtitle}</p>
+            {connection?.last_error && !needsReauth && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 font-medium mt-0.5 truncate">
+                {connection.last_error}
+              </p>
+            )}
+          </div>
+        </div>
+        <div className="flex flex-col items-end gap-2 shrink-0">
+          {isLive && (
+            <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-sm font-medium border border-green-200 dark:border-green-800">
+              <CheckCircle2 className="w-4 h-4" /> Connected
+            </div>
+          )}
+          {needsAccount && (
+            <button
+              onClick={() => connection && openAccountPicker(connection)}
+              disabled={!canManage || busy}
+              className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Building2 className="w-4 h-4" /> Choose account
+            </button>
+          )}
+          {(!connection || needsReauth) && (
+            <button
+              onClick={() => handleConnect(platform)}
+              disabled={!configured || !canManage || busy}
+              title={!configured ? `${label} is not configured on this server` : undefined}
+              className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Lock className="w-4 h-4" /> {needsReauth ? 'Reconnect' : 'Connect'}
+            </button>
+          )}
+          {connection && canManage && (
+            <div className="flex items-center gap-3 text-xs font-semibold">
+              {connection.available_accounts.length > 1 && (
+                <button
+                  onClick={() => openAccountPicker(connection)}
+                  className="text-muted-foreground hover:text-primary transition-colors"
+                >
+                  Change account
+                </button>
+              )}
+              <button
+                onClick={() => handleDisconnect(connection)}
+                disabled={busy}
+                className="text-muted-foreground hover:text-red-600 dark:hover:text-red-400 transition-colors flex items-center gap-1 disabled:opacity-50"
+              >
+                <Unplug className="w-3 h-3" /> Disconnect
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -265,9 +602,9 @@ export default function CampaignsPage() {
         {toasts.map((toast) => (
           <div
             key={toast.id}
-            className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border animate-in slide-in-from-top-2 fade-in duration-300 ${
-              toast.type === "success" 
-              ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400" 
+            className={`flex items-center gap-3 px-4 py-3 rounded-xl shadow-lg border animate-in slide-in-from-top-2 fade-in duration-300 max-w-sm ${
+              toast.type === "success"
+              ? "bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800 text-green-800 dark:text-green-400"
               : "bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800 text-red-800 dark:text-red-400"
             }`}
           >
@@ -276,7 +613,7 @@ export default function CampaignsPage() {
                 <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
               </div>
             ) : (
-              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400" />
+              <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0" />
             )}
             <span className="font-medium text-sm">{toast.message}</span>
           </div>
@@ -295,7 +632,7 @@ export default function CampaignsPage() {
             </div>
             <p className="text-muted-foreground mt-1 text-sm font-medium">Manage and monitor all your advertising campaigns in one place.</p>
           </div>
-          
+
           <div className="flex gap-6 items-center">
             <div className="flex flex-col items-end">
               <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Total Portfolio Spend</span>
@@ -309,61 +646,29 @@ export default function CampaignsPage() {
           </div>
         </div>
 
+        {/* Integration banner — a failing integration never hides CRM campaigns */}
+        {feedError && (
+          <div className="flex items-start gap-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-800 dark:text-amber-300 px-4 py-3 rounded-xl">
+            <AlertTriangle className="w-4 h-4 mt-0.5 shrink-0" />
+            <div className="text-sm font-medium">
+              {feedError}
+              <button
+                onClick={() => void loadFeed()}
+                className="ml-2 underline underline-offset-2 hover:no-underline"
+              >
+                Retry
+              </button>
+              <p className="text-xs font-normal mt-0.5 opacity-80">
+                Showing your CRM campaigns only. Imported campaigns are unavailable right now.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Connections Section */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Meta Card */}
-          <div className="bg-card p-5 rounded-xl shadow-sm border border-border flex items-center justify-between hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-50 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                <MetaIcon className="w-6 h-6 text-blue-600 dark:text-blue-400" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Meta Ads</h3>
-                <p className="text-xs text-muted-foreground font-medium">
-                  {metaConnected ? "Connected and syncing" : "Connect your Meta account"}
-                </p>
-              </div>
-            </div>
-            {metaConnected ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-sm font-medium border border-green-200 dark:border-green-800">
-                <CheckCircle2 className="w-4 h-4" /> Connected
-              </div>
-            ) : (
-              <button 
-                onClick={handleConnectMeta}
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
-              >
-                <Lock className="w-4 h-4" /> Connect
-              </button>
-            )}
-          </div>
-
-          {/* Google Card */}
-          <div className="bg-card p-5 rounded-xl shadow-sm border border-border flex items-center justify-between hover:shadow-md transition-shadow">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-muted rounded-xl flex items-center justify-center border border-border">
-                <GoogleIcon className="w-6 h-6" />
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground">Google Ads</h3>
-                <p className="text-xs text-muted-foreground font-medium">
-                  {googleConnected ? "Connected and syncing" : "Connect your Google account"}
-                </p>
-              </div>
-            </div>
-            {googleConnected ? (
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-lg text-sm font-medium border border-green-200 dark:border-green-800">
-                <CheckCircle2 className="w-4 h-4" /> Connected
-              </div>
-            ) : (
-              <button 
-                onClick={handleConnectGoogle}
-                className="px-4 py-2 bg-primary text-primary-foreground hover:bg-primary/90 rounded-lg text-sm font-medium transition-colors shadow-sm flex items-center gap-2"
-              >
-                <Lock className="w-4 h-4" /> Connect
-              </button>
-            )}
-          </div>
+          {renderConnectionCard('meta', metaConnection)}
+          {renderConnectionCard('google', googleConnection)}
         </div>
 
         {/* Action Bar */}
@@ -386,10 +691,10 @@ export default function CampaignsPage() {
                 onChange={(e) => setFilterChannel(e.target.value)}
                 className="bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
               >
-                <option value="All">All Channels</option>
-                <option value="Internal">Internal</option>
-                <option value="Meta">Meta</option>
-                <option value="Google">Google</option>
+                <option value="All">All Channels{feed ? ` (${feed.counts.all})` : ''}</option>
+                <option value="Internal">Internal{feed ? ` (${feed.counts.crm})` : ''}</option>
+                <option value="Meta">Meta{feed ? ` (${feed.counts.meta})` : ''}</option>
+                <option value="Google">Google{feed ? ` (${feed.counts.google})` : ''}</option>
               </select>
               <select
                 value={filterStatus}
@@ -397,17 +702,23 @@ export default function CampaignsPage() {
                 className="bg-background border border-border rounded-xl px-3 py-2 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-ring text-foreground"
               >
                 <option value="All">All Statuses</option>
-                <option value="Active">Active</option>
-                <option value="Paused">Paused</option>
-                <option value="Draft">Draft</option>
+                {statusOptions.map((status) => (
+                  <option key={status} value={status}>{status}</option>
+                ))}
               </select>
             </div>
           </div>
-          
+
           <div className="flex items-center gap-3 w-full md:w-auto">
+            {feed?.lastSyncedAt && (
+              <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">
+                Last synced {relativeTime(feed.lastSyncedAt)}
+              </span>
+            )}
             <button
-              onClick={handleSyncData}
-              disabled={syncing || (!metaConnected && !googleConnected)}
+              onClick={() => void runSync()}
+              disabled={syncing || !hasSyncableConnection || !canManage}
+              title={!hasSyncableConnection ? 'Connect an ad account to sync' : undefined}
               className="flex items-center gap-2 px-4 py-2 bg-primary/10 text-primary hover:bg-primary/20 rounded-xl text-sm font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-primary/20"
             >
               <RefreshCw className={`w-4 h-4 ${syncing ? "animate-spin" : ""}`} />
@@ -433,35 +744,57 @@ export default function CampaignsPage() {
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Status</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Spend vs Budget</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Performance</th>
+                  <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider">Last Synced</th>
                   <th className="px-6 py-4 text-xs font-semibold text-muted-foreground uppercase tracking-wider text-right">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
-                {filteredCampaigns.length === 0 ? (
+                {loadingFeed && rows.length === 0 ? (
                   <tr>
-                    <td colSpan={6} className="px-6 py-12 text-center">
+                    <td colSpan={7} className="px-6 py-12 text-center">
+                      <RefreshCw className="w-8 h-8 text-muted-foreground mx-auto mb-3 animate-spin" />
+                      <p className="text-muted-foreground font-medium">Loading campaigns…</p>
+                    </td>
+                  </tr>
+                ) : rows.length === 0 ? (
+                  <tr>
+                    <td colSpan={7} className="px-6 py-12 text-center">
                       <Layers className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
                       <p className="text-muted-foreground font-medium">No campaigns found matching your criteria.</p>
                     </td>
                   </tr>
                 ) : (
-                  filteredCampaigns.map((campaign) => {
-                    const progress = Math.min(100, campaign.budget > 0 ? (campaign.spent / campaign.budget) * 100 : 0);
+                  rows.map((campaign) => {
+                    const rowCurrency = campaign.currency || currency;
+                    const budget = campaign.budget ?? 0;
+                    const spend = campaign.spend ?? 0;
+                    const progress = Math.min(100, budget > 0 ? (spend / budget) * 100 : 0);
                     const progressColor = progress > 90 ? 'bg-red-500' : progress > 75 ? 'bg-amber-500' : 'bg-emerald-500';
-                    
+                    const start = shortDate(campaign.start_date);
+                    const end = shortDate(campaign.end_date);
+
                     return (
-                      <tr key={campaign.id} className="hover:bg-muted/50 transition-colors group">
+                      <tr key={`${campaign.source}-${campaign.id}`} className="hover:bg-muted/50 transition-colors group">
                         <td className="px-6 py-4">
                           <div className="flex flex-col">
                             <span className="font-semibold text-foreground">{campaign.name}</span>
-                            <span className="text-xs text-muted-foreground font-medium mt-0.5">{campaign.id}</span>
+                            <span className="text-xs text-muted-foreground font-medium mt-0.5">
+                              {campaign.external_id || campaign.id}
+                            </span>
+                            {(start || end || campaign.account_name) && (
+                              <span className="text-[11px] text-muted-foreground/80 font-medium mt-0.5">
+                                {campaign.account_name ? `${campaign.account_name}` : ''}
+                                {campaign.account_name && (start || end) ? ' · ' : ''}
+                                {start || end ? `${start || '—'} → ${end || 'Ongoing'}` : ''}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
                           <div className="flex items-center">
                             {campaign.source === 'meta' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 border border-blue-200/60 dark:border-blue-800/60"><MetaIcon className="w-3.5 h-3.5"/> Meta Ads</span>}
                             {campaign.source === 'google' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-muted text-foreground border border-border"><GoogleIcon className="w-3.5 h-3.5"/> Google Ads</span>}
-                            {campaign.source === 'internal' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20"><Layers className="w-3.5 h-3.5"/> Internal</span>}
+                            {campaign.source === 'crm' && <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-primary/10 text-primary border border-primary/20"><Layers className="w-3.5 h-3.5"/> Internal</span>}
                           </div>
                         </td>
                         <td className="px-6 py-4">
@@ -479,49 +812,71 @@ export default function CampaignsPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex flex-col gap-1.5 w-48">
-                            <div className="flex justify-between text-xs font-medium">
-                              <span className="text-foreground">{formatCurrency(campaign.spent, campaign.currency || currency)}</span>
-                              <span className="text-muted-foreground">{formatCurrency(campaign.budget, campaign.currency || currency)}</span>
+                          <div className="w-40">
+                            <div className="flex items-baseline justify-between mb-1.5">
+                              <span className="text-sm font-semibold text-foreground">
+                                {campaign.spend === undefined ? '—' : formatCurrency(spend, rowCurrency)}
+                              </span>
+                              <span className="text-xs text-muted-foreground font-medium">
+                                {campaign.budget === undefined ? 'No budget' : formatCurrency(budget, rowCurrency)}
+                              </span>
                             </div>
-                            <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full ${progressColor} transition-all duration-1000 ease-out rounded-full`}
-                                style={{ width: `${progress}%` }}
-                              />
-                            </div>
+                            {campaign.budget !== undefined && budget > 0 ? (
+                              <>
+                                <div className="w-full bg-muted rounded-full h-1.5 overflow-hidden">
+                                  <div className={`h-1.5 rounded-full ${progressColor}`} style={{ width: `${progress}%` }} />
+                                </div>
+                                <span className="text-[11px] text-muted-foreground font-medium mt-1 inline-block">
+                                  {progress.toFixed(0)}% used
+                                  {campaign.budget_period ? ` · ${campaign.budget_period}` : ''}
+                                </span>
+                              </>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground font-medium">
+                                {campaign.budget_period ? campaign.budget_period : 'Not reported'}
+                              </span>
+                            )}
                           </div>
                         </td>
                         <td className="px-6 py-4">
-                          <div className="flex items-center gap-4 text-sm font-medium">
-                            <div className="flex flex-col">
-                              <span className="text-foreground">{formatNumber(campaign.impressions)}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Impr</span>
-                            </div>
-                            <div className="flex flex-col">
-                              <span className="text-foreground">{formatNumber(campaign.clicks)}</span>
-                              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">Clicks</span>
-                            </div>
+                          <div className="flex flex-col gap-0.5 text-xs font-medium">
+                            <span className="text-foreground">{metric(campaign.impressions)} impressions</span>
+                            <span className="text-muted-foreground">{metric(campaign.clicks)} clicks</span>
+                            <span className="text-muted-foreground">{metric(campaign.conversions)} results</span>
                           </div>
                         </td>
+                        <td className="px-6 py-4">
+                          <span className="text-xs text-muted-foreground font-medium">
+                            {relativeTime(campaign.last_synced_at)}
+                          </span>
+                        </td>
                         <td className="px-6 py-4 text-right">
-                          {campaign.source === 'internal' ? (
-                            <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                              <button 
+                          {campaign.read_only ? (
+                            // Imported campaigns expose no modification actions at all:
+                            // the integration never writes back to Meta or Google.
+                            <span
+                              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold bg-muted text-muted-foreground border border-border"
+                              title={`Managed in ${PLATFORM_LABEL[campaign.source as AdPlatform] ?? 'the ad platform'}. The CRM never changes it.`}
+                            >
+                              <Lock className="w-3 h-3" /> Read Only
+                            </span>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <button
                                 onClick={() => openEditModal(campaign)}
-                                className="p-1.5 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-lg transition-colors"
+                                className="p-2 hover:bg-muted rounded-lg text-muted-foreground hover:text-foreground transition-colors"
+                                title="Edit campaign"
                               >
                                 <Edit2 className="w-4 h-4" />
                               </button>
-                              <button 
-                                onClick={() => handleDeleteCampaign(campaign.id!)}
-                                className="p-1.5 text-muted-foreground hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                              <button
+                                onClick={() => campaign.id && handleDeleteCampaign(campaign.id)}
+                                className="p-2 hover:bg-red-500/10 rounded-lg text-muted-foreground hover:text-red-500 transition-colors"
+                                title="Delete campaign"
                               >
                                 <Trash2 className="w-4 h-4" />
                               </button>
                             </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground font-medium">Read-only</span>
                           )}
                         </td>
                       </tr>
@@ -531,10 +886,106 @@ export default function CampaignsPage() {
               </tbody>
             </table>
           </div>
+          {/* Server-side pagination: the browser only ever holds one page. */}
+          {totalCount > 0 && (
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-6 py-4 border-t border-border">
+              <span className="text-xs text-muted-foreground font-medium">
+                Showing {rangeStart}–{rangeEnd} of {totalCount} campaign{totalCount === 1 ? '' : 's'}
+                {usingFallback && ' (CRM only)'}
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={currentPage <= 1 || loadingFeed}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" /> Previous
+                </button>
+                <span className="text-xs text-muted-foreground font-medium px-1">
+                  Page {currentPage} of {pageCount}
+                </span>
+                <button
+                  onClick={() => setPage((p) => Math.min(pageCount, p + 1))}
+                  disabled={currentPage >= pageCount || loadingFeed}
+                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Ad account picker — shown when a provider exposes more than one account */}
+      {accountPicker && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-card rounded-xl shadow-xl w-full max-w-md border border-border overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-border">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">
+                  Choose a {PLATFORM_LABEL[accountPicker.connection.platform]} account
+                </h2>
+                <p className="text-xs text-muted-foreground font-medium mt-0.5">
+                  Campaigns are imported from the account you pick. Read-only.
+                </p>
+              </div>
+              <button
+                onClick={() => setAccountPicker(null)}
+                className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 max-h-80 overflow-y-auto space-y-2">
+              {accountPicker.loading && accountPicker.accounts.length === 0 ? (
+                <div className="py-10 text-center">
+                  <RefreshCw className="w-6 h-6 text-muted-foreground mx-auto mb-2 animate-spin" />
+                  <p className="text-sm text-muted-foreground font-medium">Loading accounts…</p>
+                </div>
+              ) : accountPicker.accounts.length === 0 ? (
+                <div className="py-10 text-center">
+                  <Building2 className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground font-medium">
+                    No ad accounts are available for this login.
+                  </p>
+                </div>
+              ) : (
+                accountPicker.accounts.map((account) => {
+                  const isSelected = accountPicker.connection.selected_account?.id === account.id;
+                  const isSaving = accountPicker.saving === account.id;
+                  return (
+                    <button
+                      key={account.id}
+                      onClick={() => handleSelectAccount(account.id)}
+                      disabled={Boolean(accountPicker.saving)}
+                      className={`w-full flex items-center justify-between gap-3 px-4 py-3 rounded-xl border text-left transition-colors disabled:opacity-60 disabled:cursor-not-allowed ${
+                        isSelected ? 'border-primary/40 bg-primary/5' : 'border-border hover:bg-muted'
+                      }`}
+                    >
+                      <span className="flex flex-col min-w-0">
+                        <span className="text-sm font-semibold text-foreground truncate">{account.name}</span>
+                        <span className="text-xs text-muted-foreground font-medium truncate">
+                          {account.id}
+                          {account.currency ? ` · ${account.currency}` : ''}
+                          {account.inactive ? ' · Inactive' : ''}
+                        </span>
+                      </span>
+                      {isSaving ? (
+                        <RefreshCw className="w-4 h-4 text-primary animate-spin shrink-0" />
+                      ) : isSelected ? (
+                        <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />
+                      ) : null}
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Create / edit modal — CRM campaigns only, unchanged from before */}
       {isModalOpen && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/40 dark:bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200 overflow-y-auto">
           <div className="bg-card rounded-xl shadow-xl w-full max-w-lg border border-border overflow-hidden animate-in zoom-in-95 duration-200 my-8">
@@ -542,14 +993,14 @@ export default function CampaignsPage() {
               <h2 className="text-lg font-bold text-foreground">
                 {editingCampaign ? "Edit Campaign" : "Create New Campaign"}
               </h2>
-              <button 
+              <button
                 onClick={() => setIsModalOpen(false)}
                 className="p-2 text-muted-foreground hover:text-foreground hover:bg-muted rounded-full transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
-            
+
             <div className="p-6 space-y-5">
               <div>
                 <label className="block text-sm font-semibold text-foreground mb-1.5">Campaign Name *</label>
@@ -562,7 +1013,7 @@ export default function CampaignsPage() {
                   placeholder="e.g., Q4 Winter Sale"
                 />
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-1.5">Currency</label>
@@ -588,7 +1039,6 @@ export default function CampaignsPage() {
                   </select>
                 </div>
               </div>
-              
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-semibold text-foreground mb-1.5">Start Date</label>
@@ -632,12 +1082,11 @@ export default function CampaignsPage() {
                     </span>
                   </div>
                 </div>
-
                 <div className="p-4 space-y-4">
                   <h4 className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <DollarSign className="w-4 h-4 text-emerald-500" /> Track Spending
                   </h4>
-                  
+
                   <div className="flex gap-2">
                     <div className="flex-1">
                       <input
@@ -665,7 +1114,6 @@ export default function CampaignsPage() {
                       Add Entry
                     </button>
                   </div>
-
                   {formData.spendHistory && formData.spendHistory.length > 0 ? (
                     <div className="mt-4 border border-border rounded-lg overflow-hidden">
                       <div className="max-h-40 overflow-y-auto">
@@ -708,7 +1156,6 @@ export default function CampaignsPage() {
                 </div>
               </div>
             </div>
-            
             <div className="px-6 py-4 border-t border-border bg-muted/50 flex justify-end gap-3">
               <button
                 onClick={() => setIsModalOpen(false)}
