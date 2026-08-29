@@ -19,10 +19,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { toast } from 'sonner';
 
 import { useAuth } from '@/lib/firebase/auth-context';
 import { createCalendarEvent, updateCalendarEvent, deleteCalendarEvent, subscribeToCalendar, ScheduledEvent } from '@/lib/db/marketing-calendar/api';
+import { Member, subscribeToProjectsData, createMember } from '@/lib/db/projects/api';
 
 // --- Constants ---
 const CHANNELS = ['LinkedIn', 'Twitter', 'Instagram', 'Email', 'Blog', 'YouTube'];
@@ -40,10 +42,11 @@ export default function MarketingCalendarPage() {
 
   // State
   const [events, setEvents] = useState<ScheduledEvent[]>(MOCK_EVENTS);
+  const [members, setMembers] = useState<Member[]>([]);
   
   useEffect(() => {
     if (!workspace?.id) return;
-    const unsubscribe = subscribeToCalendar(workspace?.id, (data) => {
+    const unsubscribeCalendar = subscribeToCalendar(workspace?.id, (data) => {
       setEvents(data);
       if (editingEvent) {
         setEditingEvent(prev => data.find(i => i.id === prev?.id) || null);
@@ -52,7 +55,10 @@ export default function MarketingCalendarPage() {
         setViewingEvent(prev => data.find(i => i.id === prev?.id) || null);
       }
     });
-    return () => unsubscribe();
+    const unsubscribeMembers = subscribeToProjectsData(workspace?.id, (data) => {
+      setMembers(data.members || []);
+    });
+    return () => { unsubscribeCalendar(); unsubscribeMembers(); };
   }, [workspace?.id]);
 
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -70,28 +76,49 @@ export default function MarketingCalendarPage() {
   const [formClient, setFormClient] = useState('');
   const [formChannel, setFormChannel] = useState(CHANNELS[0]);
   const [formColor, setFormColor] = useState(COLORS[0]);
-  const [formDate, setFormDate] = useState('');
-  const [formTime, setFormTime] = useState('09:00');
+  const [formStartDate, setFormStartDate] = useState('');
+  const [formEndDate, setFormEndDate] = useState('');
+  const [formDescription, setFormDescription] = useState('');
   
-  const [authors, setAuthors] = useState(['Alex R.', 'Sarah J.', 'Mike T.', 'Emma W.']);
-  const [formAuthor, setFormAuthor] = useState(authors[0]);
+  const [formAuthor, setFormAuthor] = useState('');
   const [newAuthor, setNewAuthor] = useState('');
+  const [authorPopoverOpen, setAuthorPopoverOpen] = useState(false);
 
   // Derived
   const viewMode = selectedDate ? 'day' : 'month';
   const displayDate = selectedDate || currentMonth;
   
+  // Helper to get effective start/end dates for an event (backward compat)
+  const getEventDateRange = (e: ScheduledEvent) => {
+    const startStr = e.startDate || (e.date as string);
+    const endStr = e.endDate || startStr;
+    return { start: parseISO(startStr), end: parseISO(endStr), startStr, endStr };
+  };
+
   const rightColumnEvents = useMemo(() => {
     return events.filter(e => {
-      const eDate = parseISO(e.date as string);
-      return viewMode === 'day' 
-        ? isSameDay(eDate, displayDate)
-        : isSameMonth(eDate, displayDate);
-    }).sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime());
+      const { start, end } = getEventDateRange(e);
+      if (viewMode === 'day') {
+        return displayDate >= start && displayDate <= end || isSameDay(start, displayDate) || isSameDay(end, displayDate);
+      } else {
+        // Show if the event range overlaps with the displayed month
+        const monthStart = startOfMonth(displayDate);
+        const monthEnd = endOfMonth(displayDate);
+        return start <= monthEnd && end >= monthStart;
+      }
+    }).sort((a, b) => {
+      const aStart = a.startDate || (a.date as string);
+      const bStart = b.startDate || (b.date as string);
+      return new Date(aStart).getTime() - new Date(bStart).getTime();
+    });
   }, [events, viewMode, displayDate]);
 
   const upcomingEvents = useMemo(() => {
-    return [...events].sort((a, b) => new Date(a.date as string).getTime() - new Date(b.date as string).getTime());
+    return [...events].sort((a, b) => {
+      const aStart = a.startDate || (a.date as string);
+      const bStart = b.startDate || (b.date as string);
+      return new Date(aStart).getTime() - new Date(bStart).getTime();
+    });
   }, [events]);
 
   const daysInMonth = eachDayOfInterval({ start: startOfMonth(currentMonth), end: endOfMonth(currentMonth) });
@@ -106,9 +133,11 @@ export default function MarketingCalendarPage() {
       setFormClient(eventToEdit.client || '');
       setFormChannel(eventToEdit.channel);
       setFormColor(eventToEdit.color || COLORS[0]);
-      setFormDate(format(parseISO(eventToEdit.date as string), 'yyyy-MM-dd'));
-      setFormTime(eventToEdit.time); // Simple assumption format
+      const startStr = eventToEdit.startDate || format(parseISO(eventToEdit.date as string), 'yyyy-MM-dd');
+      setFormStartDate(startStr);
+      setFormEndDate(eventToEdit.endDate || startStr);
       setFormAuthor(eventToEdit.author);
+      setFormDescription(eventToEdit.description || '');
     } else {
       setEditingEvent(null);
       setFormTitle('');
@@ -116,9 +145,11 @@ export default function MarketingCalendarPage() {
       setFormClient('');
       setFormChannel(CHANNELS[0]);
       setFormColor(COLORS[0]);
-      setFormDate(prefilledDate ? format(prefilledDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd'));
-      setFormTime('09:00 AM');
-      setFormAuthor(authors[0]);
+      const defaultDate = prefilledDate ? format(prefilledDate, 'yyyy-MM-dd') : format(new Date(), 'yyyy-MM-dd');
+      setFormStartDate(defaultDate);
+      setFormEndDate(defaultDate);
+      setFormAuthor(members.length > 0 ? members[0].id : '');
+      setFormDescription('');
     }
     setIsScheduleModalOpen(true);
   };
@@ -127,19 +158,29 @@ export default function MarketingCalendarPage() {
     if (!workspace?.id) return;
     if (!formTitle) return toast.error('Title is required');
     
-    let finalDateStr = formDate;
+    const startDateStr = formStartDate || format(new Date(), 'yyyy-MM-dd');
+    const endDateStr = formEndDate || startDateStr;
+    
+    // Validate end date is not before start date
+    if (endDateStr < startDateStr) {
+      return toast.error('End date cannot be before start date');
+    }
+
+    let finalDateStr: string;
     if (editingEvent) finalDateStr = editingEvent.date as string;
-    else finalDateStr = new Date(formDate).toISOString();
+    else finalDateStr = new Date(startDateStr).toISOString();
 
     const finalEventData = {
       date: finalDateStr,
+      startDate: startDateStr,
+      endDate: endDateStr,
       title: formTitle,
       company: formCompany,
       client: formClient,
       channel: formChannel,
       color: formColor,
-      time: formTime,
       author: formAuthor,
+      description: formDescription || '',
       status: editingEvent ? editingEvent.status : 'Scheduled'
     };
 
@@ -165,6 +206,20 @@ export default function MarketingCalendarPage() {
     } catch (e) {
       toast.error('Failed to remove post');
     }
+  };
+
+  const handleAddMember = async (e: React.MouseEvent | any) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!newAuthor.trim() || !workspace?.id) return;
+    try {
+      const newId = await createMember(workspace?.id, { name: newAuthor.trim(), role: 'Member', email: '', avatar: '', projectIds: [] });
+      if (newId) { 
+        setFormAuthor(newId); 
+        setNewAuthor(''); 
+        setAuthorPopoverOpen(false); 
+      }
+    } catch(err) { console.error('Failed to create member:', err); }
   };
 
   const getChannelBadge = (channel: string) => {
@@ -199,9 +254,9 @@ export default function MarketingCalendarPage() {
         </Button>
       </div>
 
-      <div className="flex-1 flex flex-col min-h-0 space-y-6">
+      <div className="flex-1 flex flex-col min-h-0 space-y-6 overflow-y-auto pr-1 pb-4">
         {/* 3. Split View Section (Calendar & Events List) */}
-        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 shrink-0 h-[450px]">
+        <div className="grid grid-cols-1 lg:grid-cols-[1fr_420px] gap-6 shrink-0 min-h-[600px]">
           
           {/* A. Left Column: Calendar View */}
           <Card className="flex flex-col border shadow-sm h-full overflow-hidden">
@@ -233,7 +288,10 @@ export default function MarketingCalendarPage() {
                 {daysInMonth.map(day => {
                   const isSelected = selectedDate && isSameDay(day, selectedDate);
                   const isTodayDate = isToday(day);
-                  const dayEvents = events.filter(e => isSameDay(parseISO(e.date as string), day));
+                  const dayEvents = events.filter(e => {
+                    const { start, end } = getEventDateRange(e);
+                    return day >= start && day <= end || isSameDay(start, day) || isSameDay(end, day);
+                  });
                   
                   return (
                     <div 
@@ -250,12 +308,20 @@ export default function MarketingCalendarPage() {
                         {format(day, 'd')}
                       </span>
                       
-                      <div className="flex-1 flex flex-col justify-end gap-1 overflow-hidden pb-1">
-                        {dayEvents.slice(0, 3).map((e, i) => (
-                          <div key={i} className={`h-1.5 w-full rounded-sm ${e.color || 'bg-slate-400'}`} title={e.title} />
+                      <div className="flex-1 flex flex-col justify-start gap-1 overflow-y-auto mt-1 no-scrollbar">
+                        {dayEvents.slice(0, 4).map((e, i) => (
+                          <div 
+                            key={i} 
+                            onClick={(ev) => { ev.stopPropagation(); setViewingEvent(e); setIsDetailsModalOpen(true); }}
+                            className="group flex items-center gap-1.5 text-[10px] px-1.5 py-1 rounded bg-muted/40 hover:bg-muted border border-transparent hover:border-border cursor-pointer transition-all"
+                            title={e.title}
+                          >
+                            <div className={`w-1.5 h-1.5 rounded-full shrink-0 shadow-sm ${e.color || 'bg-slate-500'}`} />
+                            <span className="font-medium text-foreground/80 group-hover:text-foreground truncate">{e.title}</span>
+                          </div>
                         ))}
-                        {dayEvents.length > 3 && (
-                          <div className="text-[9px] font-bold text-muted-foreground text-center">+{dayEvents.length - 3}</div>
+                        {dayEvents.length > 4 && (
+                          <div className="text-[10px] font-bold text-muted-foreground pl-1 mt-0.5">+{dayEvents.length - 4} more</div>
                         )}
                       </div>
                     </div>
@@ -312,13 +378,24 @@ export default function MarketingCalendarPage() {
                     
                     <div className="flex items-center justify-between text-[11px] text-muted-foreground">
                       <div className="flex items-center gap-1.5 bg-muted/50 px-2 py-1 rounded">
-                        <Clock className="w-3 h-3" />
-                        <span className="font-medium">{event.time}</span>
-                        {viewMode === 'month' && <span className="opacity-70 ml-1 border-l pl-2 border-border">{format(parseISO(event.date as string), 'MMM d')}</span>}
+                        <CalendarIcon className="w-3 h-3" />
+                        <span className="font-medium">
+                          {format(parseISO(event.startDate || event.date as string), 'MMM d')}
+                          {event.endDate && event.endDate !== (event.startDate || event.date as string) && ` - ${format(parseISO(event.endDate), 'MMM d')}`}
+                        </span>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <Avatar className="h-4 w-4"><AvatarFallback className="text-[7px] bg-primary/10 text-primary">{event.author.substring(0,2).toUpperCase()}</AvatarFallback></Avatar>
-                        <span className="font-medium">{event.author}</span>
+                        {(() => {
+                          const m = members.find(x => x.id === event.author);
+                          const name = m ? m.name : event.author;
+                          const initial = m ? (m.avatar || name.substring(0,2).toUpperCase()) : name.substring(0,2).toUpperCase();
+                          return (
+                            <>
+                              <Avatar className="h-4 w-4"><AvatarFallback className="text-[7px] bg-primary/10 text-primary">{initial}</AvatarFallback></Avatar>
+                              <span className="font-medium truncate max-w-[80px]">{name}</span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
 
@@ -375,12 +452,22 @@ export default function MarketingCalendarPage() {
                       <Badge variant="secondary" className={`text-[10px] px-2 py-0.5 ${getChannelBadge(event.channel)} border-transparent`}>{event.channel}</Badge>
                     </td>
                     <td className="px-6 py-3 text-muted-foreground">
-                      {format(parseISO(event.date as string), 'MMMM d, yyyy')} &bull; {event.time}
+                      {format(parseISO(event.startDate || event.date as string), 'MMM d, yyyy')}
+                      {event.endDate && event.endDate !== (event.startDate || event.date as string) && ` - ${format(parseISO(event.endDate), 'MMM d, yyyy')}`}
                     </td>
                     <td className="px-6 py-3">
                       <div className="flex items-center gap-2">
-                        <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{event.author.substring(0,2).toUpperCase()}</AvatarFallback></Avatar>
-                        <span className="font-medium text-foreground text-xs">{event.author}</span>
+                        {(() => {
+                          const m = members.find(x => x.id === event.author);
+                          const name = m ? m.name : event.author;
+                          const initial = m ? (m.avatar || name.substring(0,2).toUpperCase()) : name.substring(0,2).toUpperCase();
+                          return (
+                            <>
+                              <Avatar className="h-6 w-6"><AvatarFallback className="text-[9px] bg-primary/10 text-primary">{initial}</AvatarFallback></Avatar>
+                              <span className="font-medium text-foreground text-xs">{name}</span>
+                            </>
+                          );
+                        })()}
                       </div>
                     </td>
                     <td className="px-6 py-3">
@@ -475,29 +562,63 @@ export default function MarketingCalendarPage() {
             </div>
 
             <div className="grid grid-cols-2 gap-4">
-              {!editingEvent && (
-                <div className="space-y-2">
-                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Date</Label>
-                  <Input type="date" value={formDate} onChange={(e) => setFormDate(e.target.value)} className="bg-background focus-visible:ring-1" />
-                </div>
-              )}
               <div className="space-y-2">
-                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Time</Label>
-                <Input type="time" value={formTime} onChange={(e) => setFormTime(e.target.value)} className="bg-background focus-visible:ring-1" />
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Start Date</Label>
+                <Input type="date" value={formStartDate} onChange={(e) => setFormStartDate(e.target.value)} className="bg-background focus-visible:ring-1" />
               </div>
-              <div className="space-y-2 col-span-2 md:col-span-1">
+              <div className="space-y-2">
+                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">End Date</Label>
+                <Input type="date" value={formEndDate} onChange={(e) => setFormEndDate(e.target.value)} min={formStartDate} className="bg-background focus-visible:ring-1" />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2 col-span-2">
                 <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Author</Label>
-                <Select value={formAuthor} onValueChange={setFormAuthor}>
-                  <SelectTrigger className="bg-background focus:ring-1"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {authors.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
-                    <div className="p-2 border-t mt-1 flex items-center gap-2">
-                      <Input placeholder="New Author" value={newAuthor} onChange={(e) => setNewAuthor(e.target.value)} className="h-8 text-xs" />
-                      <Button size="sm" variant="secondary" onClick={(e) => { e.stopPropagation(); if (newAuthor) { setAuthors([...authors, newAuthor]); setFormAuthor(newAuthor); setNewAuthor(''); }}}>Add</Button>
+                <Popover open={authorPopoverOpen} onOpenChange={setAuthorPopoverOpen}>
+                  <PopoverTrigger asChild>
+                    <Button variant="outline" className="w-full justify-start font-normal bg-background">
+                      {formAuthor ? (
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-5 w-5"><AvatarFallback className="text-[9px]">{members.find(m => m.id === formAuthor)?.avatar || members.find(m => m.id === formAuthor)?.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                          <span>{members.find(m => m.id === formAuthor)?.name}</span>
+                        </div>
+                      ) : 'Select author...'}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-[300px] p-2" align="start">
+                    <div className="max-h-48 overflow-y-auto space-y-1">
+                      {members.map(m => {
+                        const isSelected = formAuthor === m.id;
+                        return (
+                          <div key={m.id}
+                            className={`flex items-center gap-2 p-2 rounded-md hover:bg-muted cursor-pointer transition-colors ${isSelected ? 'bg-muted' : ''}`}
+                            onClick={() => { setFormAuthor(m.id); setAuthorPopoverOpen(false); }}>
+                            <Avatar className="h-5 w-5"><AvatarFallback className="text-[9px]">{m.avatar || m.name.substring(0, 2).toUpperCase()}</AvatarFallback></Avatar>
+                            <span className="text-sm font-medium">{m.name}</span>
+                            {m.role && <span className="text-xs text-muted-foreground ml-auto">{m.role}</span>}
+                          </div>
+                        );
+                      })}
+                      {members.length === 0 && <div className="text-xs text-muted-foreground p-2 text-center">No members found.</div>}
                     </div>
-                  </SelectContent>
-                </Select>
+                    <div className="pt-2 mt-1 border-t flex items-center gap-2">
+                      <Input placeholder="New Author" value={newAuthor} onChange={(e) => setNewAuthor(e.target.value)} className="h-8 text-xs" onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); handleAddMember(e as any); } }} />
+                      <Button size="sm" variant="secondary" className="h-8 text-xs shrink-0" onClick={handleAddMember}>Add</Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Description (Optional)</Label>
+              <textarea 
+                className="flex min-h-[80px] w-full rounded-md border border-input bg-background px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50" 
+                placeholder="Describe the event or post..."
+                value={formDescription} 
+                onChange={(e) => setFormDescription(e.target.value)} 
+              />
             </div>
           </div>
 
@@ -519,8 +640,12 @@ export default function MarketingCalendarPage() {
                 
                 <div className="grid grid-cols-2 gap-y-6 gap-x-4">
                   <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Date & Time</p>
-                    <p className="text-sm font-semibold flex items-center gap-1.5"><Clock className="w-3.5 h-3.5 text-muted-foreground"/> {format(parseISO(viewingEvent.date as string), 'MMM d, yyyy')} &bull; {viewingEvent.time}</p>
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground">Date</p>
+                    <p className="text-sm font-semibold flex items-center gap-1.5">
+                      <CalendarIcon className="w-3.5 h-3.5 text-muted-foreground"/>
+                      {format(parseISO(viewingEvent.startDate || viewingEvent.date as string), 'MMM d, yyyy')}
+                      {viewingEvent.endDate && viewingEvent.endDate !== (viewingEvent.startDate || viewingEvent.date as string) && ` - ${format(parseISO(viewingEvent.endDate), 'MMM d, yyyy')}`}
+                    </p>
                   </div>
                   
                   <div className="space-y-1">
@@ -547,14 +672,31 @@ export default function MarketingCalendarPage() {
                   )}
                 </div>
 
+                {viewingEvent.description && (
+                  <div className="mt-6 pt-6 border-t">
+                    <p className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-2">Description</p>
+                    <p className="text-sm text-foreground/80 whitespace-pre-wrap leading-relaxed">{viewingEvent.description}</p>
+                  </div>
+                )}
+
                 <div className="mt-8 pt-6 border-t">
                   <p className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground mb-3">Assignee / Author</p>
                   <div className="flex items-center gap-3 bg-muted/40 p-3 rounded-lg border border-transparent hover:border-border transition-colors">
-                    <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-background text-primary font-bold">{viewingEvent.author.substring(0,2).toUpperCase()}</AvatarFallback></Avatar>
-                    <div>
-                      <p className="font-bold text-sm text-foreground">{viewingEvent.author}</p>
-                      <p className="text-xs text-muted-foreground">Content Creator</p>
-                    </div>
+                    {(() => {
+                      const m = members.find(x => x.id === viewingEvent.author);
+                      const name = m ? m.name : viewingEvent.author;
+                      const initial = m ? (m.avatar || name.substring(0,2).toUpperCase()) : name.substring(0,2).toUpperCase();
+                      const role = m?.role || 'Content Creator';
+                      return (
+                        <>
+                          <Avatar className="h-10 w-10 border shadow-sm"><AvatarFallback className="bg-background text-primary font-bold">{initial}</AvatarFallback></Avatar>
+                          <div>
+                            <p className="font-bold text-sm text-foreground">{name}</p>
+                            <p className="text-xs text-muted-foreground">{role}</p>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
