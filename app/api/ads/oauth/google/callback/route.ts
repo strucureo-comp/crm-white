@@ -26,8 +26,24 @@ export async function GET(request: NextRequest) {
   }
 
   const tenantId = stateObj.tenant_id;
-  if (!tenantId) {
-    return NextResponse.json({ error: 'Invalid tenant_id in state' }, { status: 400 });
+  const stateNonce = stateObj.nonce;
+
+  if (!tenantId || !stateNonce) {
+    return NextResponse.json({ error: 'Invalid state parameters' }, { status: 400 });
+  }
+
+  // 1. CSRF Validation: Check nonce against the secure cookie
+  const cookieNonce = request.cookies.get('oauth_nonce')?.value;
+  if (!cookieNonce || cookieNonce !== stateNonce) {
+    console.error('CSRF validation failed: nonce mismatch');
+    return NextResponse.redirect(`${baseUrl}/social?error=invalid_csrf_token`);
+  }
+
+  // 2. Tenant Authorization: Ensure the authenticated user actually belongs to this tenant
+  const authorizedCompanyId = request.headers.get('x-company-id');
+  if (authorizedCompanyId && authorizedCompanyId !== tenantId) {
+    console.error('Tenant authorization failed: x-company-id does not match state tenant_id');
+    return NextResponse.redirect(`${baseUrl}/social?error=unauthorized_tenant_access`);
   }
 
   const clientId = process.env.GOOGLE_ADS_CLIENT_ID!;
