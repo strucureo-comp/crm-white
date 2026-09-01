@@ -127,9 +127,25 @@ export const deletePost = async (companyId: string, postId: string) => {
 // --- Helper: Ensure default accounts exist ---
 export const ensureDefaultAccounts = async (companyId: string) => {
   const snapshot = await get(getAccountsRef(companyId));
-  if (!snapshot.exists()) {
-    for (const account of DEFAULT_ACCOUNTS) {
+  const existingPlatforms = new Set<string>();
+
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    
+    // Clean up duplicates if any were created due to race conditions
+    for (const [key, acc] of Object.entries(data) as [string, any][]) {
+      if (existingPlatforms.has(acc.platform)) {
+        await remove(getAccountItemRef(companyId, key));
+      } else {
+        existingPlatforms.add(acc.platform);
+      }
+    }
+  }
+
+  for (const account of DEFAULT_ACCOUNTS) {
+    if (!existingPlatforms.has(account.platform)) {
       await createAccount(companyId, account);
+      existingPlatforms.add(account.platform); // add to set in case of rapid successive calls
     }
   }
 };

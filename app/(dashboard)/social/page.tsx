@@ -317,65 +317,6 @@ export default function SocialPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left Column (2fr) */}
         <div className="lg:col-span-2 space-y-6 min-w-0">
-          {/* Google Ads Connection */}
-          <div className="space-y-4">
-            <h3 className="text-lg font-bold">Advertising Platforms</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <Card className="border shadow-sm overflow-hidden transition-all">
-                {googleAdsAccounts.length > 0 && googleAdsAccounts[0].status === 'connected' ? (
-                  <>
-                    <CardHeader className="p-4 pb-3 border-b bg-muted/10 flex flex-row items-center justify-between space-y-0">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-md flex items-center justify-center bg-blue-600 text-white">
-                          <TrendingUp className="w-4 h-4" />
-                        </div>
-                        <div>
-                          <CardTitle className="text-sm font-bold">Google Ads</CardTitle>
-                          <Badge variant="outline" className="text-[9px] px-1 py-0 bg-emerald-50 text-emerald-700 border-emerald-200 mt-0.5">Connected</Badge>
-                        </div>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 text-xs text-muted-foreground hover:text-rose-600"
-                        onClick={() => handleDisconnectGoogleAds(googleAdsAccounts[0].id)}
-                      >
-                        Disconnect
-                      </Button>
-                    </CardHeader>
-                    <CardContent className="p-4 space-y-4">
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Account Name</p>
-                        <p className="font-semibold text-sm">{googleAdsAccounts[0].account_name}</p>
-                      </div>
-                      <div>
-                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Customer ID</p>
-                        <p className="font-semibold text-sm">{googleAdsAccounts[0].customer_id}</p>
-                      </div>
-                      <Button variant="outline" size="sm" className="w-full text-xs font-semibold shadow-sm h-8 mt-2">
-                        View Campaigns
-                      </Button>
-                    </CardContent>
-                  </>
-                ) : (
-                  <div className="flex flex-col items-center justify-center p-8 text-center h-full space-y-4">
-                    <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center relative">
-                      <TrendingUp className="w-5 h-5 text-muted-foreground opacity-50" />
-                    </div>
-                    <div>
-                      <Badge variant="secondary" className="mb-2">Offline</Badge>
-                      <h4 className="font-bold text-sm">Integrate with Google Ads</h4>
-                      <p className="text-xs text-muted-foreground mt-1 px-4">Connect your Google Ads account to sync campaigns.</p>
-                    </div>
-                    <Button size="sm" className="font-semibold text-xs mt-2" onClick={handleConnectGoogleAds}>
-                      Connect Google Ads
-                    </Button>
-                  </div>
-                )}
-              </Card>
-            </div>
-          </div>
-
           {/* Accounts Grid */}
           <div className="space-y-4">
             <div className="flex items-center justify-between">
