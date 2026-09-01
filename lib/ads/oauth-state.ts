@@ -24,6 +24,7 @@ interface StatePayload {
   w: string; // workspace id
   u: string; // uid
   p: AdPlatform;
+  r?: string; // return_to
   n: string; // nonce
   e: number; // expires at (epoch ms)
 }
@@ -32,6 +33,7 @@ export interface VerifiedState {
   workspaceId: string;
   uid: string;
   platform: AdPlatform;
+  returnTo?: string;
 }
 
 function getSigningKey(): Buffer {
@@ -44,7 +46,7 @@ function getSigningKey(): Buffer {
 }
 
 function sign(body: string): string {
-  return createHmac('sha256', getSigningKey()).update(body).digest('base64url');
+  return createHmac('sha256', new Uint8Array(getSigningKey())).update(body).digest('base64url');
 }
 
 /**
@@ -55,12 +57,14 @@ export async function createOAuthState(
   platform: AdPlatform,
   workspaceId: string,
   uid: string,
+  returnTo?: string,
 ): Promise<string> {
   const nonce = randomBytes(16).toString('base64url');
   const payload: StatePayload = {
     w: workspaceId,
     u: uid,
     p: platform,
+    r: returnTo,
     n: nonce,
     e: Date.now() + STATE_TTL_MS,
   };
@@ -89,8 +93,8 @@ export async function consumeOAuthState(token: string | null): Promise<VerifiedS
   const signature = token.slice(separator + 1);
 
   const expected = sign(body);
-  const providedBuf = Buffer.from(signature);
-  const expectedBuf = Buffer.from(expected);
+  const providedBuf = new Uint8Array(Buffer.from(signature));
+  const expectedBuf = new Uint8Array(Buffer.from(expected));
   if (
     providedBuf.length !== expectedBuf.length ||
     !timingSafeEqual(providedBuf, expectedBuf)
@@ -126,7 +130,7 @@ export async function consumeOAuthState(token: string | null): Promise<VerifiedS
     throw new OAuthStateError('Authorization state failed verification');
   }
 
-  return { workspaceId: payload.w, uid: payload.u, platform: payload.p };
+  return { workspaceId: payload.w, uid: payload.u, platform: payload.p, returnTo: payload.r };
 }
 
 /**

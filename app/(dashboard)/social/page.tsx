@@ -31,6 +31,7 @@ import {
   deleteGoogleAdsAccount,
   type GoogleAdsAccount,
 } from '@/lib/db/ads/api';
+import { startAdOAuth } from '@/lib/ads/client';
 
 const PlatformIcon = ({ platform, className }: { platform: string, className?: string }) => {
   switch (platform) {
@@ -141,6 +142,17 @@ export default function SocialPage() {
 
   const handleLinkAccount = async (platform: SocialPlatform) => {
     if (!workspace?.id) return;
+    
+    if (platform === 'facebook' || platform === 'instagram') {
+      try {
+        const url = await startAdOAuth(workspace.id, 'meta', '/social');
+        window.location.href = url;
+      } catch (err) {
+        toast.error('Failed to initialize Meta connection');
+      }
+      return;
+    }
+
     if (!linkHandle.trim()) {
       toast.error('Please enter your account handle');
       return;

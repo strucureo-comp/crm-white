@@ -8,8 +8,19 @@ import { MetaClientError } from '@/lib/connectors/meta/client';
 import { AdIntegrationError } from '../errors';
 import type { AdAccountRef } from '../types';
 
-/** Read-only scope. Deliberately excludes `ads_management`. */
-const META_SCOPES = ['ads_read'];
+/** Scopes needed for Pages, Instagram, and Ads management */
+const META_SCOPES = [
+  'pages_show_list',
+  'pages_read_engagement',
+  'pages_manage_posts',
+  'pages_manage_metadata',
+  'instagram_basic',
+  'instagram_content_publish',
+  'instagram_manage_comments',
+  'instagram_manage_insights',
+  'ads_management',
+  'ads_read'
+];
 
 export interface MetaAppConfig {
   appId: string;
@@ -24,6 +35,9 @@ function appBaseUrl(): string {
 }
 
 export function metaRedirectUri(): string {
+  if (process.env.META_REDIRECT_URI) {
+    return process.env.META_REDIRECT_URI;
+  }
   return `${appBaseUrl()}/api/ads/oauth/meta/callback`;
 }
 
@@ -177,6 +191,35 @@ export async function listMetaAdAccounts(accessToken: string): Promise<AdAccount
       currency: row.currency,
       inactive: row.account_status !== undefined && row.account_status !== 1,
     }));
+}
+
+export interface MetaPageRef {
+  id: string;
+  name: string;
+  access_token: string;
+  instagram_business_account?: { id: string; username?: string };
+}
+
+export async function listMetaPages(accessToken: string): Promise<MetaPageRef[]> {
+  const config = getMetaAppConfig();
+  const url = new URL(`https://graph.facebook.com/${config.apiVersion}/me/accounts`);
+  url.searchParams.set('access_token', accessToken);
+  url.searchParams.set('fields', 'id,name,access_token,instagram_business_account{id,username}');
+  url.searchParams.set('limit', '100');
+
+  const response = await fetch(url.toString());
+  const body = await response.json().catch(() => null);
+
+  if (!response.ok || body?.error) {
+    throw new MetaClientError(
+      body?.error?.message || 'Could not list Meta Pages',
+      response.status,
+      body?.error?.code,
+      body?.error?.type,
+    );
+  }
+
+  return body?.data || [];
 }
 
 /**

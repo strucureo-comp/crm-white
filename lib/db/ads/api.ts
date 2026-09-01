@@ -7,7 +7,7 @@ export interface GoogleAdsAccount {
   tenant_id: string;
   customer_id: string;
   account_name: string;
-  access_token_encrypted: string;
+  access_token_encrypted?: string;
   refresh_token_encrypted?: string;
   token_expiry?: number;
   scopes?: string;
@@ -32,7 +32,10 @@ export const subscribeToAdsData = (
   const unsubAccounts = onValue(aRef, (snap) => {
     const data = snap.val();
     if (data) {
-      currentAccounts = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+      currentAccounts = Object.keys(data).map(key => {
+        const { access_token_encrypted, refresh_token_encrypted, ...safeData } = data[key];
+        return { id: key, ...safeData } as GoogleAdsAccount;
+      });
     } else {
       currentAccounts = [];
     }
