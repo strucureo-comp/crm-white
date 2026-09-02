@@ -27,7 +27,17 @@ function buildRedirectUrl(
   basePath: string,
   params: Record<string, string>,
 ): string {
-  const origin = (process.env.NEXT_PUBLIC_APP_URL || new URL(req.url).origin).replace(/\/+$/, '');
+  let origin = process.env.NEXT_PUBLIC_APP_URL;
+  if (!origin || (process.env.NODE_ENV === 'production' && origin.includes('localhost'))) {
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+      origin = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    } else if (process.env.VERCEL_URL) {
+      origin = `https://${process.env.VERCEL_URL}`;
+    } else {
+      origin = new URL(req.url).origin;
+    }
+  }
+  origin = origin.replace(/\/+$/, '');
   const url = new URL(`${origin}${basePath}`);
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
   return url.toString();
@@ -67,7 +77,7 @@ async function exchange(platform: AdPlatform, code: string): Promise<Exchanged> 
       accessToken: tokens.accessToken,
       expiresAt: tokens.expiresAt,
       scopes: tokens.scopes,
-      accounts: await listMetaAdAccounts(tokens.accessToken),
+      accounts: await listMetaAdAccounts(tokens.accessToken).catch(() => []),
       pages: await listMetaPages(tokens.accessToken).catch(() => []),
     };
   }
@@ -113,43 +123,6 @@ export async function GET(req: Request, { params }: { params: { platform: string
     if (!code) throw new OAuthStateError('The ad platform did not return an authorization code');
 
     const result = await exchange(verified.platform, code);
-
-    if (result.accounts.length === 0) {
-      await upsertConnection(verified.workspaceId, {
-        platform: verified.platform,
-        status: 'pending_account_selection',
-        accessToken: result.accessToken,
-        refreshToken: result.refreshToken,
-        accessTokenExpiresAt: result.expiresAt,
-        scopes: result.scopes,
-        availableAccounts: [],
-        selectedAccount: null,
-        uid: verified.uid,
-        email: await resolveEmail(verified.uid),
-      });
-      return NextResponse.redirect(
-        campaignsUrl(req, {
-          ads_error:
-            'That account has no ad accounts we can read. Check the permissions and try again.',
-        }),
-      );
-    }
-
-    // A single account needs no picker — select it so the first sync can run.
-    const auto = result.accounts.length === 1 ? result.accounts[0] : null;
-
-    const connection = await upsertConnection(verified.workspaceId, {
-      platform: verified.platform,
-      status: auto ? 'connected' : 'pending_account_selection',
-      accessToken: result.accessToken,
-      refreshToken: result.refreshToken,
-      accessTokenExpiresAt: result.expiresAt,
-      scopes: result.scopes,
-      availableAccounts: result.accounts,
-      selectedAccount: auto,
-      uid: verified.uid,
-      email: await resolveEmail(verified.uid),
-    });
 
     if (verified.platform === 'meta' && result.pages && result.pages.length > 0) {
       const socialRef = getAdminDatabase().ref(`social_accounts/${verified.workspaceId}`);
@@ -225,6 +198,57 @@ export async function GET(req: Request, { params }: { params: { platform: string
         }
       }
     }
+
+    const hasPages = Boolean(verified.platform === 'meta' && result.pages && result.pages.length > 0);
+    const isSocialOrigin = verified.returnTo === '/social';
+
+    if (result.accounts.length === 0) {
+      await upsertConnection(verified.workspaceId, {
+        platform: verified.platform,
+        status: hasPages ? 'connected' : 'pending_account_selection',
+        accessToken: result.accessToken,
+        refreshToken: result.refreshToken,
+        accessTokenExpiresAt: result.expiresAt,
+        scopes: result.scopes,
+        availableAccounts: [],
+        selectedAccount: null,
+        uid: verified.uid,
+        email: await resolveEmail(verified.uid),
+      });
+
+      invalidateCampaignFeed(verified.workspaceId);
+
+      if (isSocialOrigin || hasPages) {
+        return NextResponse.redirect(
+          returnUrl(req, verified.returnTo || '/social', {
+            ads_connected: verified.platform,
+          }),
+        );
+      }
+
+      return NextResponse.redirect(
+        campaignsUrl(req, {
+          ads_error:
+            'That account has no ad accounts we can read. Check the permissions and try again.',
+        }),
+      );
+    }
+
+    // A single account needs no picker — select it so the first sync can run.
+    const auto = result.accounts.length === 1 ? result.accounts[0] : null;
+
+    const connection = await upsertConnection(verified.workspaceId, {
+      platform: verified.platform,
+      status: auto ? 'connected' : 'pending_account_selection',
+      accessToken: result.accessToken,
+      refreshToken: result.refreshToken,
+      accessTokenExpiresAt: result.expiresAt,
+      scopes: result.scopes,
+      availableAccounts: result.accounts,
+      selectedAccount: auto,
+      uid: verified.uid,
+      email: await resolveEmail(verified.uid),
+    });
 
     invalidateCampaignFeed(verified.workspaceId);
 

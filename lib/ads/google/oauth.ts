@@ -22,7 +22,17 @@ export interface GoogleAppConfig {
 }
 
 function appBaseUrl(): string {
-  return (process.env.NEXT_PUBLIC_APP_URL || '').replace(/\/+$/, '');
+  let url = process.env.NEXT_PUBLIC_APP_URL || '';
+  if (!url || (process.env.NODE_ENV === 'production' && url.includes('localhost'))) {
+    if (process.env.VERCEL_PROJECT_PRODUCTION_URL) {
+      url = `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`;
+    } else if (process.env.VERCEL_URL) {
+      url = `https://${process.env.VERCEL_URL}`;
+    } else {
+      url = 'https://crm.t4gverse.com';
+    }
+  }
+  return url.replace(/\/+$/, '');
 }
 
 export function googleRedirectUri(): string {

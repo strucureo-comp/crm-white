@@ -2,7 +2,15 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 const publicPaths = ['/login', '/register', '/forgot-password', '/setup'];
-const publicApiPaths = ['/api/enquiries', '/api/auth/session'];
+const publicApiPaths = [
+  '/api/enquiries',
+  '/api/auth/session',
+  '/api/ads/',
+  '/api/cron/',
+  '/api/health',
+  '/api/payments/webhook',
+  '/api/connectors/whatsapp/webhook',
+];
 
 
 
