@@ -26,6 +26,12 @@ import {
   type SocialPost as SocialPostType,
   type SocialPlatform,
 } from '@/lib/db/social/api';
+import {
+  subscribeToAdsData,
+  deleteGoogleAdsAccount,
+  type GoogleAdsAccount,
+} from '@/lib/db/ads/api';
+import { startAdOAuth } from '@/lib/ads/client';
 
 const PlatformIcon = ({ platform, className }: { platform: string, className?: string }) => {
   switch (platform) {
@@ -51,6 +57,7 @@ export default function SocialPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
+  const [googleAdsAccounts, setGoogleAdsAccounts] = useState<GoogleAdsAccount[]>([]);
   const [posts, setPosts] = useState<SocialPostType[]>([]);
 
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -70,20 +77,25 @@ export default function SocialPage() {
 
   useEffect(() => {
     if (!workspace?.id) return;
-    let unsubscribe: (() => void) | undefined;
+    let unsubscribeSocial: (() => void) | undefined;
+    let unsubscribeAds: (() => void) | undefined;
 
     const init = async () => {
       await ensureDefaultAccounts(workspace?.id!);
-      unsubscribe = subscribeToSocialData(workspace?.id!, (data) => {
+      unsubscribeSocial = subscribeToSocialData(workspace?.id!, (data) => {
         setAccounts(data.accounts);
         setPosts(data.posts);
         setIsLoading(false);
+      });
+      unsubscribeAds = subscribeToAdsData(workspace?.id!, (data) => {
+        setGoogleAdsAccounts(data);
       });
     };
     init();
 
     return () => {
-      if (unsubscribe) unsubscribe();
+      if (unsubscribeSocial) unsubscribeSocial();
+      if (unsubscribeAds) unsubscribeAds();
     };
   }, [workspace?.id]);
 
@@ -130,6 +142,17 @@ export default function SocialPage() {
 
   const handleLinkAccount = async (platform: SocialPlatform) => {
     if (!workspace?.id) return;
+    
+    if (platform === 'facebook' || platform === 'instagram') {
+      try {
+        const url = await startAdOAuth(workspace.id, 'meta', '/social');
+        window.location.href = url;
+      } catch (err) {
+        toast.error('Failed to initialize Meta connection');
+      }
+      return;
+    }
+
     if (!linkHandle.trim()) {
       toast.error('Please enter your account handle');
       return;
@@ -171,6 +194,22 @@ export default function SocialPage() {
       toast.success(`${platform} account disconnected.`);
     } catch {
       toast.error('Failed to disconnect account');
+    }
+  };
+
+  const handleConnectGoogleAds = () => {
+    if (!workspace?.id) return;
+    window.location.href = `/api/ads/oauth/google/connect?tenant_id=${workspace.id}`;
+  };
+
+  const handleDisconnectGoogleAds = async (accountId: string) => {
+    if (!workspace?.id) return;
+    if (!confirm('Disconnect your Google Ads account?')) return;
+    try {
+      await deleteGoogleAdsAccount(workspace.id, accountId);
+      toast.success('Google Ads account disconnected.');
+    } catch {
+      toast.error('Failed to disconnect Google Ads account');
     }
   };
 

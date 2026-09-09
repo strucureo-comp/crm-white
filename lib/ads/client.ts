@@ -106,9 +106,12 @@ export function fetchCampaignFeed(params: CampaignFeedParams): Promise<CampaignF
 }
 
 /** Returns the provider consent URL to navigate to. */
-export async function startAdOAuth(workspaceId: string, platform: AdPlatform): Promise<string> {
+export async function startAdOAuth(workspaceId: string, platform: AdPlatform, returnTo?: string): Promise<string> {
+  const query = new URLSearchParams({ workspaceId });
+  if (returnTo) query.set('returnTo', returnTo);
+  
   const { url } = await authedFetch<{ url: string }>(
-    `/api/ads/oauth/${platform}/start?workspaceId=${encodeURIComponent(workspaceId)}`,
+    `/api/ads/oauth/${platform}/start?${query.toString()}`,
   );
   return url;
 }

@@ -29,7 +29,9 @@ export async function GET(req: Request, { params }: { params: { platform: string
       return NextResponse.json({ error: 'Unknown ad platform' }, { status: 404 });
     }
 
-    const workspaceId = new URL(req.url).searchParams.get('workspaceId');
+    const searchParams = new URL(req.url).searchParams;
+    const workspaceId = searchParams.get('workspaceId');
+    const returnTo = searchParams.get('returnTo') || undefined;
     const access = await requireWorkspaceAccess(req, workspaceId);
     requireManageRole(access);
 
@@ -44,7 +46,7 @@ export async function GET(req: Request, { params }: { params: { platform: string
       );
     }
 
-    const state = await createOAuthState(platform, access.workspaceId, access.uid);
+    const state = await createOAuthState(platform, access.workspaceId, access.uid, returnTo);
     const url = platform === 'meta' ? buildMetaAuthUrl(state) : buildGoogleAuthUrl(state);
 
     return NextResponse.json({ url });

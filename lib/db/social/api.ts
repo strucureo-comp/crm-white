@@ -15,6 +15,12 @@ export interface SocialAccount {
   impressions: number;
   growth: number;
   handle?: string;
+  
+  // OAuth credentials (should never be sent to the client)
+  accessToken?: string;
+  refreshToken?: string;
+  tokenExpiresAt?: number;
+  externalAccountId?: string;
 }
 
 export interface SocialPost {
@@ -49,6 +55,7 @@ const DEFAULT_ACCOUNTS: Omit<SocialAccount, 'id'>[] = [
   { platform: 'linkedin', connected: false, followers: 0, engagement: 0, postsThisMonth: 0, impressions: 0, growth: 0 },
   { platform: 'twitter', connected: false, followers: 0, engagement: 0, postsThisMonth: 0, impressions: 0, growth: 0 },
   { platform: 'instagram', connected: false, followers: 0, engagement: 0, postsThisMonth: 0, impressions: 0, growth: 0 },
+  { platform: 'facebook', connected: false, followers: 0, engagement: 0, postsThisMonth: 0, impressions: 0, growth: 0 },
 ];
 
 // --- Subscriptions ---
@@ -72,7 +79,10 @@ export const subscribeToSocialData = (
   const unsubAccounts = onValue(aRef, (snap) => {
     const data = snap.val();
     if (data) {
-      currentAccounts = Object.keys(data).map(key => ({ id: key, ...data[key] }));
+      currentAccounts = Object.keys(data).map(key => {
+        const { accessToken, refreshToken, tokenExpiresAt, ...safeData } = data[key];
+        return { id: key, ...safeData };
+      });
     } else {
       currentAccounts = [];
     }
@@ -127,9 +137,25 @@ export const deletePost = async (companyId: string, postId: string) => {
 // --- Helper: Ensure default accounts exist ---
 export const ensureDefaultAccounts = async (companyId: string) => {
   const snapshot = await get(getAccountsRef(companyId));
-  if (!snapshot.exists()) {
-    for (const account of DEFAULT_ACCOUNTS) {
+  const existingPlatforms = new Set<string>();
+
+  if (snapshot.exists()) {
+    const data = snapshot.val();
+    
+    // Clean up duplicates if any were created due to race conditions
+    for (const [key, acc] of Object.entries(data) as [string, any][]) {
+      if (existingPlatforms.has(acc.platform)) {
+        await remove(getAccountItemRef(companyId, key));
+      } else {
+        existingPlatforms.add(acc.platform);
+      }
+    }
+  }
+
+  for (const account of DEFAULT_ACCOUNTS) {
+    if (!existingPlatforms.has(account.platform)) {
       await createAccount(companyId, account);
+      existingPlatforms.add(account.platform); // add to set in case of rapid successive calls
     }
   }
 };
