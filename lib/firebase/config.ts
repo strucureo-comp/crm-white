@@ -32,8 +32,45 @@ function getAppInstance(): FirebaseApp {
   return firebaseApp;
 }
 
-export const auth: Auth = getAuth(getAppInstance());
-export const firestore: Firestore = getFirestore(getAppInstance());
-export const storage: FirebaseStorage = getStorage(getAppInstance());
-export const database: Database = getDatabase(getAppInstance());
+export function getAuthInstance(): Auth {
+  if (!firebaseAuth) {
+    firebaseAuth = getAuth(getAppInstance());
+  }
+  return firebaseAuth;
+}
+
+export function getFirestoreInstance(): Firestore {
+  if (!firebaseFirestore) {
+    firebaseFirestore = getFirestore(getAppInstance());
+  }
+  return firebaseFirestore;
+}
+
+export function getStorageInstance(): FirebaseStorage {
+  if (!firebaseStorage) {
+    firebaseStorage = getStorage(getAppInstance());
+  }
+  return firebaseStorage;
+}
+
+export function getDatabaseInstance(): Database {
+  if (!firebaseDatabase) {
+    firebaseDatabase = getDatabase(getAppInstance());
+  }
+  return firebaseDatabase;
+}
+
+// Backward-compatible getters — these look like constants but initialize lazily
+export const auth: Auth = new Proxy({} as Auth, {
+  get: (_, prop) => (getAuthInstance() as any)[prop],
+});
+export const firestore: Firestore = new Proxy({} as Firestore, {
+  get: (_, prop) => (getFirestoreInstance() as any)[prop],
+});
+export const storage: FirebaseStorage = new Proxy({} as FirebaseStorage, {
+  get: (_, prop) => (getStorageInstance() as any)[prop],
+});
+export const database: Database = new Proxy({} as Database, {
+  get: (_, prop) => (getDatabaseInstance() as any)[prop],
+});
 export { getAppInstance as app };
