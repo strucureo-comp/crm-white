@@ -402,7 +402,7 @@ export default function ProjectsPage() {
                                     <span className="font-medium">{project.endDate ? `Due ${new Date(project.endDate).toLocaleDateString()}` : 'No due date'}</span>
 
                                     <div className="flex -space-x-2">
-                                      {project.members.map(mid => {
+                                      {(project.members || []).map(mid => {
                                         const mem = members.find(m => m.id === mid);
                                         if (!mem) return null;
                                         return (
@@ -639,7 +639,7 @@ export default function ProjectsPage() {
                   <div className="space-y-3">
                     <h4 className="text-xs font-medium text-muted-foreground border-b pb-2">Team</h4>
                     <div className="flex flex-wrap gap-2">
-                      {selectedProject.members.map(mid => {
+                      {(selectedProject.members || []).map(mid => {
                         const mem = members.find(m => m.id === mid);
                         if (!mem) return null;
                         return (
@@ -751,7 +751,7 @@ export default function ProjectsPage() {
                                         </Button>
                                       </DropdownMenuTrigger>
                                       <DropdownMenuContent className="w-56 p-2 space-y-1" align="start">
-                                        {selectedProject.members.map(mid => {
+                                        {(selectedProject.members || []).map(mid => {
                                           const m = members.find(mem => mem.id === mid);
                                           if (!m) return null;
                                           const isSelected = taskFormOwners.includes(m.id);
@@ -968,7 +968,7 @@ export default function ProjectsPage() {
                             <div className="space-y-2">
                               <Label className="text-xs uppercase tracking-wider text-muted-foreground">Select Members</Label>
                               <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-muted/5 max-h-[140px] overflow-y-auto">
-                                {selectedProject.members.map(mid => {
+                                {(selectedProject.members || []).map(mid => {
                                   const mem = members.find(m => m.id === mid);
                                   if (!mem) return null;
                                   const isSelected = noteFormVisibleTo.includes(mid);
