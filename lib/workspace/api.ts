@@ -313,14 +313,15 @@ export async function ensureWorkspaceOwnerMember(
       }
     }
 
-    // 4. If owner is not in project_members, insert owner
+    // 4. If owner is not in project_members, insert or update owner
     if (ownerEmail || ownerName) {
-      const ownerExists = existingMembers.some(m =>
+      const existingOwnerMember = existingMembers.find(m =>
         (ownerEmail && m.email?.trim().toLowerCase() === ownerEmail.trim().toLowerCase()) ||
-        (m.name?.trim().toLowerCase() === ownerName.trim().toLowerCase() && (m.role?.toLowerCase() === 'owner' || m.role?.toLowerCase() === 'admin'))
+        (m.role?.toLowerCase() === 'owner') ||
+        (m.name?.trim().toLowerCase() === 'workspace owner')
       );
 
-      if (!ownerExists) {
+      if (!existingOwnerMember) {
         const initials = (ownerName || 'OW').split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
         const newRef = push(projMembersRef);
         await set(newRef, {
@@ -331,6 +332,36 @@ export async function ensureWorkspaceOwnerMember(
           avatar: initials,
           projectIds: []
         });
+      } else {
+        let needsUpdate = false;
+        const updates: any = {};
+        
+        if (existingOwnerMember.name === 'Workspace Owner' && ownerName && ownerName !== 'Workspace Owner') {
+          updates.name = ownerName;
+          updates.avatar = ownerName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+          needsUpdate = true;
+        }
+        
+        if (!existingOwnerMember.email && ownerEmail) {
+          updates.email = ownerEmail;
+          needsUpdate = true;
+        }
+        
+        if (needsUpdate) {
+          await update(ref(database, `project_members/${workspaceId}/${existingOwnerMember.id}`), updates);
+        }
+      }
+    }
+
+    // Clean up any duplicate owner records
+    const ownerMembers = existingMembers.filter(m => 
+      m.role?.toLowerCase() === 'owner' || m.name?.trim().toLowerCase() === 'workspace owner'
+    );
+    if (ownerMembers.length > 1) {
+      // Keep the one with an email or the first one if none have emails
+      ownerMembers.sort((a, b) => (a.email ? -1 : (b.email ? 1 : 0)));
+      for (let i = 1; i < ownerMembers.length; i++) {
+        await remove(ref(database, `project_members/${workspaceId}/${ownerMembers[i].id}`));
       }
     }
 
