@@ -43,3 +43,13 @@ export function getAdminDatabase(): Database {
   }
   return adminDbInstance;
 }
+
+export async function verifyFirebaseToken(token: string) {
+  try {
+    const decoded = await getAdminAuth().verifyIdToken(token);
+    return decoded;
+  } catch (error) {
+    console.error('Error verifying token:', error);
+    return null;
+  }
+}

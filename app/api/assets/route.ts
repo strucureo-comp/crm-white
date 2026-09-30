@@ -82,6 +82,7 @@ export async function POST(req: Request) {
 
     const connection = await getConnection(access.workspaceId);
     if (!connection) {
+      console.warn(`[assets:upload] No connection found for workspace ${access.workspaceId}`);
       return NextResponse.json(
         { error: 'Google Drive is not connected. Please connect first.', code: 'not_connected' },
         { status: 400 },
@@ -107,28 +108,83 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'File type not allowed' }, { status: 400 });
     }
 
+    console.log(`[assets:upload] User: ${access.uid}, Workspace: ${access.workspaceId}, File: ${file.name}, Size: ${file.size}, Mime: ${file.type}, Folder: ${folder}`);
+    console.log(`[assets:upload] Drive Connected: true, Access Token exists: ${!!connection.accessToken}, Refresh Token exists: ${!!connection.refreshToken}`);
+
     // Get a valid access token (refresh if needed)
     let accessToken = connection.accessToken;
-    try {
-      if (connection.accessTokenExpiresAt && Date.now() > connection.accessTokenExpiresAt) {
+    if (connection.accessTokenExpiresAt && Date.now() > connection.accessTokenExpiresAt) {
+      console.log(`[assets:upload] Access token expired. Refreshing...`);
+      try {
         accessToken = await refreshGoogleDriveAccessToken(connection.refreshToken);
+        
+        // Update connection with new access token
+        const { upsertConnection } = await import('@/lib/assets/google-drive');
+        await upsertConnection(access.workspaceId, {
+          accessToken: accessToken,
+          refreshToken: connection.refreshToken,
+          scopes: connection.scopes,
+          uid: connection.uid,
+          email: connection.email,
+          driveFolderId: connection.driveFolderId,
+        });
+      } catch (err) {
+        console.error(`[assets:upload] Token refresh failed:`, err);
+        return NextResponse.json(
+          { error: 'Drive connection expired. Please reconnect.', code: 'reauth_required' },
+          { status: 401 },
+        );
       }
-    } catch {
-      return NextResponse.json(
-        { error: 'Drive connection expired. Please reconnect.', code: 'reauth_required' },
-        { status: 401 },
-      );
     }
 
     // Determine parent folder: use workspace's dedicated folder or root
-    const parentFolderId = connection.driveFolderId || undefined;
+    let parentFolderId = connection.driveFolderId || undefined;
+
+    // Resolve specific subfolder if provided (e.g. "Product screenshots")
+    if (folder && folder !== 'Uncategorized') {
+      try {
+        // Search for the folder by name
+        let q = `mimeType='application/vnd.google-apps.folder' and name='${folder.replace(/'/g, "\\'")}' and trashed=false`;
+        if (parentFolderId) {
+          q += ` and '${parentFolderId}' in parents`;
+        }
+
+        const params = new URLSearchParams({
+          q,
+          fields: 'files(id, name)',
+          pageSize: '1'
+        });
+
+        const searchRes = await fetch(`https://www.googleapis.com/drive/v3/files?${params}`, {
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (searchRes.ok) {
+          const searchData = await searchRes.json();
+          if (searchData.files && searchData.files.length > 0) {
+            parentFolderId = searchData.files[0].id;
+          } else {
+            // Folder doesn't exist, create it
+            const newFolder = await createDriveFolder(accessToken, folder, parentFolderId);
+            parentFolderId = newFolder.id;
+          }
+        }
+      } catch (err) {
+        console.error(`[assets:upload] Failed to resolve subfolder '${folder}':`, err);
+        // Continue with the parent folder if subfolder resolution fails
+      }
+    }
+
+    console.log(`[assets:upload] Target Google Drive Folder ID: ${parentFolderId || 'root'}`);
 
     // Upload file to Google Drive via multipart upload
     const fileBuffer = Buffer.from(await file.arrayBuffer());
-    const metadata = {
+    const metadata: Record<string, any> = {
       name: file.name,
-      parents: parentFolderId ? [parentFolderId] : undefined,
     };
+    if (parentFolderId) {
+      metadata.parents = [parentFolderId];
+    }
 
     const boundary = `----FormBoundary${Date.now()}`;
     const parts: Buffer[] = [];
@@ -153,7 +209,7 @@ export async function POST(req: Request) {
     const body = Buffer.concat(parts);
 
     const uploadResponse = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart',
+      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webViewLink,thumbnailLink',
       {
         method: 'POST',
         headers: {
@@ -167,7 +223,25 @@ export async function POST(req: Request) {
     if (!uploadResponse.ok) {
       const errorBody = await uploadResponse.text().catch(() => '');
       console.error('[assets:upload] Drive upload failed:', uploadResponse.status, errorBody);
-      return NextResponse.json({ error: 'Failed to upload to Google Drive' }, { status: 500 });
+      
+      let errorMsg = 'Failed to upload to Google Drive';
+      let statusCode = 500;
+      
+      if (uploadResponse.status === 401) {
+        errorMsg = 'Google Drive token invalid or expired.';
+        statusCode = 401;
+      } else if (uploadResponse.status === 403) {
+        errorMsg = 'Insufficient permission to upload to Google Drive.';
+        statusCode = 403;
+      } else if (uploadResponse.status === 404) {
+        errorMsg = 'Target Google Drive folder not found.';
+        statusCode = 404;
+      } else if (uploadResponse.status === 400) {
+        errorMsg = 'Invalid upload request sent to Google Drive.';
+        statusCode = 400;
+      }
+      
+      return NextResponse.json({ error: errorMsg, details: errorBody }, { status: statusCode });
     }
 
     const driveFile = (await uploadResponse.json()) as {
@@ -179,23 +253,28 @@ export async function POST(req: Request) {
       thumbnailLink?: string;
     };
 
+    console.log(`[assets:upload] Successfully uploaded to Drive. File ID: ${driveFile.id}`);
+
     // Store metadata in database
-    const asset = await createAsset(access.workspaceId, {
+    const assetData: any = {
       name: file.name,
       mimeType: file.type,
       size: file.size,
       folder,
       driveFileId: driveFile.id,
-      driveViewLink: driveFile.webViewLink,
-      thumbnailLink: driveFile.thumbnailLink,
       uid: access.uid,
-    });
+    };
+    
+    if (driveFile.webViewLink) assetData.driveViewLink = driveFile.webViewLink;
+    if (driveFile.thumbnailLink) assetData.thumbnailLink = driveFile.thumbnailLink;
+
+    const asset = await createAsset(access.workspaceId, assetData);
 
     return NextResponse.json({ asset }, { status: 201 });
   } catch (error) {
     const denied = workspaceAccessResponse(error);
     if (denied) return denied;
-    console.error('[assets:upload]', error);
-    return NextResponse.json({ error: 'Failed to upload asset' }, { status: 500 });
+    console.error('[assets:upload] Internal Error:', error instanceof Error ? error.stack : error);
+    return NextResponse.json({ error: 'Failed to upload asset (Internal Error)' }, { status: 500 });
   }
 }

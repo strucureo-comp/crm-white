@@ -25,18 +25,38 @@ export async function GET(req: Request) {
 
     // Try to get account info if token is valid
     let accountInfo: { displayName?: string; emailAddress?: string } | undefined;
+    let isConnected = true;
+
     try {
       const about = await getDriveAbout(connection.accessToken);
       accountInfo = about.user;
     } catch {
       // Token may be expired — try refresh
       try {
-        const newAccessToken = await refreshGoogleDriveAccessToken(connection.accessToken);
+        const newAccessToken = await refreshGoogleDriveAccessToken(connection.refreshToken);
         const about = await getDriveAbout(newAccessToken);
         accountInfo = about.user;
-      } catch {
-        // Connection may be invalid
+        
+        // Update the refreshed access token in the DB
+        const { upsertConnection } = await import('@/lib/assets/google-drive');
+        await upsertConnection(access.workspaceId, {
+          accessToken: newAccessToken,
+          refreshToken: connection.refreshToken,
+          scopes: connection.scopes,
+          uid: connection.uid,
+          email: connection.email,
+          driveFolderId: connection.driveFolderId,
+        });
+      } catch (err) {
+        // Connection may be invalid or revoked
+        isConnected = false;
+        const { deleteConnection } = await import('@/lib/assets/google-drive');
+        await deleteConnection(access.workspaceId);
       }
+    }
+
+    if (!isConnected) {
+      return NextResponse.json({ connected: false });
     }
 
     return NextResponse.json({

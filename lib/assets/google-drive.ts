@@ -22,7 +22,7 @@ function appBaseUrl(): string {
 }
 
 export function googleDriveRedirectUri(): string {
-  return `${appBaseUrl()}/api/assets/callback`;
+  return `${appBaseUrl()}/api/auth/google/callback`;
 }
 
 export function isGoogleDriveConfigured(): boolean {
